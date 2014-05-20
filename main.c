@@ -78,6 +78,18 @@ void init_gpio() {
 	);
 
 	GPIO_setAsPeripheralModuleFunctionOutputPin(LED_PORT, LED_BLANK);
+
+
+	//P4SEL = BIT4 | BIT5;                      // P3.3,4 = USCI_A0 TXD/RXD
+
+		GPIO_setAsPeripheralModuleFunctionOutputPin(
+				GPIO_PORT_P4,
+				GPIO_PIN4
+		);
+		GPIO_setAsPeripheralModuleFunctionInputPin(
+				GPIO_PORT_P4,
+				GPIO_PIN5
+		);
 }
 
 void init_clocks() {
@@ -160,20 +172,33 @@ void init_clocks() {
 }
 
 void init_timers() {
-//	TIMER_A_configureContinuousMode(
-//		TIMER_A0_BASE,
-//		TIMER_A_CLOCKSOURCE_ACLK,
-//		TIMER_A_CLOCKSOURCE_DIVIDER_1,
-//		TIMER_A_TAIE_INTERRUPT_ENABLE,
-//		TIMER_A_DO_CLEAR
-//	);
-//
-//	TIMER_A_clearTimerInterruptFlag(TIMER_A0_BASE);
-//
-//	TIMER_A_startCounter(TIMER_A0_BASE, TIMER_A_CONTINUOUS_MODE);
-
 
 }
+
+void init_serial() {
+	USCI_A_UART_disable(USCI_A1_BASE);
+
+		USCI_A_UART_initAdvance(
+				USCI_A1_BASE,
+				USCI_A_UART_CLOCKSOURCE_ACLK,
+				3,
+				0,
+				3,
+				USCI_A_UART_NO_PARITY,
+				USCI_A_UART_LSB_FIRST,
+				USCI_A_UART_ONE_STOP_BIT,
+				USCI_A_UART_MODE,
+				USCI_A_UART_LOW_FREQUENCY_BAUDRATE_GENERATION
+		);
+
+		USCI_A_UART_enable(USCI_A1_BASE);
+
+		USCI_A_UART_enableInterrupt(
+				USCI_A1_BASE,
+				USCI_A_UART_RECEIVE_INTERRUPT
+		);
+}
+
 
 int main( void )
 {
@@ -183,20 +208,22 @@ int main( void )
 	init_gpio();
 	init_clocks();
 	init_timers();
+	init_serial();
 
 	led_display_bits(values);
-	// uint8_t duty = 0;
+	//led_enable(5);
+	led_disable();
 
+	  __bis_SR_register(LPM3_bits | GIE);       // Enter LPM3, interrupts enabled
 	while (1) {
 		// LPM3
 		// __bis_SR_register(LPM3_bits + GIE);
 //		led_enable(duty++);
 //		duty %= 10;
 //		delay(500);
-		led_enable(5);
+//		led_enable(5);
 		__bis_SR_register(LPM3_bits + GIE);
 	}
-
 }
 
 void delay(uint16_t ms)
@@ -293,3 +320,19 @@ void NMI_ISR(void)
 //     default: _never_executed();
 //    }
 //}
+
+// Echo back RXed character, confirm TX buffer is ready first
+#pragma vector=USCI_A1_VECTOR
+__interrupt void USCI_A1_ISR(void)
+{
+  switch(__even_in_range(UCA1IV,4))
+  {
+  case 0:break;                             // Vector 0 - no interrupt
+  case 2:                                   // Vector 2 - RXIFG
+    while (!(UCA1IFG&UCTXIFG));             // USCI_A1 TX buffer ready?
+    UCA1TXBUF = UCA1RXBUF;                  // TX -> RXed character
+    break;
+  case 4:break;                             // Vector 4 - TXIFG
+  default: break;
+  }
+}
