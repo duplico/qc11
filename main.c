@@ -10,41 +10,47 @@
 #include <stdint.h>
 #include "driverlib.h"
 
+#define WRITE_IF(port, pin, val) if (val) GPIO_setOutputHighOnPin(port, pin); else GPIO_setOutputLowOnPin(port, pin);
+#define PULSE(port, pin) do { GPIO_setOutputHighOnPin(port, pin); GPIO_setOutputLowOnPin(port, pin); } while (0);
+
 // For clock initialization:
 #define UCS_XT1_TIMEOUT 50000
 #define UCS_XT2_TIMEOUT 50000
-#define UCS_XT1_CRYSTAL_FREQUENCY    32768
-#define UCS_XT2_CRYSTAL_FREQUENCY   16000000
+#define UCS_XT1_CRYSTAL_FREQUENCY	32768
+#define UCS_XT2_CRYSTAL_FREQUENCY	16000000
+#define MCLK_DESIRED_FREQUENCY_IN_KHZ 8000
+#define MCLK_FLLREF_RATIO MCLK_DESIRED_FREQUENCY_IN_KHZ / (UCS_REFOCLK_FREQUENCY / 1024)
 uint8_t returnValue = 0;
 uint32_t clockValue;
 // Status of oscillator fault flags:
 uint16_t status;
 
 //Define our pins
-#define DATA BIT5 // DS -> 1.0
-#define CLOCK BIT4 // SH_CP -> 1.4
-#define LATCH BIT7 // ST_CP -> 1.5
-#define BLANK BIT3 // OE -> 1.6
-// The OE pin can be tied directly to ground, but controlling
-// it from the MCU lets you turn off the entire array without
-// zeroing the register
+#define LED_PORT	GPIO_PORT_P1
+#define LED_DATA	GPIO_PIN5
+#define LED_CLOCK	GPIO_PIN4
+#define LED_LATCH	GPIO_PIN7
+#define LED_BLANK	GPIO_PIN3
 
 // Declare functions
-void delay ( unsigned int );
-void pulseClock ( void );
-void shiftOut ( uint16_t* );
-void enable ( void );
-void disable ( void );
-void init ( void );
-void pinWrite ( uint16_t, uint16_t );
+void delay(unsigned int);
+void led_enable(uint16_t);
+void led_disable(void);
+void led_display_bits(uint16_t*);
 
 uint16_t values[5] = {65535, 65535, 65535, 65535, 65535};
 uint16_t zeroes[5] = {0, 0, 0, 0, 0};
 
-int main( void )
-{
-	// Stop watchdog timer to prevent time out reset
+void init_watchdog() {
 	WDT_A_hold(WDT_A_BASE);
+}
+
+void init_power() {
+	// Set Vcore to 1.8 V - NB: allows MCLK up to 8 MHz only
+	PMM_setVCore(PMM_CORE_LEVEL_0);
+}
+
+void init_gpio() {
 
 	// Start out by turning off all the pins.
 	P1DIR = 0xFF;
@@ -60,87 +66,230 @@ int main( void )
 	P6DIR = 0xFF;
 	P6OUT = 0x00;
 
-	P1DIR |= (DATA + CLOCK + LATCH + BLANK);  // Setup pins as outputs
+	GPIO_setAsPeripheralModuleFunctionOutputPin(
+			GPIO_PORT_P5,
+			GPIO_PIN2 + GPIO_PIN3 // XT2
+	   // + GPIO_PIN4 + GPIO_PIN5 // XT1
+	);
 
-	P5SEL = BIT2 + BIT3 + BIT4 + BIT5;
-	UCSCTL4 |= SELA_0 + SELS_5 + SELM_5;
-	UCSCTL6 &= ~XT2BYPASS;
+	GPIO_setAsOutputPin(
+			LED_PORT,
+			LED_DATA + LED_CLOCK + LED_LATCH // + LED_BLANK
+	);
 
-
-
-	enable(); // Enable output (set blank low)
-
-	for(;;){
-	  shiftOut(values);
-	  delay(100);
-	  shiftOut(zeroes);
-	  delay(100);
-	}
+	GPIO_setAsPeripheralModuleFunctionOutputPin(LED_PORT, LED_BLANK);
 }
 
-// Delays by the specified Milliseconds
-// thanks to:
-// http://www.threadabort.com/archive/2010/09/05/msp430-delay-function-like-the-arduino.aspx
+void init_clocks() {
+
+	UCS_setExternalClockSource(
+			UCS_XT1_CRYSTAL_FREQUENCY,
+			UCS_XT2_CRYSTAL_FREQUENCY
+	);
+
+	// Initialize XT1 at 32.768KHz
+//	returnValue = UCS_LFXT1StartWithTimeout(
+//			UCS_XT1_DRIVE3, // MAX POWER
+//			UCX_XCAP_1,		// 5.5 pF, closest to 4 pF of crystal.
+//			UCS_XT1_TIMEOUT
+//	);
+
+	// Turn off XT1 because it's soldered on backwards. TODO
+	UCS_XT1Off();
+
+	// Init XT2:
+	returnValue = UCS_XT2StartWithTimeout(
+			UCS_XT2DRIVE_8MHZ_16MHZ,
+			UCS_XT2_TIMEOUT
+	);
+
+	// Setup the clocks:
+
+	// Select XT1 as ACLK source
+//	UCS_clockSignalInit(
+//			UCS_ACLK,
+//			UCS_XT1CLK_SELECT,
+//			UCS_CLOCK_DIVIDER_1
+//	);
+
+	// Never mind, actually use REFO because the crystal is in backwards.
+	UCS_clockSignalInit(
+			UCS_ACLK,
+			UCS_REFOCLK_SELECT,
+			UCS_CLOCK_DIVIDER_1
+	);
+
+	//Select XT2 as SMCLK source
+	UCS_clockSignalInit(
+			UCS_SMCLK,
+			UCS_XT2CLK_SELECT,
+			UCS_CLOCK_DIVIDER_2 // Divide by 2 to get 8 MHz.
+	);
+
+	// Select REFO as the input to the FLL reference.
+	// TODO: once the crystal is in correctly, we can go back
+	// to using UCS_XT1CLK_SELECT.
+	UCS_clockSignalInit(UCS_FLLREF, UCS_REFOCLK_SELECT,
+			UCS_CLOCK_DIVIDER_1);
+
+	UCS_initFLLSettle(
+			MCLK_DESIRED_FREQUENCY_IN_KHZ,
+			MCLK_FLLREF_RATIO
+	);
+
+	// TODO: Configure DCO
+
+	// Use the DCO paired with REFO+FLL (or XT1, later) as the master clock
+	// This will run at around 1 MHz. This is the default.
+	//                     (1,048,576 Hz)
+	UCS_clockSignalInit(UCS_MCLK, UCS_DCOCLKDIV_SELECT,
+			UCS_CLOCK_DIVIDER_1);
+
+	// Enable global oscillator fault flag
+	SFR_clearInterrupt(SFR_OSCILLATOR_FAULT_INTERRUPT);
+	SFR_enableInterrupt(SFR_OSCILLATOR_FAULT_INTERRUPT);
+
+	// Enable global interrupt:
+	__bis_SR_register(GIE);
+
+	// Verify if the clock settings are as expected:
+	clockValue = UCS_getMCLK();
+	clockValue = UCS_getACLK();
+	clockValue = UCS_getSMCLK();
+
+}
+
+void init_timers() {
+//	TIMER_A_configureContinuousMode(
+//		TIMER_A0_BASE,
+//		TIMER_A_CLOCKSOURCE_ACLK,
+//		TIMER_A_CLOCKSOURCE_DIVIDER_1,
+//		TIMER_A_TAIE_INTERRUPT_ENABLE,
+//		TIMER_A_DO_CLEAR
+//	);
+//
+//	TIMER_A_clearTimerInterruptFlag(TIMER_A0_BASE);
+//
+//	TIMER_A_startCounter(TIMER_A0_BASE, TIMER_A_CONTINUOUS_MODE);
+
+
+}
+
+int main( void )
+{
+	// TODO: check to see what powerup mode we're in.
+	init_watchdog();
+	init_power();
+	init_gpio();
+	init_clocks();
+	init_timers();
+
+	led_display_bits(values);
+	// uint8_t duty = 0;
+
+	while (1) {
+		// LPM3
+		// __bis_SR_register(LPM3_bits + GIE);
+//		led_enable(duty++);
+//		duty %= 10;
+//		delay(500);
+		led_enable(5);
+		__bis_SR_register(LPM3_bits + GIE);
+	}
+
+}
+
 void delay(uint16_t ms)
 {
- while (ms--)
+	while (ms--)
     {
-        __delay_cycles(16000); // set for 16Mhz change it to 1000 for 1 Mhz
+        __delay_cycles(MCLK_DESIRED_FREQUENCY_IN_KHZ);
     }
 }
 
-// Writes a value to the specified bitmask/pin. Use built in defines
-// when calling this, as the shiftOut() function does.
-// All nonzero values are treated as "high" and zero is "low"
-void pinWrite( uint16_t bit, uint16_t val )
+void led_display_bits(uint16_t* val)
 {
-  if (val){
-    P1OUT |= bit;
-  } else {
-    P1OUT &= ~bit;
-  }
+	//Set latch to low (should be already)
+	GPIO_setOutputLowOnPin(LED_PORT, LED_LATCH);
+
+	uint16_t i;
+	uint8_t j;
+
+	for (j=5; j; j--) {
+		// Iterate over each bit, set data pin, and pulse the clock to send it
+		// to the shift register
+		for (i = 0; i < 16; i++)  {
+			WRITE_IF(LED_PORT, LED_DATA, (val[j] & (1 << i)));
+			PULSE(LED_PORT, LED_CLOCK)
+		}
+	}
+
+	// Pulse the latch pin to write the values into the display register
+	PULSE(LED_PORT, LED_LATCH);
 }
 
-// Pulse the clock pin
-void pulseClock( void )
-{
-  P1OUT |= CLOCK;
-  P1OUT ^= CLOCK;
+void led_enable(uint16_t duty_cycle) {
+	GPIO_setAsPeripheralModuleFunctionOutputPin(LED_PORT, LED_BLANK);
+
+	TIMER_A_generatePWM(
+		TIMER_A0_BASE,
+		TIMER_A_CLOCKSOURCE_ACLK,
+		TIMER_A_CLOCKSOURCE_DIVIDER_1,
+		10, // period
+		TIMER_A_CAPTURECOMPARE_REGISTER_2,
+		TIMER_A_OUTPUTMODE_RESET_SET,
+		10 - duty_cycle // duty cycle
+	);
+
+	TIMER_A_startCounter(TIMER_A0_BASE, TIMER_A_UP_MODE);
 
 }
 
-// Take the given 8-bit value and shift it out, LSB to MSB
-void shiftOut(uint16_t* val)
+void led_disable( void )
 {
-  //Set latch to low (should be already)
-  P1OUT &= ~LATCH;
+	GPIO_setAsOutputPin(
+			LED_PORT,
+			LED_BLANK
+	);
 
-  uint16_t i;
-  uint8_t j;
-
-  for (j=5; j; j--) {
-
-	  // Iterate over each bit, set data pin, and pulse the clock to send it
-	  // to the shift register
-	  for (i = 0; i < 16; i++)  {
-		  pinWrite(DATA, (val[j] & (1 << i)));
-		  pulseClock();
-	  }
-  }
-
-  // Pulse the latch pin to write the values into the display register
-  P1OUT |= LATCH;
-  P1OUT &= ~LATCH;
+	GPIO_setOutputHighOnPin(LED_PORT, LED_BLANK);
 }
 
-// These functions are just a shortcut to turn on and off the array of
-// LED's when you have the enable pin tied to the MCU. Entirely optional.
-void enable( void )
-{
-  P1OUT &= ~BLANK;
+inline void led_toggle( void ) {
+	GPIO_toggleOutputOnPin(LED_PORT, LED_BLANK);
 }
 
-void disable( void )
+#if defined(__TI_COMPILER_VERSION__) || defined(__IAR_SYSTEMS_ICC__)
+#pragma vector=UNMI_VECTOR
+__interrupt
+#elif defined(__GNUC__)
+__attribute__((interrupt(UNMI_VECTOR)))
+#endif
+void NMI_ISR(void)
 {
-  P1OUT |= BLANK;
+        do {
+                // If it still can't clear the oscillator fault flags after the timeout,
+                // trap and wait here.
+                status = UCS_clearAllOscFlagsWithTimeout(1000);
+        } while (status != 0);
 }
+
+//#pragma vector=TIMER0_A1_VECTOR
+//__interrupt void timer0_ISR (void)
+//{
+//    // 4. Timer ISR and vector
+//
+//    switch( __even_in_range( TA0IV, 14 )) {
+//     case  0: break;                // None
+//     case  2: break;                // CCR1 IFG
+//     case  4: break;                // CCR2 IFG
+//     case  6: break;                // CCR3 IFG
+//     case  8: break;                // CCR4 IFG
+//     case 10: break;                // CCR5 IFG
+//     case 12: break;                // CCR6 IFG
+//     case 14:                       // TAR overflow
+//              led_toggle();
+//              break;
+//     default: _never_executed();
+//    }
+//}
