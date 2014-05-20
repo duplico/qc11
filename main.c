@@ -11,7 +11,7 @@
 #include "driverlib.h"
 
 #define WRITE_IF(port, pin, val) if (val) GPIO_setOutputHighOnPin(port, pin); else GPIO_setOutputLowOnPin(port, pin);
-#define PULSE(port, pin) do { GPIO_setOutputHighOnPin(port, pin); GPIO_setOutputLowOnPin(port, pin); } while (0);
+#define GPIO_pulse(port, pin) do { GPIO_setOutputHighOnPin(port, pin); GPIO_setOutputLowOnPin(port, pin); } while (0);
 
 // For clock initialization:
 #define UCS_XT1_TIMEOUT 50000
@@ -79,17 +79,14 @@ void init_gpio() {
 
 	GPIO_setAsPeripheralModuleFunctionOutputPin(LED_PORT, LED_BLANK);
 
-
-	//P4SEL = BIT4 | BIT5;                      // P3.3,4 = USCI_A0 TXD/RXD
-
-		GPIO_setAsPeripheralModuleFunctionOutputPin(
-				GPIO_PORT_P4,
-				GPIO_PIN4
-		);
-		GPIO_setAsPeripheralModuleFunctionInputPin(
-				GPIO_PORT_P4,
-				GPIO_PIN5
-		);
+	GPIO_setAsPeripheralModuleFunctionOutputPin(
+			GPIO_PORT_P4,
+			GPIO_PIN4
+	);
+	GPIO_setAsPeripheralModuleFunctionInputPin(
+			GPIO_PORT_P4,
+			GPIO_PIN5
+	);
 }
 
 void init_clocks() {
@@ -210,11 +207,10 @@ int main( void )
 	init_timers();
 	init_serial();
 
-	led_display_bits(values);
+//	led_display_bits(values);
 	//led_enable(5);
 	led_disable();
 
-	  __bis_SR_register(LPM3_bits | GIE);       // Enter LPM3, interrupts enabled
 	while (1) {
 		// LPM3
 		// __bis_SR_register(LPM3_bits + GIE);
@@ -247,28 +243,28 @@ void led_display_bits(uint16_t* val)
 		// to the shift register
 		for (i = 0; i < 16; i++)  {
 			WRITE_IF(LED_PORT, LED_DATA, (val[j] & (1 << i)));
-			PULSE(LED_PORT, LED_CLOCK)
+			GPIO_pulse(LED_PORT, LED_CLOCK)
 		}
 	}
 
 	// Pulse the latch pin to write the values into the display register
-	PULSE(LED_PORT, LED_LATCH);
+	GPIO_pulse(LED_PORT, LED_LATCH);
 }
 
 void led_enable(uint16_t duty_cycle) {
-	GPIO_setAsPeripheralModuleFunctionOutputPin(LED_PORT, LED_BLANK);
-
-	TIMER_A_generatePWM(
-		TIMER_A0_BASE,
-		TIMER_A_CLOCKSOURCE_ACLK,
-		TIMER_A_CLOCKSOURCE_DIVIDER_1,
-		10, // period
-		TIMER_A_CAPTURECOMPARE_REGISTER_2,
-		TIMER_A_OUTPUTMODE_RESET_SET,
-		10 - duty_cycle // duty cycle
-	);
-
-	TIMER_A_startCounter(TIMER_A0_BASE, TIMER_A_UP_MODE);
+//	GPIO_setAsPeripheralModuleFunctionOutputPin(LED_PORT, LED_BLANK);
+//
+//	TIMER_A_generatePWM(
+//		TIMER_A0_BASE,
+//		TIMER_A_CLOCKSOURCE_ACLK,
+//		TIMER_A_CLOCKSOURCE_DIVIDER_1,
+//		10, // period
+//		TIMER_A_CAPTURECOMPARE_REGISTER_2,
+//		TIMER_A_OUTPUTMODE_RESET_SET,
+//		10 - duty_cycle // duty cycle
+//	);
+//
+//	TIMER_A_startCounter(TIMER_A0_BASE, TIMER_A_UP_MODE);
 
 }
 
@@ -301,25 +297,7 @@ void NMI_ISR(void)
         } while (status != 0);
 }
 
-//#pragma vector=TIMER0_A1_VECTOR
-//__interrupt void timer0_ISR (void)
-//{
-//    // 4. Timer ISR and vector
-//
-//    switch( __even_in_range( TA0IV, 14 )) {
-//     case  0: break;                // None
-//     case  2: break;                // CCR1 IFG
-//     case  4: break;                // CCR2 IFG
-//     case  6: break;                // CCR3 IFG
-//     case  8: break;                // CCR4 IFG
-//     case 10: break;                // CCR5 IFG
-//     case 12: break;                // CCR6 IFG
-//     case 14:                       // TAR overflow
-//              led_toggle();
-//              break;
-//     default: _never_executed();
-//    }
-//}
+uint8_t received_data = 0;
 
 // Echo back RXed character, confirm TX buffer is ready first
 #pragma vector=USCI_A1_VECTOR
@@ -329,10 +307,12 @@ __interrupt void USCI_A1_ISR(void)
   {
   case 0:break;                             // Vector 0 - no interrupt
   case 2:                                   // Vector 2 - RXIFG
-    while (!(UCA1IFG&UCTXIFG));             // USCI_A1 TX buffer ready?
-    UCA1TXBUF = UCA1RXBUF;                  // TX -> RXed character
+	  while (!USCI_A_UART_getInterruptStatus(USCI_A1_BASE, UCTXIFG));
+	  received_data = USCI_A_UART_receiveData(USCI_A1_BASE);
+	  USCI_A_UART_transmitData(USCI_A1_BASE, received_data);
+
     break;
-  case 4:break;                             // Vector 4 - TXIFG
+  case 4:break;                             // Vector 4 - TXIFG // Ready for another character...
   default: break;
   }
 }
