@@ -10,6 +10,9 @@
 #include <stdint.h>
 #include "driverlib.h"
 
+#include "radio.h"
+#include "main.h"
+
 #define WRITE_IF(port, pin, val) if (val) GPIO_setOutputHighOnPin(port, pin); else GPIO_setOutputLowOnPin(port, pin);
 #define GPIO_pulse(port, pin) do { GPIO_setOutputHighOnPin(port, pin); GPIO_setOutputLowOnPin(port, pin); } while (0);
 
@@ -20,12 +23,10 @@
 #define UCS_XT2_CRYSTAL_FREQUENCY	16000000
 #define MCLK_DESIRED_FREQUENCY_IN_KHZ 8000
 #define MCLK_FLLREF_RATIO MCLK_DESIRED_FREQUENCY_IN_KHZ / (UCS_REFOCLK_FREQUENCY / 1024)
-uint8_t returnValue = 0;
+extern uint8_t returnValue;
 uint32_t clockValue;
 // Status of oscillator fault flags:
 uint16_t status;
-
-#define SPICLK 1000000
 
 //Define our pins
 #define LED_PORT	GPIO_PORT_P1
@@ -33,6 +34,8 @@ uint16_t status;
 #define LED_CLOCK	GPIO_PIN4
 #define LED_LATCH	GPIO_PIN7
 #define LED_BLANK	GPIO_PIN3
+
+#define DEBUG_SERIAL 1
 
 // Declare functions
 void delay(unsigned int);
@@ -42,7 +45,6 @@ void led_display_bits(uint16_t*);
 
 uint16_t values[5] = {65535, 65535, 65535, 65535, 65535};
 uint16_t zeroes[5] = {0, 0, 0, 0, 0};
-char msg0[25] = "Testing the sending.";
 
 void init_watchdog() {
 	WDT_A_hold(WDT_A_BASE);
@@ -114,34 +116,12 @@ void init_gpio() {
 			GPIO_PORT_P4,
 			GPIO_PIN5
 	);
-	// TODO: SD, whatever that is
 
-	// SPI for radio //////////////////////////////////////////////////////////
-	//
-	// P4.1 ---- MOSI (TX) >>--|
-	// P4.2 ---- MISO (RX) <<--| RFM69CW
-	// P4.3 ----------- CLK ---|
-	// P4.7 ----------- NSS ---|
-	//                         |
-	//                         |
-	// P2.0 --------- DIO0 <<--| (TODO)
-	//
+	// Shutdown (SD) for IR
+	GPIO_setAsOutputPin(GPIO_PORT_P4, GPIO_PIN6);
+	GPIO_setOutputLowOnPin(GPIO_PORT_P4, GPIO_PIN6); // shutdown low = on
 
-	//P3.5,4,0 option select
-	GPIO_setAsPeripheralModuleFunctionInputPin(
-			GPIO_PORT_P4,
-			GPIO_PIN2 // + GPIO_PIN7
-			);
-
-	GPIO_setAsPeripheralModuleFunctionOutputPin(
-			GPIO_PORT_P4,
-			GPIO_PIN1 + GPIO_PIN3
-	);
-
-	// TODO: Can probably do this in hardware instead:
-	GPIO_setAsOutputPin(GPIO_PORT_P4, GPIO_PIN7);
-	GPIO_setOutputHighOnPin(GPIO_PORT_P4, GPIO_PIN7); // NSS is active low.
-
+	// ALTERNATE FOR IR: serial debug interface ///////////////////////////////
 	// serial debug:
 	GPIO_setAsPeripheralModuleFunctionInputPin(GPIO_PORT_P4, GPIO_PIN5); // 4.5: RXD
 	GPIO_setAsPeripheralModuleFunctionOutputPin(GPIO_PORT_P4, GPIO_PIN4); // 4.4: TXD
@@ -158,7 +138,7 @@ void init_clocks() {
 	// Initialize XT1 at 32.768KHz
 //	returnValue = UCS_LFXT1StartWithTimeout(
 //			UCS_XT1_DRIVE3, // MAX POWER
-//			UCX_XCAP_1,		// 5.5 pF, closest to 4 pF of crystal.
+//			UCS_XCAP_1,		// 5.5 pF, closest to 4 pF of crystal.
 //			UCS_XT1_TIMEOUT
 //	);
 
@@ -233,6 +213,8 @@ void init_timers() {
 
 void init_serial() {
 
+#if DEBUG_SERIAL
+
 	// UART Serial to PC //////////////////////////////////////////////////////
 	//
 	// Initialize the UART serial, used to speak over USB.
@@ -252,45 +234,39 @@ void init_serial() {
 			USCI_A_UART_LOW_FREQUENCY_BAUDRATE_GENERATION
 	);
 
+#else
+
+
+	// IR Interface ///////////////////////////////////////////////////////////
+	//
+	USCI_A_UART_initAdvance(
+			USCI_A1_BASE,
+			USCI_A_UART_CLOCKSOURCE_SMCLK,
+			833,
+			0,
+			2,
+			USCI_A_UART_NO_PARITY,
+			USCI_A_UART_MSB_FIRST,
+			USCI_A_UART_ONE_STOP_BIT,
+			USCI_A_UART_MODE,
+			USCI_A_UART_LOW_FREQUENCY_BAUDRATE_GENERATION
+	);
+
+//	UCA1CTL0 = 0x0;
+//	UCA1CTL1 = UCSSEL1;
+//	UCA1BR0 = 0x41;
+//	UCA1BR1 = 0x03;
+//	UCA1MCTL = 0x04;
+
+	UCA1IRTCTL = UCIREN + UCIRTXPL5;
+#endif
+
 	USCI_A_UART_enable(USCI_A1_BASE);
 
 	USCI_A_UART_enableInterrupt(
 			USCI_A1_BASE,
 			USCI_A_UART_RECEIVE_INTERRUPT
 	);
-
-	// IR Interface ///////////////////////////////////////////////////////////
-	//
-	// TODO: Init the IR interface
-
-
-	// SPI to RFM /////////////////////////////////////////////////////////////
-	//
-	// Initialize the SPI for talking to the radio
-//	USCI_B_SPI_disable(USCI_B1_BASE); // This wasn't in the example.
-
-	//Initialize Master
-	returnValue = USCI_B_SPI_masterInit(
-			USCI_B1_BASE,
-			USCI_B_SPI_CLOCKSOURCE_SMCLK, // selectClockSource
-			UCS_getSMCLK(),
-			SPICLK,
-			USCI_B_SPI_MSB_FIRST,
-			USCI_B_SPI_PHASE_DATA_CAPTURED_ONFIRST_CHANGED_ON_NEXT,
-			USCI_B_SPI_CLOCKPOLARITY_INACTIVITY_LOW
-	);
-
-	if (STATUS_FAIL == returnValue)
-			return;
-
-	//Enable SPI module
-	USCI_B_SPI_enable(USCI_B1_BASE);
-
-	//Enable Receive interrupt
-	USCI_B_SPI_clearInterruptFlag(USCI_B1_BASE, USCI_B_SPI_RECEIVE_INTERRUPT);
-	USCI_B_SPI_enableInterrupt(USCI_B1_BASE, USCI_B_SPI_RECEIVE_INTERRUPT);
-//	USCI_B_SPI_clearInterruptFlag(USCI_B1_BASE, USCI_B_SPI_TRANSMIT_INTERRUPT);
-//	USCI_B_SPI_enableInterrupt(USCI_B1_BASE, USCI_B_SPI_TRANSMIT_INTERRUPT);
 
 }
 
@@ -304,7 +280,6 @@ void write_serial(char* text) {
 
 uint8_t reg_read = 0;
 char reg_reads[2] = {0, 0};
-uint8_t i_sent_a_frame = 0;
 
 int main( void )
 {
@@ -316,6 +291,7 @@ int main( void )
 	init_clocks();
 	init_timers();
 	init_serial();
+	init_radio();
 
 //	led_display_bits(values);
 	//led_enable(5);
@@ -324,32 +300,22 @@ int main( void )
 	delay(500);
 
 	write_serial("OK, so we're starting up now.");
+//	set_register(RFM_OPMODE, 0b00010000); // Receive mode.
+//	read_register(RFM_IRQ1); // Waiting for (data | 0b01000000)
 
+//	write_serial(received_data_str);
 	delay(1000);
-	// SPI TX to radio module buffer ready?
-	//    P.S. I HATE BUSY WAITING
-
-
-//			//    // READ RegBitrateMsb
-//	USCI_B_SPI_transmitData(USCI_B1_BASE, 0x06);
 
 	while (1) {
 		// LPM3
 		// __bis_SR_register(LPM3_bits + GIE);
-
-//		write_serial("Reading");
-		write_serial(reg_reads);
-		while (!USCI_B_SPI_getInterruptStatus(USCI_B1_BASE,
-											  USCI_B_SPI_TRANSMIT_INTERRUPT));
-		GPIO_setOutputLowOnPin(GPIO_PORT_P4, GPIO_PIN7); // Hold NSS low.
-		//    // READ RegBitrateMsb
-		i_sent_a_frame = 2;
-		USCI_B_SPI_transmitData(USCI_B1_BASE, reg_reads[0]);
-		while (!USCI_B_SPI_getInterruptStatus(USCI_B1_BASE,
-											  USCI_B_SPI_TRANSMIT_INTERRUPT));
-		USCI_B_SPI_transmitData(USCI_B1_BASE, 0);
+		reg_reads[0] = reg_read;
+		write_serial(reg_reads); // Address
+		reg_reads[0] = read_register_sync(reg_read, 1);
+		write_serial(reg_reads); // Data
 		delay(500);
-		reg_reads[0] = (reg_reads[0] + 1) % 0x72;
+		reg_read = (reg_read + 1) % 0x72;
+		delay(500);
 	}
 }
 
@@ -440,39 +406,6 @@ __interrupt void USCI_A1_ISR(void)
 
 		break;
 	case 4:                             // Vector 4 - TXIFG // Ready for another character...
-		break;
-	default: break;
-	}
-}
-char received_data_str[2] = {5, 0};
-uint8_t low_message = 0;
-
-uint8_t bytes_to_receive = 10;
-
-//******************************************************************************
-//
-//This is the USCI_B1 interrupt vector service routine.
-//
-//******************************************************************************
-#pragma vector=USCI_B1_VECTOR
-__interrupt void USCI_B1_ISR(void)
-{
-	switch (__even_in_range(UCB1IV, 4)) {
-	//Vector 2 - RXIFG
-	case 2:
-		received_data_str[0] = USCI_B_SPI_receiveData(USCI_B1_BASE);
-		if (!--i_sent_a_frame) {
-			GPIO_setOutputHighOnPin(GPIO_PORT_P4, GPIO_PIN7); // NSS high to end frame
-			write_serial(received_data_str);
-		}
-		break;
-	case 4:                             // Vector 4 - TXIFG // Ready for another character...
-//		USCI_B_SPI_transmitData(USCI_B1_BASE, 0);
-//		if (low_message) {
-//			USCI_B_SPI_transmitData(USCI_B1_BASE, 0);
-//			low_message--;
-//		}
-//		USCI_B_SPI_clearInterruptFlag(USCI_B1_BASE, USCI_B_SPI_TRANSMIT_INTERRUPT);
 		break;
 	default: break;
 	}
