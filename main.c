@@ -270,7 +270,7 @@ void init_serial() {
 
 }
 
-void write_serial(char* text) {
+void write_serial(uint8_t* text) {
 	uint16_t sendchar = 0;
 	do {
 		while (!USCI_A_UART_getInterruptStatus(USCI_A1_BASE, UCTXIFG));
@@ -279,7 +279,9 @@ void write_serial(char* text) {
 }
 
 uint8_t reg_read = 0;
-char reg_reads[2] = {0, 0};
+uint8_t reg_reads[2] = {0, 0};
+
+uint8_t reg_data[64] = {0};
 
 int main( void )
 {
@@ -300,7 +302,7 @@ int main( void )
 	delay(500);
 
 	write_serial("OK, so we're starting up now.");
-//	set_register(RFM_OPMODE, 0b00010000); // Receive mode.
+	set_register(RFM_OPMODE, 0b00010000); // Receive mode.
 //	read_register(RFM_IRQ1); // Waiting for (data | 0b01000000)
 
 //	write_serial(received_data_str);
@@ -311,8 +313,8 @@ int main( void )
 		// __bis_SR_register(LPM3_bits + GIE);
 		reg_reads[0] = reg_read;
 		write_serial(reg_reads); // Address
-		reg_reads[0] = read_register_sync(reg_read, 1);
-		write_serial(reg_reads); // Data
+		read_register_sync(reg_read, 2, reg_data);
+		write_serial(reg_data);
 		delay(500);
 		reg_read = (reg_read + 1) % 0x72;
 		delay(500);
