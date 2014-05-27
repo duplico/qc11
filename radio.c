@@ -9,6 +9,7 @@
 #include <stdint.h>
 #include "driverlib.h"
 #include "main.h"
+#include <string.h>
 
 #define SPICLK 1000000
 
@@ -72,10 +73,28 @@ void init_radio() {
 }
 
 uint8_t rfm_reg_data[64] = {0};
+uint8_t rfm_zeroes[64] = {0};
 uint8_t rfm_reg_data_index = 0;
 uint8_t rfm_reg_data_length = 0;
 uint8_t rfm_reg_data_ready = 0;
 uint8_t frame_bytes_remaining = 0;
+
+void cmd_register(uint8_t cmd, uint8_t *data, uint8_t len) {
+	frame_bytes_remaining = len;
+	rfm_reg_data_length = len;
+
+	while (!USCI_B_SPI_getInterruptStatus(USCI_B1_BASE,
+		USCI_B_SPI_TRANSMIT_INTERRUPT)); // Make sure we can send
+	rfm_reg_data_ready = 0;
+	GPIO_setOutputLowOnPin(GPIO_PORT_P4, GPIO_PIN7); // Hold NSS low.
+	USCI_B_SPI_transmitData(USCI_B1_BASE, cmd);
+	for (int i=0; i<len; i++) {
+
+		while (!USCI_B_SPI_getInterruptStatus(USCI_B1_BASE,
+			USCI_B_SPI_TRANSMIT_INTERRUPT));
+		USCI_B_SPI_transmitData(USCI_B1_BASE, data[i]);
+	}
+}
 
 void set_register(uint8_t addr, uint8_t data) {
 	/*
@@ -83,41 +102,22 @@ void set_register(uint8_t addr, uint8_t data) {
 	 */
 	// MSB=1 is a write command:
 	addr = 0b10000000 | addr;
-
-	while (!USCI_B_SPI_getInterruptStatus(USCI_B1_BASE,
-		USCI_B_SPI_TRANSMIT_INTERRUPT)); // Make sure we can send
-	GPIO_setOutputLowOnPin(GPIO_PORT_P4, GPIO_PIN7); // Hold NSS low.
-	frame_bytes_remaining = 1;
-	rfm_reg_data_length = 1;
-	USCI_B_SPI_transmitData(USCI_B1_BASE, addr);
-	while (!USCI_B_SPI_getInterruptStatus(USCI_B1_BASE,
-		USCI_B_SPI_TRANSMIT_INTERRUPT));
-	USCI_B_SPI_transmitData(USCI_B1_BASE, data);
+	uint8_t buf[1] = {data};
+	cmd_register(addr, buf, 1);
 }
 
 void read_register(uint8_t addr, uint8_t len) {
 	// MSB=0 is a read command:
 	addr = 0b01111111 & addr;
-	rfm_reg_data_length = len;
-	frame_bytes_remaining = len;
-
-	while (!USCI_B_SPI_getInterruptStatus(USCI_B1_BASE,
-		USCI_B_SPI_TRANSMIT_INTERRUPT)); // Make sure we can send
-	rfm_reg_data_ready = 0;
-	GPIO_setOutputLowOnPin(GPIO_PORT_P4, GPIO_PIN7); // Hold NSS low.
-	frame_bytes_remaining = 1;
-	USCI_B_SPI_transmitData(USCI_B1_BASE, addr);
-	while (!USCI_B_SPI_getInterruptStatus(USCI_B1_BASE,
-		USCI_B_SPI_TRANSMIT_INTERRUPT));
-	USCI_B_SPI_transmitData(USCI_B1_BASE, 0);
+	cmd_register(addr, rfm_zeroes, len);
 }
 
-// TODO: Accept a buffer to memcpy into?
-uint8_t read_register_sync(uint8_t addr, uint8_t len) {
+uint8_t read_register_sync(uint8_t addr, uint8_t len, uint8_t *target) {
 	read_register(addr, len);
 	while (!rfm_reg_data_ready);
 	rfm_reg_data_ready = 0;
-	return rfm_reg_data[0];
+	memcpy(target, rfm_reg_data, len);
+	return len;
 }
 
 #pragma vector=USCI_B1_VECTOR
@@ -126,7 +126,7 @@ __interrupt void USCI_B1_ISR(void)
 	switch (__even_in_range(UCB1IV, 4)) {
 	//Vector 2 - RXIFG
 	case 2:
-		// TODO: This could break is we ask for a length of 0.
+		// TODO: This could break if we ask for a length of 0.
 		// Don't ask for a length of 0.
 		if (frame_bytes_remaining == rfm_reg_data_length) {
 			USCI_B_SPI_receiveData(USCI_B1_BASE); // throw away the first byte
