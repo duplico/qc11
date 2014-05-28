@@ -5,13 +5,14 @@
  *      Author: George
  */
 
-#include <msp430f5308.h>
+#include "radio.h"
+#include "main.h"
+
 #include <stdint.h>
 #include "driverlib.h"
-#include "main.h"
 #include <string.h>
 
-#define SPICLK 1000000
+#define SPICLK 9600
 
 uint8_t returnValue = 0;
 
@@ -40,8 +41,8 @@ void init_radio() {
 	);
 
 	// TODO: Can probably do this in hardware instead?
-	GPIO_setAsOutputPin(GPIO_PORT_P4, GPIO_PIN7);
-	GPIO_setOutputHighOnPin(GPIO_PORT_P4, GPIO_PIN7); // NSS is active low.
+	GPIO_setAsOutputPin(NSS_PORT, NSS_PIN);
+	GPIO_setOutputHighOnPin(NSS_PORT, NSS_PIN); // NSS is active low.
 
 	// SPI to RFM /////////////////////////////////////////////////////////////
 	//
@@ -86,24 +87,34 @@ void cmd_register(uint8_t cmd, uint8_t *data, uint8_t len) {
 	while (!USCI_B_SPI_getInterruptStatus(USCI_B1_BASE,
 		USCI_B_SPI_TRANSMIT_INTERRUPT)); // Make sure we can send
 	rfm_reg_data_ready = 0;
-	GPIO_setOutputLowOnPin(GPIO_PORT_P4, GPIO_PIN7); // Hold NSS low.
+	GPIO_setOutputLowOnPin(NSS_PORT, NSS_PIN); // Hold NSS low.
 	USCI_B_SPI_transmitData(USCI_B1_BASE, cmd);
 	for (int i=0; i<len; i++) {
-
 		while (!USCI_B_SPI_getInterruptStatus(USCI_B1_BASE,
 			USCI_B_SPI_TRANSMIT_INTERRUPT));
 		USCI_B_SPI_transmitData(USCI_B1_BASE, data[i]);
 	}
+	while (!rfm_reg_data_ready);
+	rfm_reg_data_ready = 0;
 }
 
-void set_register(uint8_t addr, uint8_t data) {
+void write_register(uint8_t addr, uint8_t *data, uint8_t len) {
 	/*
 	 * You can use set_register like a blocking call.
 	 */
 	// MSB=1 is a write command:
-	addr = 0b10000000 | addr;
+	addr |= 0b10000000;
+	cmd_register(addr, data, len);
+}
+
+
+void write_single_register(uint8_t addr, uint8_t data) {
+	/*
+	 * You can use set_register like a blocking call.
+	 */
+	// MSB=1 is a write command:
 	uint8_t buf[1] = {data};
-	cmd_register(addr, buf, 1);
+	write_register(addr, buf, 1);
 }
 
 void read_register(uint8_t addr, uint8_t len) {
@@ -114,10 +125,30 @@ void read_register(uint8_t addr, uint8_t len) {
 
 uint8_t read_register_sync(uint8_t addr, uint8_t len, uint8_t *target) {
 	read_register(addr, len);
-	while (!rfm_reg_data_ready);
-	rfm_reg_data_ready = 0;
 	memcpy(target, rfm_reg_data, len);
 	return len;
+}
+
+uint8_t read_single_register_sync(uint8_t addr) {
+	read_register(addr, 1);
+	return rfm_reg_data[0];
+}
+
+void mode_rx_sync() {
+	write_single_register(RFM_OPMODE, 0b00010000); // Receive mode.
+	while (!(BIT7 & read_single_register_sync(RFM_IRQ1)));
+}
+
+void mode_tx_sync() {
+	write_single_register(RFM_OPMODE, 0b00001100); // TX mode.
+	while (!(BIT7 & read_single_register_sync(RFM_IRQ1)));
+}
+
+uint8_t rfm_crcok() {
+	uint8_t status = 0;
+	read_register(RFM_IRQ2, 1);
+	status = rfm_reg_data[0] & BIT1;
+	return status ? 1 : 0;
 }
 
 #pragma vector=USCI_B1_VECTOR
@@ -135,7 +166,7 @@ __interrupt void USCI_B1_ISR(void)
 					USCI_B_SPI_receiveData(USCI_B1_BASE);
 		}
 		if (!(frame_bytes_remaining--)) {
-			GPIO_setOutputHighOnPin(GPIO_PORT_P4, GPIO_PIN7); // NSS high to end frame
+			GPIO_setOutputHighOnPin(NSS_PORT, NSS_PIN); // NSS high to end frame
 			rfm_reg_data_ready = 1;
 		}
 		break;
