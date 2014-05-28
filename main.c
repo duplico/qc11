@@ -1,17 +1,6 @@
-//***************************************************************************************
-// MSP430 Driver for 74HC595 Shift Register
-//
-// Description; Drives 8 LED's with 3 digital pins of the MSP430, via a shift register
-//
-// MSP430x2xx
-//
-//***************************************************************************************
-#include <msp430f5308.h>
-#include <stdint.h>
-#include "driverlib.h"
-
-#include "radio.h"
 #include "main.h"
+#include "driverlib.h"
+#include "radio.h"
 
 #define WRITE_IF(port, pin, val) if (val) GPIO_setOutputHighOnPin(port, pin); else GPIO_setOutputLowOnPin(port, pin);
 #define GPIO_pulse(port, pin) do { GPIO_setOutputHighOnPin(port, pin); GPIO_setOutputLowOnPin(port, pin); } while (0);
@@ -281,7 +270,8 @@ void write_serial(uint8_t* text) {
 uint8_t reg_read = 0;
 uint8_t reg_reads[2] = {0, 0};
 
-uint8_t reg_data[64] = {0};
+uint8_t reg_data[65] = {0};
+uint8_t test_data[65] = {0};
 
 int main( void )
 {
@@ -301,19 +291,55 @@ int main( void )
 
 	delay(500);
 
-	write_serial("OK, so we're starting up now.");
-	set_register(RFM_OPMODE, 0b00010000); // Receive mode.
-//	read_register(RFM_IRQ1); // Waiting for (data | 0b01000000)
+	for (int i=0; i<64; i++) {
+		test_data[i] = (uint8_t)'Q';
+	}
+	write_serial("OK");
 
-//	write_serial(received_data_str);
-	delay(1000);
+//	while (1) {
+//
+//#if !BADGE_TARGET
+//		while (1) {
+//			mode_tx_sync();
+//			write_serial("Transmitting a thing.\r\n");
+//			write_serial(test_data);
+//			write_register(RFM_FIFO, test_data, 64);
+//			delay(2500);
+//		}
+//#else
+//		mode_rx_sync();
+//		write_serial("Receive mode!");
+//		while (!rfm_crcok());
+//		write_serial("We seem to have gotten something!");
+//		read_register_sync(RFM_FIFO, 64, reg_data);
+//		write_serial(reg_data);
+//#endif
+//	}
+
+	//write_single_register(RFM_OPMODE, 0b00010000);
+	uint8_t receive_status = read_single_register_sync(RFM_IRQ1);
+	while (1) {
+		receive_status = read_single_register_sync(RFM_IRQ1);
+		delay(100);
+		write_single_register(RFM_OPMODE, 0b00010000);
+		reg_data[0] = receive_status;
+		write_serial(reg_data);
+		receive_status &= BIT7;
+		if (!receive_status) {
+			write_serial("No receive");
+		}
+		else {
+			write_serial("Receive.");
+		}
+		delay(1500);
+	}
 
 	while (1) {
 		// LPM3
 		// __bis_SR_register(LPM3_bits + GIE);
 		reg_reads[0] = reg_read;
 		write_serial(reg_reads); // Address
-		read_register_sync(reg_read, 2, reg_data);
+		read_register_sync(reg_read, 1, reg_data);
 		write_serial(reg_data);
 		delay(500);
 		reg_read = (reg_read + 1) % 0x72;
