@@ -35,6 +35,26 @@ void led_display_bits(uint16_t*);
 uint16_t values[5] = {65535, 65535, 65535, 65535, 65535};
 uint16_t zeroes[5] = {0, 0, 0, 0, 0};
 
+uint8_t disp[16][5] = { // column-major format (for some reason)
+		{0}, {0}, {0}, {0}, {0},
+		{0}, {0}, {0}, {0}, {0},
+		{0}, {0}, {0}, {0}, {0}, {0}
+};
+
+void led_disp_to_values() {
+	// row 1 : values[0]
+	values[0] = 0;
+	for (int bit_index=0; bit_index<16; bit_index++) {
+		values[0] |= ((disp[bit_index][0] ? 1 : 0) << bit_index);
+	}
+	for (int led_segment = 1; led_segment<=4; led_segment++) {
+		values[led_segment] = 0;
+		for (int bit_index=0; bit_index<16; bit_index++) {
+			values[led_segment] |= ((disp[(bit_index % 8) + (~(led_segment & 0b1) * 8)][led_segment + bit_index / 8] ? 1 : 0) << bit_index);
+		}
+	}
+}
+
 void init_watchdog() {
 	WDT_A_hold(WDT_A_BASE);
 }
@@ -285,9 +305,9 @@ int main( void )
 	init_serial();
 	init_radio();
 
-//	led_display_bits(values);
-	//led_enable(5);
-	led_disable();
+	led_display_bits(values);
+	led_enable(5);
+//	led_disable();
 
 	delay(500);
 
@@ -317,6 +337,19 @@ int main( void )
 //	}
 
 	//write_single_register(RFM_OPMODE, 0b00010000);
+
+	delay(5000);
+	while (1) {
+		for (int i=0; i<16; i++) {
+			for (int j=0; j<5; j++) {
+				disp[i][j] ^= 1;
+				led_disp_to_values();
+				led_display_bits(values);
+				delay(250);
+			}
+		}
+	}
+
 	uint8_t receive_status = read_single_register_sync(RFM_IRQ1);
 	while (1) {
 		receive_status = read_single_register_sync(RFM_IRQ1);
@@ -363,7 +396,7 @@ void led_display_bits(uint16_t* val)
 	uint16_t i;
 	uint8_t j;
 
-	for (j=5; j; j--) {
+	for (j=4; j>=0; j--) {
 		// Iterate over each bit, set data pin, and pulse the clock to send it
 		// to the shift register
 		for (i = 0; i < 16; i++)  {
@@ -377,20 +410,20 @@ void led_display_bits(uint16_t* val)
 }
 
 void led_enable(uint16_t duty_cycle) {
-	led_disable(); // TODO
-//	GPIO_setAsPeripheralModuleFunctionOutputPin(LED_PORT, LED_BLANK);
-//
-//	TIMER_A_generatePWM(
-//		TIMER_A0_BASE,
-//		TIMER_A_CLOCKSOURCE_ACLK,
-//		TIMER_A_CLOCKSOURCE_DIVIDER_1,
-//		10, // period
-//		TIMER_A_CAPTURECOMPARE_REGISTER_2,
-//		TIMER_A_OUTPUTMODE_RESET_SET,
-//		10 - duty_cycle // duty cycle
-//	);
-//
-//	TIMER_A_startCounter(TIMER_A0_BASE, TIMER_A_UP_MODE);
+//	led_disable(); // TODO
+	GPIO_setAsPeripheralModuleFunctionOutputPin(LED_PORT, LED_BLANK);
+
+	TIMER_A_generatePWM(
+		TIMER_A0_BASE,
+		TIMER_A_CLOCKSOURCE_ACLK,
+		TIMER_A_CLOCKSOURCE_DIVIDER_1,
+		10, // period
+		TIMER_A_CAPTURECOMPARE_REGISTER_2,
+		TIMER_A_OUTPUTMODE_RESET_SET,
+		10 - duty_cycle // duty cycle
+	);
+
+	TIMER_A_startCounter(TIMER_A0_BASE, TIMER_A_UP_MODE);
 
 }
 
