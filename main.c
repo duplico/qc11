@@ -26,6 +26,9 @@ uint16_t status;
 
 #define DEBUG_SERIAL 1
 
+#define BACK_BUFFER_HEIGHT 15
+#define BACK_BUFFER_WIDTH 48
+
 // Declare functions
 void delay(unsigned int);
 void led_enable(uint16_t);
@@ -33,6 +36,7 @@ void led_disable(void);
 void led_display_bits(uint16_t*);
 
 uint16_t values[5] = {65535, 65535, 65535, 65535, 65535};
+
 uint16_t zeroes[5] = {0, 0, 0, 0, 0};
 
 uint8_t disp[16][5] = { // column-major format (for some reason)
@@ -41,17 +45,104 @@ uint8_t disp[16][5] = { // column-major format (for some reason)
 		{0}, {0}, {0}, {0}, {0}, {0}
 };
 
-void led_disp_to_values() {
+//uint8_t disp_buffer[BACK_BUFFER_WIDTH][BACK_BUFFER_HEIGHT] = { // column-major format (for some reason) (back buffer)
+//		{0}, {0}, {0}, {0}, {0},
+//		{0}, {0}, {0}, {0}, {0},
+//		{0}, {0}, {0}, {0}, {0}, {0},
+//		{0}, {0}, {0}, {0}, {0},
+//		{0}, {0}, {0}, {0}, {0},
+//		{0}, {0}, {0}, {0}, {0}, {0},
+//		{0}, {0}, {0}, {0}, {0},
+//		{0}, {0}, {0}, {0}, {0},
+//		{0}, {0}, {0}, {0}, {0}, {0}
+//};
+
+uint8_t disp_buffer[BACK_BUFFER_WIDTH][BACK_BUFFER_HEIGHT] = {
+		 {0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		 {1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		 {1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		 {1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		 {0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		 {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		 {1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		 {0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		 {0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		 {1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		 {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		 {1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		 {1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		 {1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		 {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		 {1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		 {1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		 {1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		 {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		 {1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		 {1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		 {1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		 {0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		 {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		 {0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		 {1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		 {1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		 {1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		 {0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		 {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		 {0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		 {1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		 {1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		 {1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		 {0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		 {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		 {1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		 {0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		 {0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		 {1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		 {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		 {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		 {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		 {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		 {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		 {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		 {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+};
+
+uint8_t back_buffer_x = 32;
+uint8_t back_buffer_y = 10;
+
+void led_disp_to_values(uint8_t left, uint8_t top) {
 	// row 1 : values[0]
 	values[0] = 0;
+	uint8_t x_offset = 0;
+	uint8_t y_offset = 0;
 	for (int bit_index=0; bit_index<16; bit_index++) {
-		values[0] |= ((disp[bit_index][0] ? 1 : 0) << bit_index);
+		if (disp_buffer[(bit_index+left) % BACK_BUFFER_WIDTH][top % BACK_BUFFER_HEIGHT])
+			values[0] |= (1 << (15 - bit_index));
 	}
 	for (int led_segment = 1; led_segment<=4; led_segment++) {
 		values[led_segment] = 0;
-		for (int bit_index=0; bit_index<16; bit_index++) {
-			values[led_segment] |= ((disp[(bit_index % 8) + (~(led_segment & 0b1) * 8)][led_segment + bit_index / 8] ? 1 : 0) << bit_index);
+
+		if (led_segment % 2) // odd
+			x_offset = 0;
+		else // even
+			x_offset = 8;
+
+		if (led_segment > 2)
+			y_offset = 3;
+		else
+			y_offset = 1;
+
+		for (int bit_index=0; bit_index<8; bit_index++) {
+			if (disp_buffer[(x_offset + bit_index + left) % BACK_BUFFER_WIDTH][(y_offset + top) % BACK_BUFFER_HEIGHT])
+				values[led_segment] |= (1 << (15 - bit_index));
 		}
+		y_offset++;
+		for (int bit_index=0; bit_index<8; bit_index++) {
+			if (disp_buffer[(x_offset + bit_index + left) % BACK_BUFFER_WIDTH][(y_offset + top) % BACK_BUFFER_HEIGHT])
+				values[led_segment] |= (1 << (7 - bit_index));
+		}
+
+		//values[led_segment] |= ((disp[(bit_index % 8) + (~(led_segment & 0b1) * 8)][led_segment + bit_index / 8] ? 1 : 0) << bit_index);
 	}
 }
 
@@ -304,17 +395,14 @@ int main( void )
 	init_timers();
 	init_serial();
 	init_radio();
+	led_disable();
 
-	led_display_bits(values);
-	led_enable(5);
-//	led_disable();
+	delay(100);
 
-	delay(500);
-
-	for (int i=0; i<64; i++) {
-		test_data[i] = (uint8_t)'Q';
-	}
-	write_serial("OK");
+//	for (int i=0; i<64; i++) {
+//		test_data[i] = (uint8_t)'Q';
+//	}
+//	write_serial("OK");
 
 //	while (1) {
 //
@@ -338,15 +426,13 @@ int main( void )
 
 	//write_single_register(RFM_OPMODE, 0b00010000);
 
-	delay(5000);
+	led_display_bits(zeroes);
+	led_enable(1);
 	while (1) {
-		for (int i=0; i<16; i++) {
-			for (int j=0; j<5; j++) {
-				disp[i][j] ^= 1;
-				led_disp_to_values();
-				led_display_bits(values);
-				delay(250);
-			}
+		for (int i=0; i<BACK_BUFFER_WIDTH; i++) {
+			led_disp_to_values(i, 0);
+			led_display_bits(values);
+			delay(150);
 		}
 	}
 
@@ -396,11 +482,11 @@ void led_display_bits(uint16_t* val)
 	uint16_t i;
 	uint8_t j;
 
-	for (j=4; j>=0; j--) {
+	for (j=0; j<5; j++) {
 		// Iterate over each bit, set data pin, and pulse the clock to send it
 		// to the shift register
 		for (i = 0; i < 16; i++)  {
-			WRITE_IF(LED_PORT, LED_DATA, (val[j] & (1 << i)));
+			WRITE_IF(LED_PORT, LED_DATA, (val[4-j] & (1 << i)));
 			GPIO_pulse(LED_PORT, LED_CLOCK)
 		}
 	}
