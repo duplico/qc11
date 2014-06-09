@@ -26,7 +26,7 @@ uint16_t status;
 
 #define DEBUG_SERIAL 1
 
-#define BACK_BUFFER_HEIGHT 15
+#define BACK_BUFFER_HEIGHT 16
 #define BACK_BUFFER_WIDTH 48
 
 // Declare functions
@@ -45,104 +45,297 @@ uint8_t disp[16][5] = { // column-major format (for some reason)
 		{0}, {0}, {0}, {0}, {0}, {0}
 };
 
-//uint8_t disp_buffer[BACK_BUFFER_WIDTH][BACK_BUFFER_HEIGHT] = { // column-major format (for some reason) (back buffer)
-//		{0}, {0}, {0}, {0}, {0},
-//		{0}, {0}, {0}, {0}, {0},
-//		{0}, {0}, {0}, {0}, {0}, {0},
-//		{0}, {0}, {0}, {0}, {0},
-//		{0}, {0}, {0}, {0}, {0},
-//		{0}, {0}, {0}, {0}, {0}, {0},
-//		{0}, {0}, {0}, {0}, {0},
-//		{0}, {0}, {0}, {0}, {0},
-//		{0}, {0}, {0}, {0}, {0}, {0}
-//};
+/*
+**  Font data for Microsoft Sans Serif 5pt
+*/
 
-uint8_t disp_buffer[BACK_BUFFER_WIDTH][BACK_BUFFER_HEIGHT] = {
-		 {0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		 {1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		 {1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		 {1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		 {0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		 {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		 {1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		 {0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		 {0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		 {1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		 {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		 {1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		 {1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		 {1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		 {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		 {1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		 {1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		 {1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		 {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		 {1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		 {1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		 {1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		 {0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		 {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		 {0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		 {1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		 {1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		 {1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		 {0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		 {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		 {0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		 {1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		 {1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		 {1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		 {0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		 {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		 {1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		 {0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		 {0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		 {1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		 {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		 {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		 {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		 {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		 {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		 {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		 {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+/* Character bitmaps for Microsoft Sans Serif 5pt */
+const uint8_t microsoftSansSerif_5ptBitmaps[] =
+{
+	/* @0 '1' (2 pixels wide) */
+	// ##
+	//  #
+	//  #
+	//  #
+	//  #
+	//
+	0x01, 0x1F,
+
+	/* @2 'c' (3 pixels wide) */
+	//
+	//  ##
+	// #
+	// #
+	//  ##
+	//
+	0x0C, 0x12, 0x12,
+
+	/* @5 'e' (4 pixels wide) */
+	//
+	//  ##
+	// #  #
+	// ###
+	//  ###
+	//
+	0x0C, 0x1A, 0x1A, 0x14,
+
+	/* @9 'n' (3 pixels wide) */
+	//
+	// ###
+	// # #
+	// # #
+	// # #
+	//
+	0x1E, 0x02, 0x1E,
+
+	/* @12 'o' (4 pixels wide) */
+	//
+	//  ##
+	// #  #
+	// #  #
+	//  ##
+	//
+	0x0C, 0x12, 0x12, 0x0C,
+
+	/* @16 'q' (3 pixels wide) */
+	//
+	//  ##
+	// # #
+	// # #
+	// ###
+	//   #
+	0x1C, 0x12, 0x3E,
+
+	/* @19 'r' (2 pixels wide) */
+	//
+	// ##
+	// #
+	// #
+	// #
+	//
+	0x1E, 0x02,
+
+	/* @21 's' (3 pixels wide) */
+	//
+	//  ##
+	// #
+	//  ##
+	// ###
+	//
+	0x14, 0x1A, 0x1A,
+
+	/* @24 't' (2 pixels wide) */
+	// #
+	// ##
+	// #
+	// #
+	// ##
+	//
+	0x1F, 0x12,
+
+	/* @26 'u' (3 pixels wide) */
+	//
+	// # #
+	// # #
+	// # #
+	//  ##
+	//
+	0x0E, 0x10, 0x1E,
+};
+
+/* Character descriptors for Microsoft Sans Serif 5pt */
+/* { [Char width in bits], [Offset into microsoftSansSerif_5ptCharBitmaps in bytes] } */
+const FONT_CHAR_INFO microsoftSansSerif_5ptDescriptors[] =
+{
+	{2, 0}, 		/* 1 */
+	{0, 0}, 		/* 2 */
+	{0, 0}, 		/* 3 */
+	{0, 0}, 		/* 4 */
+	{0, 0}, 		/* 5 */
+	{0, 0}, 		/* 6 */
+	{0, 0}, 		/* 7 */
+	{0, 0}, 		/* 8 */
+	{0, 0}, 		/* 9 */
+	{0, 0}, 		/* : */
+	{0, 0}, 		/* ; */
+	{0, 0}, 		/* < */
+	{0, 0}, 		/* = */
+	{0, 0}, 		/* > */
+	{0, 0}, 		/* ? */
+	{0, 0}, 		/* @ */
+	{0, 0}, 		/* A */
+	{0, 0}, 		/* B */
+	{0, 0}, 		/* C */
+	{0, 0}, 		/* D */
+	{0, 0}, 		/* E */
+	{0, 0}, 		/* F */
+	{0, 0}, 		/* G */
+	{0, 0}, 		/* H */
+	{0, 0}, 		/* I */
+	{0, 0}, 		/* J */
+	{0, 0}, 		/* K */
+	{0, 0}, 		/* L */
+	{0, 0}, 		/* M */
+	{0, 0}, 		/* N */
+	{0, 0}, 		/* O */
+	{0, 0}, 		/* P */
+	{0, 0}, 		/* Q */
+	{0, 0}, 		/* R */
+	{0, 0}, 		/* S */
+	{0, 0}, 		/* T */
+	{0, 0}, 		/* U */
+	{0, 0}, 		/* V */
+	{0, 0}, 		/* W */
+	{0, 0}, 		/* X */
+	{0, 0}, 		/* Y */
+	{0, 0}, 		/* Z */
+	{0, 0}, 		/* [ */
+	{0, 0}, 		/* \ */
+	{0, 0}, 		/* ] */
+	{0, 0}, 		/* ^ */
+	{0, 0}, 		/* _ */
+	{0, 0}, 		/* ` */
+	{0, 0}, 		/* a */
+	{0, 0}, 		/* b */
+	{3, 2}, 		/* c */
+	{0, 0}, 		/* d */
+	{4, 5}, 		/* e */
+	{0, 0}, 		/* f */
+	{0, 0}, 		/* g */
+	{0, 0}, 		/* h */
+	{0, 0}, 		/* i */
+	{0, 0}, 		/* j */
+	{0, 0}, 		/* k */
+	{0, 0}, 		/* l */
+	{0, 0}, 		/* m */
+	{3, 9}, 		/* n */
+	{4, 12}, 		/* o */
+	{0, 0}, 		/* p */
+	{3, 16}, 		/* q */
+	{2, 19}, 		/* r */
+	{3, 21}, 		/* s */
+	{2, 24}, 		/* t */
+	{3, 26}, 		/* u */
+};
+
+/* Font information for Microsoft Sans Serif 5pt */
+const FONT_INFO microsoftSansSerif_5ptFontInfo =
+{
+	1, /*  Character height */
+	'1', /*  Start character */
+	'u', /*  End character */
+	2, /*  Width, in pixels, of space character */
+	microsoftSansSerif_5ptDescriptors, /*  Character descriptor array */
+	microsoftSansSerif_5ptBitmaps, /*  Character bitmap array */
+};
+
+
+
+uint16_t disp_bit_buffer[BACK_BUFFER_WIDTH] = {
+		0b0000000000001110,
+		0b0000000000010001,
+		0b0000000000010001,
+		0b0000000000011001,
+		0b0000000000011110,
+		0b0000000000000000,
+		0b0000000000011111,
+		0b0000000000010000,
+		0b0000000000010000,
+		0b0000000000001111,
+		0b0000000000000000,
+		0b0000000000011111,
+		0b0000000000010101,
+		0b0000000000010101,
+		0b0000000000000000,
+		0b0000000000011111,
+		0b0000000000010101,
+		0b0000000000010101,
+		0b0000000000000000,
+		0b0000000000011111,
+		0b0000000000000101,
+		0b0000000000001101,
+		0b0000000000010010,
+		0b0000000000000000,
+		0b0000000000001110,
+		0b0000000000010001,
+		0b0000000000010001,
+		0b0000000000010001,
+		0b0000000000001010,
+		0b0000000000000000,
+		0b0000000000001110,
+		0b0000000000010001,
+		0b0000000000010001,
+		0b0000000000010001,
+		0b0000000000001110,
+		0b0000000000000000,
+		0b0000000000011111,
+		0b0000000000000100,
+		0b0000000000011000,
+		0b0000000000011111,
+		0b0000000000000000,
+		0b0000000000000000,
+		0b0000000000000000,
+		0b0000000000000000,
+		0b0000000000000000,
+		0b0000000000000000,
+		0b0000000000000000
 };
 
 uint8_t back_buffer_x = 32;
 uint8_t back_buffer_y = 10;
 
-void led_disp_to_values(uint8_t left, uint8_t top) {
+void print(char* text) {
+	uint8_t character = 0;
+	uint8_t cursor = 0;
+	do {
+		// character is:
+		// microsoftSansSerif_5ptFontInfo.data[microsoftSansSerif_5ptFontInfo.startChar + text[i]]
+
+		// if (character is space), use spacePixels
+
+		for (uint16_t i = microsoftSansSerif_5ptFontInfo.charInfo[text[character] - microsoftSansSerif_5ptFontInfo.startChar].offset; i < microsoftSansSerif_5ptFontInfo.charInfo[text[character] - microsoftSansSerif_5ptFontInfo.startChar].offset + microsoftSansSerif_5ptFontInfo.charInfo[text[character] - microsoftSansSerif_5ptFontInfo.startChar].widthBits; i++) {
+			disp_bit_buffer[cursor++] = microsoftSansSerif_5ptFontInfo.data[i];
+		}
+		disp_bit_buffer[cursor++] = 0; // gap between letters
+		character++;
+
+	} while (text[character]);
+
+	while (cursor < BACK_BUFFER_WIDTH) { // empty everything else.
+		disp_bit_buffer[cursor++] = 0;
+	}
+}
+
+void led_disp_bit_to_values(uint8_t left, uint8_t top) {
 	// row 1 : values[0]
 	values[0] = 0;
-	uint8_t x_offset = 0;
-	uint8_t y_offset = 0;
+	int x_offset = 0;
+	int y_offset = 0;
 	for (int bit_index=0; bit_index<16; bit_index++) {
-		if (disp_buffer[(bit_index+left) % BACK_BUFFER_WIDTH][top % BACK_BUFFER_HEIGHT])
+		if (disp_bit_buffer[(bit_index + left) % BACK_BUFFER_WIDTH] & ((1 << top) % BACK_BUFFER_HEIGHT)) {
 			values[0] |= (1 << (15 - bit_index));
+		}
 	}
 	for (int led_segment = 1; led_segment<=4; led_segment++) {
 		values[led_segment] = 0;
 
-		if (led_segment % 2) // odd
-			x_offset = 0;
-		else // even
-			x_offset = 8;
+		// If led_segment is odd, set x_offset to 0; otherwise, set to 8.
+		x_offset = (led_segment & 1)? 0: 8;
+		// TODO: This also works, please benchmark:
+		// x_offset = (~led_segment & 1) << 3;
 
-		if (led_segment > 2)
-			y_offset = 3;
-		else
-			y_offset = 1;
+		// If led segment is one of the bottom two, y_offset is 3; else 1.
+		y_offset = (led_segment > 2)? 3 : 1;
 
-		for (int bit_index=0; bit_index<8; bit_index++) {
-			if (disp_buffer[(x_offset + bit_index + left) % BACK_BUFFER_WIDTH][(y_offset + top) % BACK_BUFFER_HEIGHT])
+		for (int bit_index=0; bit_index<16; bit_index++) {
+			if (bit_index == 8) {
+				y_offset++;
+				x_offset-=8;
+			}
+
+			if (disp_bit_buffer[(x_offset + bit_index + left) % BACK_BUFFER_WIDTH] & (1 << ((y_offset + top) % BACK_BUFFER_HEIGHT)))
 				values[led_segment] |= (1 << (15 - bit_index));
 		}
-		y_offset++;
-		for (int bit_index=0; bit_index<8; bit_index++) {
-			if (disp_buffer[(x_offset + bit_index + left) % BACK_BUFFER_WIDTH][(y_offset + top) % BACK_BUFFER_HEIGHT])
-				values[led_segment] |= (1 << (7 - bit_index));
-		}
-
-		//values[led_segment] |= ((disp[(bit_index % 8) + (~(led_segment & 0b1) * 8)][led_segment + bit_index / 8] ? 1 : 0) << bit_index);
 	}
 }
 
@@ -430,10 +623,12 @@ int main( void )
 	led_enable(1);
 	while (1) {
 		for (int i=0; i<BACK_BUFFER_WIDTH; i++) {
-			led_disp_to_values(i, 0);
+//			led_disp_to_values(i, 0);
+			led_disp_bit_to_values(i, 0);
 			led_display_bits(values);
 			delay(150);
 		}
+		print("test");
 	}
 
 	uint8_t receive_status = read_single_register_sync(RFM_IRQ1);
