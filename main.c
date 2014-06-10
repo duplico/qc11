@@ -1,6 +1,7 @@
 #include "main.h"
 #include "driverlib.h"
 #include "radio.h"
+#include "fonts.h"
 
 #define WRITE_IF(port, pin, val) if (val) GPIO_setOutputHighOnPin(port, pin); else GPIO_setOutputLowOnPin(port, pin);
 #define GPIO_pulse(port, pin) do { GPIO_setOutputHighOnPin(port, pin); GPIO_setOutputLowOnPin(port, pin); } while (0);
@@ -44,191 +45,6 @@ uint8_t disp[16][5] = { // column-major format (for some reason)
 		{0}, {0}, {0}, {0}, {0},
 		{0}, {0}, {0}, {0}, {0}, {0}
 };
-
-/*
-**  Font data for Microsoft Sans Serif 5pt
-*/
-
-/* Character bitmaps for Microsoft Sans Serif 5pt */
-const uint8_t microsoftSansSerif_5ptBitmaps[] =
-{
-	/* @0 '1' (2 pixels wide) */
-	// ##
-	//  #
-	//  #
-	//  #
-	//  #
-	//
-	0x01, 0x1F,
-
-	/* @2 'c' (3 pixels wide) */
-	//
-	//  ##
-	// #
-	// #
-	//  ##
-	//
-	0x0C, 0x12, 0x12,
-
-	/* @5 'e' (4 pixels wide) */
-	//
-	//  ##
-	// #  #
-	// ###
-	//  ###
-	//
-	0x0C, 0x1A, 0x1A, 0x14,
-
-	/* @9 'n' (3 pixels wide) */
-	//
-	// ###
-	// # #
-	// # #
-	// # #
-	//
-	0x1E, 0x02, 0x1E,
-
-	/* @12 'o' (4 pixels wide) */
-	//
-	//  ##
-	// #  #
-	// #  #
-	//  ##
-	//
-	0x0C, 0x12, 0x12, 0x0C,
-
-	/* @16 'q' (3 pixels wide) */
-	//
-	//  ##
-	// # #
-	// # #
-	// ###
-	//   #
-	0x1C, 0x12, 0x3E,
-
-	/* @19 'r' (2 pixels wide) */
-	//
-	// ##
-	// #
-	// #
-	// #
-	//
-	0x1E, 0x02,
-
-	/* @21 's' (3 pixels wide) */
-	//
-	//  ##
-	// #
-	//  ##
-	// ###
-	//
-	0x14, 0x1A, 0x1A,
-
-	/* @24 't' (2 pixels wide) */
-	// #
-	// ##
-	// #
-	// #
-	// ##
-	//
-	0x1F, 0x12,
-
-	/* @26 'u' (3 pixels wide) */
-	//
-	// # #
-	// # #
-	// # #
-	//  ##
-	//
-	0x0E, 0x10, 0x1E,
-};
-
-/* Character descriptors for Microsoft Sans Serif 5pt */
-/* { [Char width in bits], [Offset into microsoftSansSerif_5ptCharBitmaps in bytes] } */
-const FONT_CHAR_INFO microsoftSansSerif_5ptDescriptors[] =
-{
-	{2, 0}, 		/* 1 */
-	{0, 0}, 		/* 2 */
-	{0, 0}, 		/* 3 */
-	{0, 0}, 		/* 4 */
-	{0, 0}, 		/* 5 */
-	{0, 0}, 		/* 6 */
-	{0, 0}, 		/* 7 */
-	{0, 0}, 		/* 8 */
-	{0, 0}, 		/* 9 */
-	{0, 0}, 		/* : */
-	{0, 0}, 		/* ; */
-	{0, 0}, 		/* < */
-	{0, 0}, 		/* = */
-	{0, 0}, 		/* > */
-	{0, 0}, 		/* ? */
-	{0, 0}, 		/* @ */
-	{0, 0}, 		/* A */
-	{0, 0}, 		/* B */
-	{0, 0}, 		/* C */
-	{0, 0}, 		/* D */
-	{0, 0}, 		/* E */
-	{0, 0}, 		/* F */
-	{0, 0}, 		/* G */
-	{0, 0}, 		/* H */
-	{0, 0}, 		/* I */
-	{0, 0}, 		/* J */
-	{0, 0}, 		/* K */
-	{0, 0}, 		/* L */
-	{0, 0}, 		/* M */
-	{0, 0}, 		/* N */
-	{0, 0}, 		/* O */
-	{0, 0}, 		/* P */
-	{0, 0}, 		/* Q */
-	{0, 0}, 		/* R */
-	{0, 0}, 		/* S */
-	{0, 0}, 		/* T */
-	{0, 0}, 		/* U */
-	{0, 0}, 		/* V */
-	{0, 0}, 		/* W */
-	{0, 0}, 		/* X */
-	{0, 0}, 		/* Y */
-	{0, 0}, 		/* Z */
-	{0, 0}, 		/* [ */
-	{0, 0}, 		/* \ */
-	{0, 0}, 		/* ] */
-	{0, 0}, 		/* ^ */
-	{0, 0}, 		/* _ */
-	{0, 0}, 		/* ` */
-	{0, 0}, 		/* a */
-	{0, 0}, 		/* b */
-	{3, 2}, 		/* c */
-	{0, 0}, 		/* d */
-	{4, 5}, 		/* e */
-	{0, 0}, 		/* f */
-	{0, 0}, 		/* g */
-	{0, 0}, 		/* h */
-	{0, 0}, 		/* i */
-	{0, 0}, 		/* j */
-	{0, 0}, 		/* k */
-	{0, 0}, 		/* l */
-	{0, 0}, 		/* m */
-	{3, 9}, 		/* n */
-	{4, 12}, 		/* o */
-	{0, 0}, 		/* p */
-	{3, 16}, 		/* q */
-	{2, 19}, 		/* r */
-	{3, 21}, 		/* s */
-	{2, 24}, 		/* t */
-	{3, 26}, 		/* u */
-};
-
-/* Font information for Microsoft Sans Serif 5pt */
-const FONT_INFO microsoftSansSerif_5ptFontInfo =
-{
-	1, /*  Character height */
-	'1', /*  Start character */
-	'u', /*  End character */
-	2, /*  Width, in pixels, of space character */
-	microsoftSansSerif_5ptDescriptors, /*  Character descriptor array */
-	microsoftSansSerif_5ptBitmaps, /*  Character bitmap array */
-};
-
 
 
 uint16_t disp_bit_buffer[BACK_BUFFER_WIDTH] = {
@@ -293,8 +109,8 @@ void print(char* text) {
 
 		// if (character is space), use spacePixels
 
-		for (uint16_t i = microsoftSansSerif_5ptFontInfo.charInfo[text[character] - microsoftSansSerif_5ptFontInfo.startChar].offset; i < microsoftSansSerif_5ptFontInfo.charInfo[text[character] - microsoftSansSerif_5ptFontInfo.startChar].offset + microsoftSansSerif_5ptFontInfo.charInfo[text[character] - microsoftSansSerif_5ptFontInfo.startChar].widthBits; i++) {
-			disp_bit_buffer[cursor++] = microsoftSansSerif_5ptFontInfo.data[i];
+		for (uint16_t i = d3_5ptFontInfo.charInfo[text[character] - d3_5ptFontInfo.startChar].offset; i < d3_5ptFontInfo.charInfo[text[character] - d3_5ptFontInfo.startChar].offset + d3_5ptFontInfo.charInfo[text[character] - d3_5ptFontInfo.startChar].widthBits; i++) {
+			disp_bit_buffer[cursor++] = d3_5ptFontInfo.data[i];
 		}
 		disp_bit_buffer[cursor++] = 0; // gap between letters
 		character++;
@@ -589,8 +405,7 @@ int main( void )
 	init_serial();
 	init_radio();
 	led_disable();
-
-	delay(100);
+	print("qcxi");
 
 //	for (int i=0; i<64; i++) {
 //		test_data[i] = (uint8_t)'Q';
@@ -619,16 +434,18 @@ int main( void )
 
 	//write_single_register(RFM_OPMODE, 0b00010000);
 
-	led_display_bits(zeroes);
+//	led_display_bits(zeroes);
 	led_enable(1);
+
+	delay(2000);
 	while (1) {
 		for (int i=0; i<BACK_BUFFER_WIDTH; i++) {
 //			led_disp_to_values(i, 0);
 			led_disp_bit_to_values(i, 0);
 			led_display_bits(values);
-			delay(150);
+			delay(225);
 		}
-		print("test");
+//		print("test");
 	}
 
 	uint8_t receive_status = read_single_register_sync(RFM_IRQ1);
