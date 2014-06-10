@@ -1,4 +1,4 @@
-#include "main.h"
+#include "qcxi.h"
 #include "driverlib.h"
 #include "radio.h"
 #include "fonts.h"
