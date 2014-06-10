@@ -40,62 +40,7 @@ uint16_t values[5] = {65535, 65535, 65535, 65535, 65535};
 
 uint16_t zeroes[5] = {0, 0, 0, 0, 0};
 
-uint8_t disp[16][5] = { // column-major format (for some reason)
-		{0}, {0}, {0}, {0}, {0},
-		{0}, {0}, {0}, {0}, {0},
-		{0}, {0}, {0}, {0}, {0}, {0}
-};
-
-
-uint16_t disp_bit_buffer[BACK_BUFFER_WIDTH] = {
-		0b0000000000001110,
-		0b0000000000010001,
-		0b0000000000010001,
-		0b0000000000011001,
-		0b0000000000011110,
-		0b0000000000000000,
-		0b0000000000011111,
-		0b0000000000010000,
-		0b0000000000010000,
-		0b0000000000001111,
-		0b0000000000000000,
-		0b0000000000011111,
-		0b0000000000010101,
-		0b0000000000010101,
-		0b0000000000000000,
-		0b0000000000011111,
-		0b0000000000010101,
-		0b0000000000010101,
-		0b0000000000000000,
-		0b0000000000011111,
-		0b0000000000000101,
-		0b0000000000001101,
-		0b0000000000010010,
-		0b0000000000000000,
-		0b0000000000001110,
-		0b0000000000010001,
-		0b0000000000010001,
-		0b0000000000010001,
-		0b0000000000001010,
-		0b0000000000000000,
-		0b0000000000001110,
-		0b0000000000010001,
-		0b0000000000010001,
-		0b0000000000010001,
-		0b0000000000001110,
-		0b0000000000000000,
-		0b0000000000011111,
-		0b0000000000000100,
-		0b0000000000011000,
-		0b0000000000011111,
-		0b0000000000000000,
-		0b0000000000000000,
-		0b0000000000000000,
-		0b0000000000000000,
-		0b0000000000000000,
-		0b0000000000000000,
-		0b0000000000000000
-};
+uint16_t disp_bit_buffer[BACK_BUFFER_WIDTH] = { 0 };
 
 uint8_t back_buffer_x = 32;
 uint8_t back_buffer_y = 10;
@@ -104,11 +49,6 @@ void print(char* text) {
 	uint8_t character = 0;
 	uint8_t cursor = 0;
 	do {
-		// character is:
-		// microsoftSansSerif_5ptFontInfo.data[microsoftSansSerif_5ptFontInfo.startChar + text[i]]
-
-		// if (character is space), use spacePixels
-
 		for (uint16_t i = d3_5ptFontInfo.charInfo[text[character] - d3_5ptFontInfo.startChar].offset; i < d3_5ptFontInfo.charInfo[text[character] - d3_5ptFontInfo.startChar].offset + d3_5ptFontInfo.charInfo[text[character] - d3_5ptFontInfo.startChar].widthBits; i++) {
 			disp_bit_buffer[cursor++] = d3_5ptFontInfo.data[i];
 		}
@@ -192,7 +132,7 @@ void init_gpio() {
 	GPIO_setAsPeripheralModuleFunctionOutputPin(
 			GPIO_PORT_P5,
 			GPIO_PIN2 + GPIO_PIN3 // XT2
-	   // + GPIO_PIN4 + GPIO_PIN5 // XT1
+	   // + GPIO_PIN4 + GPIO_PIN5 // XT1 // TODO
 	);
 
 	// Setup LED module pins //////////////////////////////////////////////////
@@ -207,8 +147,6 @@ void init_gpio() {
 
 	//   PWM-enabled BLANK pin:
 //	GPIO_setAsPeripheralModuleFunctionOutputPin(LED_PORT, LED_BLANK);
-
-	// PWM disable - TODO:
 	GPIO_setAsOutputPin(LED_PORT, LED_BLANK);
 
 	// IR pins ////////////////////////////////////////////////////////////////
@@ -244,15 +182,19 @@ void init_clocks() {
 			UCS_XT2_CRYSTAL_FREQUENCY
 	);
 
-	// Initialize XT1 at 32.768KHz
-//	returnValue = UCS_LFXT1StartWithTimeout(
-//			UCS_XT1_DRIVE3, // MAX POWER
-//			UCS_XCAP_1,		// 5.5 pF, closest to 4 pF of crystal.
-//			UCS_XT1_TIMEOUT
-//	);
+	//Port select XT1
+	GPIO_setAsPeripheralModuleFunctionInputPin(
+			GPIO_PORT_P5,
+			GPIO_PIN4 + GPIO_PIN5
+	);
 
-	// Turn off XT1 because it's soldered on backwards. TODO
-	UCS_XT1Off();
+	//Initializes the XT1 crystal oscillator with no timeout
+	//In case of failure, code hangs here.
+	//For time-out instead of code hang use UCS_LFXT1StartWithTimeout()
+	UCS_LFXT1Start(
+			UCS_XT1_DRIVE0,
+			UCS_XCAP_3
+	);
 
 	// Init XT2:
 	returnValue = UCS_XT2StartWithTimeout(
@@ -263,16 +205,9 @@ void init_clocks() {
 	// Setup the clocks:
 
 	// Select XT1 as ACLK source
-//	UCS_clockSignalInit(
-//			UCS_ACLK,
-//			UCS_XT1CLK_SELECT,
-//			UCS_CLOCK_DIVIDER_1
-//	);
-
-	// Never mind, actually use REFO because the crystal is in backwards.
 	UCS_clockSignalInit(
 			UCS_ACLK,
-			UCS_REFOCLK_SELECT,
+			UCS_XT1CLK_SELECT,
 			UCS_CLOCK_DIVIDER_1
 	);
 
@@ -284,9 +219,7 @@ void init_clocks() {
 	);
 
 	// Select REFO as the input to the FLL reference.
-	// TODO: once the crystal is in correctly, we can go back
-	// to using UCS_XT1CLK_SELECT.
-	UCS_clockSignalInit(UCS_FLLREF, UCS_REFOCLK_SELECT,
+	UCS_clockSignalInit(UCS_FLLREF, UCS_XT1CLK_SELECT,
 			UCS_CLOCK_DIVIDER_1);
 
 	UCS_initFLLSettle(
@@ -294,9 +227,7 @@ void init_clocks() {
 			MCLK_FLLREF_RATIO
 	);
 
-	// TODO: Configure DCO
-
-	// Use the DCO paired with REFO+FLL (or XT1, later) as the master clock
+	// Use the DCO paired with XT1+FLL as the master clock
 	// This will run at around 1 MHz. This is the default.
 	//                     (1,048,576 Hz)
 	UCS_clockSignalInit(UCS_MCLK, UCS_DCOCLKDIV_SELECT,
@@ -393,6 +324,11 @@ uint8_t reg_reads[2] = {0, 0};
 uint8_t reg_data[65] = {0};
 uint8_t test_data[65] = {0};
 
+
+volatile Calendar currentTime;
+char time[6] = "00:00";
+
+
 int main( void )
 {
 	// TODO: check to see what powerup mode we're in.
@@ -405,37 +341,95 @@ int main( void )
 	init_serial();
 	init_radio();
 	led_disable();
-	print("qcxi");
+	print("qcxi  QCXI");
+	led_disp_bit_to_values(0, 0);
+	led_display_bits(values);
+	led_enable(1);
+
+
+
+    //Setup Current Time for Calendar
+    currentTime.Seconds    = 0x00;
+    currentTime.Minutes    = 6;
+    currentTime.Hours      = 1;
+    currentTime.DayOfWeek  = 0x03;
+    currentTime.DayOfMonth = 0x20;
+    currentTime.Month      = 0x07;
+    currentTime.Year       = 0x2011;
+
+    //Initialize Calendar Mode of RTC
+    /*
+     * Base Address of the RTC_A_A
+     * Pass in current time, intialized above
+     * Use BCD as Calendar Register Format
+     */
+    RTC_A_calendarInit(RTC_A_BASE,
+                       currentTime,
+                       RTC_A_FORMAT_BCD);
+
+    //Specify an interrupt to assert every minute
+    RTC_A_setCalendarEvent(RTC_A_BASE,
+                           RTC_A_CALENDAREVENT_MINUTECHANGE);
+
+    //Enable interrupt for RTC Ready Status, which asserts when the RTC
+    //Calendar registers are ready to read.
+    //Also, enable interrupts for the Calendar alarm and Calendar event.
+    RTC_A_clearInterrupt(RTC_A_BASE,
+                         RTCRDYIFG + RTCTEVIFG + RTCAIFG);
+    RTC_A_enableInterrupt(RTC_A_BASE,
+                          RTCRDYIE + RTCTEVIE + RTCAIE);
+
+    //Start RTC Clock
+    RTC_A_startClock(RTC_A_BASE);
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 //	for (int i=0; i<64; i++) {
 //		test_data[i] = (uint8_t)'Q';
 //	}
 //	write_serial("OK");
 
-//	while (1) {
-//
-//#if !BADGE_TARGET
-//		while (1) {
-//			mode_tx_sync();
-//			write_serial("Transmitting a thing.\r\n");
-//			write_serial(test_data);
-//			write_register(RFM_FIFO, test_data, 64);
-//			delay(2500);
-//		}
-//#else
-//		mode_rx_sync();
-//		write_serial("Receive mode!");
-//		while (!rfm_crcok());
-//		write_serial("We seem to have gotten something!");
-//		read_register_sync(RFM_FIFO, 64, reg_data);
-//		write_serial(reg_data);
-//#endif
-//	}
+
+	mode_rx_sync();
+	print("RM");
+	led_disp_bit_to_values(0, 0);
+	led_display_bits(values);
+
+	//		write_serial("Receive mode!");
+	//		while (!rfm_crcok());
+	//		write_serial("We seem to have gotten something!");
+	//		read_register_sync(RFM_FIFO, 64, reg_data);
+	//		write_serial(reg_data);
+
+	while (1) {
+
+        time[0] = '0' + currentTime.Hours / 10;
+        time[1] = '0' + currentTime.Hours % 10;
+        time[3] = '0' + currentTime.Minutes / 10;
+        time[4] = '0' + currentTime.Minutes % 10;
+        print(time);
+		for (int i=0; i<BACK_BUFFER_WIDTH; i++) {
+			led_disp_bit_to_values(i, 0);
+			led_display_bits(values);
+			delay(100);
+		}
+	}
 
 	//write_single_register(RFM_OPMODE, 0b00010000);
 
 //	led_display_bits(zeroes);
-	led_enable(1);
+	led_enable(10);
 
 	delay(2000);
 	while (1) {
@@ -443,7 +437,7 @@ int main( void )
 //			led_disp_to_values(i, 0);
 			led_disp_bit_to_values(i, 0);
 			led_display_bits(values);
-			delay(225);
+			delay(100);
 		}
 //		print("test");
 	}
@@ -568,4 +562,40 @@ __interrupt void USCI_A1_ISR(void)
 		break;
 	default: break;
 	}
+}
+
+#if defined(__TI_COMPILER_VERSION__) || defined(__IAR_SYSTEMS_ICC__)
+#pragma vector=RTC_VECTOR
+__interrupt
+#elif defined(__GNUC__)
+__attribute__((interrupt(RTC_VECTOR)))
+#endif
+void RTC_A_ISR(void)
+{
+        switch (__even_in_range(RTCIV, 16)) {
+        case 0: break;  //No interrupts
+        case 2:         //RTCRDYIFG
+                //Toggle P1.0 every second
+                GPIO_toggleOutputOnPin(
+                        GPIO_PORT_P1,
+                        GPIO_PIN0);
+                break;
+        case 4:         //RTCEVIFG
+                //Interrupts every minute
+                __no_operation();
+
+                //Read out New Time a Minute Later BREAKPOINT HERE
+                currentTime = RTC_A_getCalendarTime(RTC_A_BASE);
+                break;
+        case 6:         //RTCAIFG
+                //Interrupts 5:00pm on 5th day of week
+                __no_operation();
+                break;
+        case 8: break;  //RT0PSIFG
+        case 10: break; //RT1PSIFG
+        case 12: break; //Reserved
+        case 14: break; //Reserved
+        case 16: break; //Reserved
+        default: break;
+        }
 }
