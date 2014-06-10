@@ -5,7 +5,7 @@
  *      Author: George
  */
 
-#include "main.h"
+#include "qcxi.h"
 #include "fonts.h"
 
 /* Character bitmaps for D3 5pt */

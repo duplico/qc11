@@ -6,7 +6,7 @@
  */
 
 #include "radio.h"
-#include "main.h"
+#include "qcxi.h"
 
 #include <stdint.h>
 #include "driverlib.h"
