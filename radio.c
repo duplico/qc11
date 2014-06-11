@@ -73,11 +73,11 @@ void init_radio() {
 	//	USCI_B_SPI_enableInterrupt(USCI_B1_BASE, USCI_B_SPI_TRANSMIT_INTERRUPT);
 }
 
-uint8_t rfm_reg_data[64] = {0};
+volatile uint8_t rfm_reg_data[64] = {0};
 uint8_t rfm_zeroes[64] = {0};
 uint8_t rfm_reg_data_index = 0;
 uint8_t rfm_reg_data_length = 0;
-uint8_t rfm_reg_data_ready = 0;
+volatile uint8_t rfm_reg_data_ready = 0;
 uint8_t frame_bytes_remaining = 0;
 
 void cmd_register(uint8_t cmd, uint8_t *data, uint8_t len) {
@@ -123,7 +123,7 @@ void read_register(uint8_t addr, uint8_t len) {
 	cmd_register(addr, rfm_zeroes, len);
 }
 
-uint8_t read_register_sync(uint8_t addr, uint8_t len, uint8_t *target) {
+uint8_t read_register_sync(uint8_t addr, uint8_t len, uint8_t *target) { // TODO: Refactor to be the same as write.
 	read_register(addr, len);
 	memcpy(target, rfm_reg_data, len);
 	return len;
