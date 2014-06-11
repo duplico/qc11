@@ -136,12 +136,20 @@ uint8_t read_single_register_sync(uint8_t addr) {
 
 void mode_rx_sync() {
 	write_single_register(RFM_OPMODE, 0b00010000); // Receive mode.
-	while (!(BIT7 & read_single_register_sync(RFM_IRQ1)));
+	uint8_t reg_read;
+	do {
+		reg_read = read_single_register_sync(RFM_IRQ1);
+	}
+	while (!(BIT7 & reg_read) || !(BIT6 & reg_read));
 }
 
 void mode_tx_sync() {
 	write_single_register(RFM_OPMODE, 0b00001100); // TX mode.
-	while (!(BIT7 & read_single_register_sync(RFM_IRQ1)));
+	uint8_t reg_read;
+	do {
+		reg_read = read_single_register_sync(RFM_IRQ1);
+	}
+	while (!(BIT7 & reg_read) || !(BIT5 & reg_read));
 }
 
 uint8_t rfm_crcok() {
