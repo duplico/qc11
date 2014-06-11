@@ -51,8 +51,12 @@ void print(char* text) {
 	do {
 		for (uint16_t i = d3_5ptFontInfo.charInfo[text[character] - d3_5ptFontInfo.startChar].offset; i < d3_5ptFontInfo.charInfo[text[character] - d3_5ptFontInfo.startChar].offset + d3_5ptFontInfo.charInfo[text[character] - d3_5ptFontInfo.startChar].widthBits; i++) {
 			disp_bit_buffer[cursor++] = d3_5ptFontInfo.data[i];
+			if (cursor == BACK_BUFFER_WIDTH)
+				return;
 		}
 		disp_bit_buffer[cursor++] = 0; // gap between letters
+		if (cursor == BACK_BUFFER_WIDTH)
+			return;
 		character++;
 
 	} while (text[character]);
@@ -191,10 +195,35 @@ void init_clocks() {
 	//Initializes the XT1 crystal oscillator with no timeout
 	//In case of failure, code hangs here.
 	//For time-out instead of code hang use UCS_LFXT1StartWithTimeout()
-	UCS_LFXT1Start(
-			UCS_XT1_DRIVE0,
-			UCS_XCAP_3
-	);
+	// TODO: this is to make it work with the first round of prototypes
+//	UCS_LFXT1Start(
+//			UCS_XT1_DRIVE0,
+//			UCS_XCAP_0
+//	);
+//	// Select XT1 as ACLK source
+//	UCS_clockSignalInit(
+//			UCS_ACLK,
+//			UCS_XT1CLK_SELECT,
+//			UCS_CLOCK_DIVIDER_1
+//	);
+//	// Select XT1 as the input to the FLL reference.
+//	UCS_clockSignalInit(UCS_FLLREF, UCS_XT1CLK_SELECT,
+//			UCS_CLOCK_DIVIDER_1);
+
+	// TODO: REMOVE THIS ////////////////////////////////////
+	UCS_XT1Off();                                          //
+	UCS_clockSignalInit(                                   //
+			UCS_ACLK,                                      //
+			UCS_REFOCLK_SELECT,                            //
+			UCS_CLOCK_DIVIDER_1                            //
+	);                                                     //
+	UCS_clockSignalInit(UCS_FLLREF, UCS_REFOCLK_SELECT,    //
+			UCS_CLOCK_DIVIDER_1);                          //
+	                                                       //
+	/////////////////////////////////////////////////////////
+	// OR ELSE!!!!!!!                                      //
+	/////////////////////////////////////////////////////////
+
 
 	// Init XT2:
 	returnValue = UCS_XT2StartWithTimeout(
@@ -204,12 +233,6 @@ void init_clocks() {
 
 	// Setup the clocks:
 
-	// Select XT1 as ACLK source
-	UCS_clockSignalInit(
-			UCS_ACLK,
-			UCS_XT1CLK_SELECT,
-			UCS_CLOCK_DIVIDER_1
-	);
 
 	//Select XT2 as SMCLK source
 	UCS_clockSignalInit(
@@ -218,9 +241,6 @@ void init_clocks() {
 			UCS_CLOCK_DIVIDER_2 // Divide by 2 to get 8 MHz.
 	);
 
-	// Select REFO as the input to the FLL reference.
-	UCS_clockSignalInit(UCS_FLLREF, UCS_XT1CLK_SELECT,
-			UCS_CLOCK_DIVIDER_1);
 
 	UCS_initFLLSettle(
 			MCLK_DESIRED_FREQUENCY_IN_KHZ,
@@ -328,6 +348,9 @@ uint8_t test_data[65] = {0};
 volatile Calendar currentTime;
 char time[6] = "00:00";
 
+volatile uint8_t f_new_minute = 0;
+
+uint8_t receive_status;
 
 int main( void )
 {
@@ -346,12 +369,12 @@ int main( void )
 	led_display_bits(values);
 	led_enable(1);
 
-
+	// Clock startup
 
     //Setup Current Time for Calendar
     currentTime.Seconds    = 0x00;
-    currentTime.Minutes    = 6;
-    currentTime.Hours      = 1;
+    currentTime.Minutes    = 0x19;
+    currentTime.Hours      = 0x18;
     currentTime.DayOfWeek  = 0x03;
     currentTime.DayOfMonth = 0x20;
     currentTime.Month      = 0x07;
@@ -382,48 +405,50 @@ int main( void )
     //Start RTC Clock
     RTC_A_startClock(RTC_A_BASE);
 
+    // End clock startup
 
 
+	for (int i=0; i<64; i++) {
+		test_data[i] = (uint8_t)'Q';
+	}
 
-
-
-
-
-
-
-
-
-
-
-//	for (int i=0; i<64; i++) {
-//		test_data[i] = (uint8_t)'Q';
-//	}
-//	write_serial("OK");
-
-
+    // Radio startup
 	mode_rx_sync();
-	print("RM");
+	print("Read mode");
 	led_disp_bit_to_values(0, 0);
 	led_display_bits(values);
 
+	// TODO: loop
+
+
+//	while (!rfm_crcok());
+//	write_serial("We seem to have gotten something!");
+//	read_register_sync(RFM_FIFO, 64, reg_data);
+
 	//		write_serial("Receive mode!");
-	//		while (!rfm_crcok());
-	//		write_serial("We seem to have gotten something!");
-	//		read_register_sync(RFM_FIFO, 64, reg_data);
 	//		write_serial(reg_data);
 
 	while (1) {
 
-        time[0] = '0' + currentTime.Hours / 10;
-        time[1] = '0' + currentTime.Hours % 10;
-        time[3] = '0' + currentTime.Minutes / 10;
-        time[4] = '0' + currentTime.Minutes % 10;
-        print(time);
+		if (f_new_minute) {
+			currentTime = RTC_A_getCalendarTime(RTC_A_BASE);
+			time[0] = '0' + ((currentTime.Hours & 0b11110000) >> 4);
+			time[1] = '0' + (currentTime.Hours & 0b1111);
+			time[3] = '0' + ((currentTime.Minutes & 0b11110000) >> 4);
+			time[4] = '0' + (currentTime.Minutes & 0b1111);
+			print(time);
+			f_new_minute = 0;
+		}
 		for (int i=0; i<BACK_BUFFER_WIDTH; i++) {
 			led_disp_bit_to_values(i, 0);
 			led_display_bits(values);
 			delay(100);
+			if (rfm_crcok()) {
+				read_register_sync(RFM_FIFO, 64, reg_data);
+				print((char *)reg_data);
+			}
 		}
+		// TODO: "scroll" flag w/ configgable ISR
 	}
 
 	//write_single_register(RFM_OPMODE, 0b00010000);
@@ -442,7 +467,7 @@ int main( void )
 //		print("test");
 	}
 
-	uint8_t receive_status = read_single_register_sync(RFM_IRQ1);
+//	uint8_t receive_status = read_single_register_sync(RFM_IRQ1);
 	while (1) {
 		receive_status = read_single_register_sync(RFM_IRQ1);
 		delay(100);
@@ -576,16 +601,13 @@ void RTC_A_ISR(void)
         case 0: break;  //No interrupts
         case 2:         //RTCRDYIFG
                 //Toggle P1.0 every second
-                GPIO_toggleOutputOnPin(
-                        GPIO_PORT_P1,
-                        GPIO_PIN0);
+//                GPIO_toggleOutputOnPin(
+//                        GPIO_PORT_P1,
+//                        GPIO_PIN0);
                 break;
         case 4:         //RTCEVIFG
                 //Interrupts every minute
-                __no_operation();
-
-                //Read out New Time a Minute Later BREAKPOINT HERE
-                currentTime = RTC_A_getCalendarTime(RTC_A_BASE);
+                f_new_minute = 1;
                 break;
         case 6:         //RTCAIFG
                 //Interrupts 5:00pm on 5th day of week
