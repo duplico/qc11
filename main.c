@@ -458,7 +458,7 @@ int main( void )
 			}
 		}
 		mode_tx_sync();
-		print("TX mode");
+		print(" TX");
 		led_disp_bit_to_values(0, 0);
 		led_display_bits(values);
 
@@ -467,7 +467,10 @@ int main( void )
 		// check 0x28 & BIT3, AKA "PacketSent"
 		packet_sent = read_single_register_sync(0x28);
 		packet_sent &= BIT3;
-		print((packet_sent >> 3) ? "sent" : "ntsnt?");
+		print((packet_sent >> 3) ? "snt" : "ntx?");
+		led_disp_bit_to_values(0, 0);
+		led_display_bits(values);
+		delay(500);
 
 
 
