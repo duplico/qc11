@@ -45,6 +45,8 @@ uint16_t disp_bit_buffer[BACK_BUFFER_WIDTH] = { 0 };
 uint8_t back_buffer_x = 32;
 uint8_t back_buffer_y = 10;
 
+uint8_t xt1_status; // 1 = working, 0 = fault condition
+
 void print(char* text) {
 	uint8_t character = 0;
 	uint8_t cursor = 0;
@@ -192,38 +194,38 @@ void init_clocks() {
 			GPIO_PIN4 + GPIO_PIN5
 	);
 
-	//Initializes the XT1 crystal oscillator with no timeout
-	//In case of failure, code hangs here.
-	//For time-out instead of code hang use UCS_LFXT1StartWithTimeout()
-	// TODO: this is to make it work with the first round of prototypes
-//	UCS_LFXT1Start(
-//			UCS_XT1_DRIVE0,
-//			UCS_XCAP_0
-//	);
-//	// Select XT1 as ACLK source
-//	UCS_clockSignalInit(
-//			UCS_ACLK,
-//			UCS_XT1CLK_SELECT,
-//			UCS_CLOCK_DIVIDER_1
-//	);
-//	// Select XT1 as the input to the FLL reference.
-//	UCS_clockSignalInit(UCS_FLLREF, UCS_XT1CLK_SELECT,
-//			UCS_CLOCK_DIVIDER_1);
+	xt1_status = UCS_LFXT1StartWithTimeout(
+		UCS_XT1_DRIVE0,
+		UCS_XCAP_3,
+		65535
+	);
 
-	// TODO: REMOVE THIS ////////////////////////////////////
-	UCS_XT1Off();                                          //
-	UCS_clockSignalInit(                                   //
-			UCS_ACLK,                                      //
-			UCS_REFOCLK_SELECT,                            //
-			UCS_CLOCK_DIVIDER_1                            //
-	);                                                     //
-	UCS_clockSignalInit(UCS_FLLREF, UCS_REFOCLK_SELECT,    //
-			UCS_CLOCK_DIVIDER_1);                          //
-	                                                       //
-	/////////////////////////////////////////////////////////
-	// OR ELSE!!!!!!!                                      //
-	/////////////////////////////////////////////////////////
 
+	if (xt1_status == STATUS_FAIL) { // TODO remove compare and switch if around
+		// XT1 is broken.
+		// Fall back to REFO ////////////////////////////////////
+		UCS_XT1Off();                                          //
+		UCS_clockSignalInit(                                   //
+				UCS_ACLK,                                      //
+				UCS_REFOCLK_SELECT,                            //
+				UCS_CLOCK_DIVIDER_1                            //
+		);                                                     //
+		UCS_clockSignalInit(UCS_FLLREF, UCS_REFOCLK_SELECT,    //
+				UCS_CLOCK_DIVIDER_1);                          //
+		                                                       //
+		/////////////////////////////////////////////////////////
+	}
+	else { // XT1 is not broken:
+		// Select XT1 as ACLK source
+		UCS_clockSignalInit(
+			UCS_ACLK,
+			UCS_XT1CLK_SELECT,
+			UCS_CLOCK_DIVIDER_1
+		);
+		// Select XT1 as the input to the FLL reference.
+		UCS_clockSignalInit(UCS_FLLREF, UCS_XT1CLK_SELECT,
+				UCS_CLOCK_DIVIDER_1);
+	}
 
 	// Init XT2:
 	returnValue = UCS_XT2StartWithTimeout(
@@ -352,6 +354,8 @@ volatile uint8_t f_new_minute = 0;
 
 uint8_t receive_status;
 
+uint8_t packet_sent = 0;
+
 int main( void )
 {
 	// TODO: check to see what powerup mode we're in.
@@ -412,11 +416,11 @@ int main( void )
 		test_data[i] = (uint8_t)'Q';
 	}
 
-    // Radio startup
-	mode_rx_sync();
-	print("Read mode");
-	led_disp_bit_to_values(0, 0);
-	led_display_bits(values);
+//    // Radio startup
+//	mode_rx_sync();
+//	print("RX mode");
+//	led_disp_bit_to_values(0, 0);
+//	led_display_bits(values);
 
 	// TODO: loop
 
@@ -429,6 +433,10 @@ int main( void )
 	//		write_serial(reg_data);
 
 	while (1) {
+		mode_rx_sync();
+		print("RX mode");
+		led_disp_bit_to_values(0, 0);
+		led_display_bits(values);
 
 		if (f_new_minute) {
 			currentTime = RTC_A_getCalendarTime(RTC_A_BASE);
@@ -445,9 +453,24 @@ int main( void )
 			delay(100);
 			if (rfm_crcok()) {
 				read_register_sync(RFM_FIFO, 64, reg_data);
-				print((char *)reg_data);
+				//print((char *)reg_data);
+				print("recv");
 			}
 		}
+		mode_tx_sync();
+		print("TX mode");
+		led_disp_bit_to_values(0, 0);
+		led_display_bits(values);
+
+		write_register(RFM_FIFO, test_data, 64);
+		delay(500);
+		// check 0x28 & BIT3, AKA "PacketSent"
+		packet_sent = read_single_register_sync(0x28);
+		packet_sent &= BIT3;
+		print((packet_sent >> 3) ? "sent" : "ntsnt?");
+
+
+
 		// TODO: "scroll" flag w/ configgable ISR
 	}
 
