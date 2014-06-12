@@ -74,12 +74,16 @@ void led_disp_bit_to_values(uint8_t left, uint8_t top) {
 	values[0] = 0b1000000000000001;
 	int x_offset = 0;
 	int y_offset = 0;
-	for (int bit_index=0; bit_index<16; bit_index++) {
+	for (int bit_index=0; bit_index<14; bit_index++) {
 		// 0 is set, 15 is set...
 		if (disp_bit_buffer[(bit_index + left) % BACK_BUFFER_WIDTH] & ((1 << top) % BACK_BUFFER_HEIGHT)) {
-			values[0] |= (1 << (15 - bit_index));
+			values[0] |= (1 << (14 - bit_index));
 		}
 	}
+
+	// instead of 0-16 it's now 0-14 with offsets.
+	//0000000000000111 // shift to the left one fewer time
+	// 00000000000001  // and include 2 fewer pixels
 	for (int led_segment = 1; led_segment<=4; led_segment++) {
 
 		// x_offset = (led_segment & 1)? 0: 8;
@@ -92,7 +96,7 @@ void led_disp_bit_to_values(uint8_t left, uint8_t top) {
 			x_offset = 8;
 			values[led_segment] = 0b0000000100000001;
 		}
-
+		// TODO: FIX THIS FOR THE NEW ARRANGEMENT:
 		// If led segment is one of the bottom two, y_offset is 3; else 1.
 		y_offset = (led_segment > 2)? 3 : 1;
 
@@ -380,8 +384,8 @@ int main( void )
 	print("qcxi  QCXI");
 	led_disp_bit_to_values(0, 0);
 	led_display_bits(values);
-//	led_on();
-	led_enable(2);
+	led_on();
+//	led_enable(2);
 
 	// TODO
 	while (1) {
