@@ -9,10 +9,13 @@
 #define MAIN_H_
 
 #include <stdint.h>
+#include "driverlib.h"
 
 #define BADGE_TARGET 1
-
 #define BIT15 0x8000
+
+#define WRITE_IF(port, pin, val) if (val) GPIO_setOutputHighOnPin(port, pin); else GPIO_setOutputLowOnPin(port, pin)
+#define GPIO_pulse(port, pin) do { GPIO_setOutputHighOnPin(port, pin); GPIO_setOutputLowOnPin(port, pin); } while (0)
 
 #if BADGE_TARGET
 #include <msp430f5308.h>
