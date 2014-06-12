@@ -2,7 +2,7 @@
 #include "driverlib.h"
 #include "radio.h"
 #include "fonts.h"
-
+// TODO: These might could use semicolons.
 #define WRITE_IF(port, pin, val) if (val) GPIO_setOutputHighOnPin(port, pin); else GPIO_setOutputLowOnPin(port, pin);
 #define GPIO_pulse(port, pin) do { GPIO_setOutputHighOnPin(port, pin); GPIO_setOutputLowOnPin(port, pin); } while (0);
 
@@ -35,6 +35,7 @@ void delay(unsigned int);
 void led_enable(uint16_t);
 void led_disable(void);
 void led_display_bits(uint16_t*);
+void led_on();
 
 uint16_t values[5] = {65535, 65535, 65535, 65535, 65535};
 
@@ -70,21 +71,27 @@ void print(char* text) {
 
 void led_disp_bit_to_values(uint8_t left, uint8_t top) {
 	// row 1 : values[0]
-	values[0] = 0;
+	values[0] = 0b1000000000000001;
 	int x_offset = 0;
 	int y_offset = 0;
 	for (int bit_index=0; bit_index<16; bit_index++) {
+		// 0 is set, 15 is set...
 		if (disp_bit_buffer[(bit_index + left) % BACK_BUFFER_WIDTH] & ((1 << top) % BACK_BUFFER_HEIGHT)) {
 			values[0] |= (1 << (15 - bit_index));
 		}
 	}
 	for (int led_segment = 1; led_segment<=4; led_segment++) {
-		values[led_segment] = 0;
 
-		// If led_segment is odd, set x_offset to 0; otherwise, set to 8.
-		x_offset = (led_segment & 1)? 0: 8;
-		// TODO: This also works, please benchmark:
+		// x_offset = (led_segment & 1)? 0: 8;
 		// x_offset = (~led_segment & 1) << 3;
+
+		if (led_segment & 1) {
+			x_offset = 0;
+			values[led_segment] = 0b1000000010000000;
+		} else {
+			x_offset = 8;
+			values[led_segment] = 0b0000000100000001;
+		}
 
 		// If led segment is one of the bottom two, y_offset is 3; else 1.
 		y_offset = (led_segment > 2)? 3 : 1;
@@ -154,6 +161,8 @@ void init_gpio() {
 	//   PWM-enabled BLANK pin:
 //	GPIO_setAsPeripheralModuleFunctionOutputPin(LED_PORT, LED_BLANK);
 	GPIO_setAsOutputPin(LED_PORT, LED_BLANK);
+	// TODO: Also, there's an input FROM the LED controllers on pin 1.6
+	GPIO_setAsInputPin(LED_PORT, GPIO_PIN6);
 
 	// IR pins ////////////////////////////////////////////////////////////////
 	//
@@ -359,7 +368,7 @@ uint8_t packet_sent = 0;
 int main( void )
 {
 	// TODO: check to see what powerup mode we're in.
-	led_disable();
+//	led_disable();
 	init_watchdog();
 	init_power();
 	init_gpio();
@@ -371,9 +380,12 @@ int main( void )
 	print("qcxi  QCXI");
 	led_disp_bit_to_values(0, 0);
 	led_display_bits(values);
-	led_enable(1);
+//	led_on();
+	led_enable(2);
 
-	// Clock startup
+	// TODO
+	while (1) {
+	}
 
     //Setup Current Time for Calendar
     currentTime.Seconds    = 0x00;
@@ -538,7 +550,6 @@ void led_display_bits(uint16_t* val)
 
 	uint16_t i;
 	uint8_t j;
-
 	for (j=0; j<5; j++) {
 		// Iterate over each bit, set data pin, and pulse the clock to send it
 		// to the shift register
@@ -547,8 +558,6 @@ void led_display_bits(uint16_t* val)
 			GPIO_pulse(LED_PORT, LED_CLOCK)
 		}
 	}
-
-	// Pulse the latch pin to write the values into the display register
 	GPIO_pulse(LED_PORT, LED_LATCH);
 }
 
@@ -568,6 +577,16 @@ void led_enable(uint16_t duty_cycle) {
 
 	TIMER_A_startCounter(TIMER_A0_BASE, TIMER_A_UP_MODE);
 
+}
+
+void led_on()
+{
+	GPIO_setAsOutputPin(
+			LED_PORT,
+			LED_BLANK
+	);
+
+	GPIO_setOutputLowOnPin(LED_PORT, LED_BLANK);
 }
 
 void led_disable( void )
