@@ -12,6 +12,8 @@
 
 #define BADGE_TARGET 1
 
+#define BIT15 0x8000
+
 #if BADGE_TARGET
 #include <msp430f5308.h>
 #define NSS_PORT GPIO_PORT_P4

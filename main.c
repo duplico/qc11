@@ -28,7 +28,7 @@ uint16_t status;
 #define DEBUG_SERIAL 1
 
 #define BACK_BUFFER_HEIGHT 16
-#define BACK_BUFFER_WIDTH 48
+#define BACK_BUFFER_WIDTH 127
 
 // Declare functions
 void delay(unsigned int);
@@ -69,25 +69,51 @@ void print(char* text) {
 	}
 }
 
+void led_set_rainbow(uint16_t value) {
+	value &= 0b01111111111;
+	// 0.15 = value.9,
+	// 1.15 = value.8
+	// 1.7 = value.7
+	// 3.15 = value.6
+	// 3.7 = value.5
+	// 0.0 = value.4
+	// 2.8 = value.3
+	// 2.0 = value.2
+	// 4.8 = value.1
+	// 4.0 = value.0
+	values[0] &= 0b0111111111111110;
+	values[1] &= 0b0111111101111111;
+	values[2] &= 0b1111111011111110;
+	values[3] &= 0b0111111101111111;
+	values[4] &= 0b1111111011111110;
+
+	values[0] |= (value & BIT9)? BIT15 : 0;
+	values[1] |= (value & BIT8)? BIT15 : 0;
+	values[1] |= (value & BIT7)? BIT7 : 0;
+	values[3] |= (value & BIT6)? BIT15 : 0;
+	values[3] |= (value & BIT5)? BIT7 : 0;
+	values[0] |= (value & BIT4)? BIT0 : 0;
+	values[2] |= (value & BIT3)? BIT8 : 0;
+	values[2] |= (value & BIT2)? BIT0 : 0;
+	values[4] |= ((value & BIT1)? BIT8 : 0) | ((value & BIT0)? BIT0 : 0);
+}
+
+uint16_t rainbow_values;
+
 void led_disp_bit_to_values(uint8_t left, uint8_t top) {
 
 	// TODO: This will be handled in another routine later. But for
 	//  now, we'll light the whole rainbow in this one:
-	values[0] = 0b1000000000000001;
+	values[0] &= 0b1000000000000001;
 	for (int i=1; i<5; i++) {
 		if (i & 1) {
-			values[i] = 0b1000000010000000;
+			values[i] &= 0b1000000010000000;
 		} else {
-			values[i] = 0b0000000100000001;
+			values[i] &= 0b0000000100000001;
 		}
 	}
+
 	int x_offset = 0;
-//	for (int bit_index=0; bit_index<14; bit_index++) {
-//		// 0 is set, 15 is set...
-//		if (disp_bit_buffer[(bit_index + left) % BACK_BUFFER_WIDTH] & ((1 << top) % BACK_BUFFER_HEIGHT)) {
-//			values[0] |= (1 << (14 - bit_index));
-//		}
-//	}
 
 	uint8_t led_segment = 1;
 	uint8_t led_index = 0;
@@ -131,34 +157,6 @@ void led_disp_bit_to_values(uint8_t left, uint8_t top) {
 
 		}
 	}
-
-
-//	for (int led_segment = 1; led_segment<=4; led_segment++) {
-//
-//		// x_offset = (led_segment & 1)? 0: 8;
-//		// x_offset = (~led_segment & 1) << 3;
-//
-//		if (led_segment & 1) {
-//			x_offset = 0;
-//			values[led_segment] = 0b1000000010000000;
-//		} else {
-//			x_offset = 8;
-//			values[led_segment] = 0b0000000100000001;
-//		}
-//		// TODO: FIX THIS FOR THE NEW ARRANGEMENT:
-//		// If led segment is one of the bottom two, y_offset is 3; else 1.
-//		y_offset = (led_segment > 2)? 3 : 1;
-//
-//		for (int bit_index=0; bit_index<16; bit_index++) {
-//			if (bit_index == 8) {
-//				y_offset++;
-//				x_offset-=8;
-//			}
-//
-//			if (disp_bit_buffer[(x_offset + bit_index + left) % BACK_BUFFER_WIDTH] & (1 << ((y_offset + top) % BACK_BUFFER_HEIGHT)))
-//				values[led_segment] |= (1 << (15 - bit_index));
-//		}
-//	}
 }
 
 void init_watchdog() {
@@ -418,6 +416,12 @@ uint8_t receive_status;
 
 uint8_t packet_sent = 0;
 
+uint16_t _rotl(uint16_t value, int shift) {
+    if ((shift &= sizeof(value)*8 - 1) == 0)
+      return value;
+    return (value << shift) | (value >> (sizeof(value)*8 - shift));
+}
+
 int main( void )
 {
 	// TODO: check to see what powerup mode we're in.
@@ -431,13 +435,22 @@ int main( void )
 	init_radio();
 	led_disable();
 	print("qcxi  QCXI");
+	print("Hello Evan!");
 	led_disp_bit_to_values(0, 0);
 	led_display_bits(values);
 //	led_on();
 	led_enable(1);
 
 	// TODO
+	uint16_t i = 0b0000000000011111;
+	uint16_t buffer_offset = 0;
 	while (1) {
+		led_set_rainbow(i);
+		led_disp_bit_to_values(buffer_offset, 0);
+		led_display_bits(values);
+		buffer_offset = (buffer_offset + 1) % BACK_BUFFER_WIDTH;
+		i = _rotl(i, 1);
+		delay(100);
 	}
 
     //Setup Current Time for Calendar
