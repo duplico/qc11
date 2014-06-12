@@ -70,46 +70,95 @@ void print(char* text) {
 }
 
 void led_disp_bit_to_values(uint8_t left, uint8_t top) {
-	// row 1 : values[0]
+
+	// TODO: This will be handled in another routine later. But for
+	//  now, we'll light the whole rainbow in this one:
 	values[0] = 0b1000000000000001;
-	int x_offset = 0;
-	int y_offset = 0;
-	for (int bit_index=0; bit_index<14; bit_index++) {
-		// 0 is set, 15 is set...
-		if (disp_bit_buffer[(bit_index + left) % BACK_BUFFER_WIDTH] & ((1 << top) % BACK_BUFFER_HEIGHT)) {
-			values[0] |= (1 << (14 - bit_index));
+	for (int i=1; i<5; i++) {
+		if (i & 1) {
+			values[i] = 0b1000000010000000;
+		} else {
+			values[i] = 0b0000000100000001;
 		}
 	}
+	int x_offset = 0;
+//	for (int bit_index=0; bit_index<14; bit_index++) {
+//		// 0 is set, 15 is set...
+//		if (disp_bit_buffer[(bit_index + left) % BACK_BUFFER_WIDTH] & ((1 << top) % BACK_BUFFER_HEIGHT)) {
+//			values[0] |= (1 << (14 - bit_index));
+//		}
+//	}
 
-	// instead of 0-16 it's now 0-14 with offsets.
-	//0000000000000111 // shift to the left one fewer time
-	// 00000000000001  // and include 2 fewer pixels
-	for (int led_segment = 1; led_segment<=4; led_segment++) {
-
-		// x_offset = (led_segment & 1)? 0: 8;
-		// x_offset = (~led_segment & 1) << 3;
-
-		if (led_segment & 1) {
-			x_offset = 0;
-			values[led_segment] = 0b1000000010000000;
-		} else {
-			x_offset = 8;
-			values[led_segment] = 0b0000000100000001;
-		}
-		// TODO: FIX THIS FOR THE NEW ARRANGEMENT:
-		// If led segment is one of the bottom two, y_offset is 3; else 1.
-		y_offset = (led_segment > 2)? 3 : 1;
-
-		for (int bit_index=0; bit_index<16; bit_index++) {
-			if (bit_index == 8) {
-				y_offset++;
-				x_offset-=8;
+	uint8_t led_segment = 1;
+	uint8_t led_index = 0;
+	for (uint8_t x=0; x<14; x++) {
+		for (uint8_t y=0; y<5; y++) {
+			if (y == 0) {
+				led_segment = 0;
+				x_offset = 1;
+			} else {
+				if (x<7) {
+					led_segment = 1; // LED segment is odd  (left side)
+					// left side is x = [0 .. 6]
+					// so x_offset is set to skip the leftmost LEDs only,
+					// leading to x=0->out=1
+					x_offset = 1;
+				}
+				else {
+					led_segment = 2; // LED segment is even (right side)
+					// right side is x = [7 .. 13], skipping the far right LED
+					// so x_offset is set to make x=7->out=0
+					x_offset = -7;
+				}
+				if (y>2) {
+					led_segment+=2;
+				}
+				if (!(y % 2)) {
+					// if Y is even (second row of a controller's segment)
+					// then we need the offset to change. i.e. x=0->out=1->out'=9
+					// or x=7->out=0->out'=8
+					x_offset += 8;
+				}
 			}
 
-			if (disp_bit_buffer[(x_offset + bit_index + left) % BACK_BUFFER_WIDTH] & (1 << ((y_offset + top) % BACK_BUFFER_HEIGHT)))
-				values[led_segment] |= (1 << (15 - bit_index));
+			led_index = x_offset + x;
+
+			// now we need to write to:
+			// segment: 	led_segment
+			// bit: 		x_offset + x
+			if (disp_bit_buffer[(x + left) % BACK_BUFFER_WIDTH] & (1 << ((y + top) % BACK_BUFFER_HEIGHT)))
+				values[led_segment] |= (1 << (15 - led_index));
+
 		}
 	}
+
+
+//	for (int led_segment = 1; led_segment<=4; led_segment++) {
+//
+//		// x_offset = (led_segment & 1)? 0: 8;
+//		// x_offset = (~led_segment & 1) << 3;
+//
+//		if (led_segment & 1) {
+//			x_offset = 0;
+//			values[led_segment] = 0b1000000010000000;
+//		} else {
+//			x_offset = 8;
+//			values[led_segment] = 0b0000000100000001;
+//		}
+//		// TODO: FIX THIS FOR THE NEW ARRANGEMENT:
+//		// If led segment is one of the bottom two, y_offset is 3; else 1.
+//		y_offset = (led_segment > 2)? 3 : 1;
+//
+//		for (int bit_index=0; bit_index<16; bit_index++) {
+//			if (bit_index == 8) {
+//				y_offset++;
+//				x_offset-=8;
+//			}
+//
+//			if (disp_bit_buffer[(x_offset + bit_index + left) % BACK_BUFFER_WIDTH] & (1 << ((y_offset + top) % BACK_BUFFER_HEIGHT)))
+//				values[led_segment] |= (1 << (15 - bit_index));
+//		}
+//	}
 }
 
 void init_watchdog() {
@@ -384,8 +433,8 @@ int main( void )
 	print("qcxi  QCXI");
 	led_disp_bit_to_values(0, 0);
 	led_display_bits(values);
-	led_on();
-//	led_enable(2);
+//	led_on();
+	led_enable(1);
 
 	// TODO
 	while (1) {
