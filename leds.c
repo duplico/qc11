@@ -34,6 +34,8 @@ void print(char* text) {
 	while (cursor < BACK_BUFFER_WIDTH) { // empty everything else.
 		disp_bit_buffer[cursor++] = 0;
 	}
+	led_disp_bit_to_values(0, 0);
+	led_display_bits(values);
 }
 
 void led_set_rainbow(uint16_t value) {
@@ -152,10 +154,10 @@ void led_enable(uint16_t duty_cycle) {
 		TIMER_A0_BASE,
 		TIMER_A_CLOCKSOURCE_ACLK,
 		TIMER_A_CLOCKSOURCE_DIVIDER_1,
-		10, // period
+		20, // period
 		TIMER_A_CAPTURECOMPARE_REGISTER_2,
 		TIMER_A_OUTPUTMODE_RESET_SET,
-		10 - duty_cycle // duty cycle
+		20 - duty_cycle // duty cycle
 	);
 
 	TIMER_A_startCounter(TIMER_A0_BASE, TIMER_A_UP_MODE);

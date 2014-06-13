@@ -71,6 +71,20 @@ void init_radio() {
 	USCI_B_SPI_enableInterrupt(USCI_B1_BASE, USCI_B_SPI_RECEIVE_INTERRUPT);
 	//	USCI_B_SPI_clearInterruptFlag(USCI_B1_BASE, USCI_B_SPI_TRANSMIT_INTERRUPT);
 	//	USCI_B_SPI_enableInterrupt(USCI_B1_BASE, USCI_B_SPI_TRANSMIT_INTERRUPT);
+
+	// init radio to recommended "defaults" per datasheet:
+	write_single_register(0x18, 0x88);
+	write_single_register(0x19, 0x55);
+	write_single_register(0x1a, 0x8b);
+	write_single_register(0x26, 0x07);
+	write_single_register(0x29, 0xe0);
+//	write_single_register(0x29, 0xd0);
+	for (uint8_t sync_addr=0x2f; sync_addr<=0x36; sync_addr++) {
+		write_single_register(sync_addr, 0x01);
+	}
+	write_single_register(0x3c, 0x8f);
+	write_single_register(0x6f, 0x30);
+
 }
 
 volatile uint8_t rfm_reg_data[64] = {0};
@@ -143,6 +157,15 @@ void mode_rx_sync() {
 	while (!(BIT7 & reg_read) || !(BIT6 & reg_read));
 }
 
+void mode_sb_sync() {
+	write_single_register(RFM_OPMODE, 0b00000100); // Receive mode.
+	uint8_t reg_read;
+	do {
+		reg_read = read_single_register_sync(RFM_IRQ1);
+	}
+	while (!(BIT7 & reg_read));
+}
+
 void mode_tx_sync() {
 	write_single_register(RFM_OPMODE, 0b00001100); // TX mode.
 	uint8_t reg_read;
@@ -150,6 +173,10 @@ void mode_tx_sync() {
 		reg_read = read_single_register_sync(RFM_IRQ1);
 	}
 	while (!(BIT7 & reg_read) || !(BIT5 & reg_read));
+}
+
+void mode_tx_async() {
+	write_single_register(RFM_OPMODE, 0b00001100); // TX mode.
 }
 
 uint8_t rfm_crcok() {

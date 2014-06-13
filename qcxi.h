@@ -8,10 +8,13 @@
 #ifndef MAIN_H_
 #define MAIN_H_
 
+// Configuration flags (TODO: should probably be in a make file):
+#define BADGE_TARGET 1
+#define DEBUG_SERIAL 1
+
 #include <stdint.h>
 #include "driverlib.h"
 
-#define BADGE_TARGET 1
 #define BIT15 0x8000
 
 #define WRITE_IF(port, pin, val) if (val) GPIO_setOutputHighOnPin(port, pin); else GPIO_setOutputLowOnPin(port, pin)
@@ -27,11 +30,10 @@
 #define NSS_PIN GPIO_PIN7
 #endif
 
+void write_serial(uint8_t*);
+void delay(unsigned int);
 
-extern char received_data_str[2];
-extern void init_radio();
-extern void write_serial(uint8_t*);
-extern void mode_rx_sync();
-extern uint8_t rfm_crcok();
+// Interrupt flags:
+extern volatile uint8_t f_new_minute;
 
 #endif /* MAIN_H_ */

@@ -15,7 +15,7 @@
 #define LED_BLANK	GPIO_PIN3
 
 #define BACK_BUFFER_HEIGHT 16
-#define BACK_BUFFER_WIDTH 127
+#define BACK_BUFFER_WIDTH 255
 
 extern uint16_t values[5];
 extern uint16_t zeroes[5];

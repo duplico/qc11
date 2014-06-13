@@ -8,6 +8,8 @@
 #include "qcxi.h"
 #include "clocks.h"
 
+volatile Calendar currentTime;
+
 void init_clocks() {
 
 	UCS_setExternalClockSource(
@@ -100,9 +102,70 @@ void init_timers() {
 
 void init_rtc() {
 
+	//Starting Time for Calendar:
+	currentTime.Seconds    = 0x00;
+	currentTime.Minutes    = 0x19;
+	currentTime.Hours      = 0x18;
+	currentTime.DayOfWeek  = 0x03;
+	currentTime.DayOfMonth = 0x20;
+	currentTime.Month      = 0x07;
+	currentTime.Year       = 0x2011;
+
+	//Initialize Calendar Mode of RTC
+	RTC_A_calendarInit(RTC_A_BASE,
+			currentTime,
+			RTC_A_FORMAT_BCD);
+
+	//Interrupt to every minute with a CalendarEvent
+	RTC_A_setCalendarEvent(RTC_A_BASE,
+			RTC_A_CALENDAREVENT_MINUTECHANGE);
+
+	//Enable interrupt for RTC Ready Status, which asserts when the RTC
+	//Calendar registers are ready to read.
+	RTC_A_clearInterrupt(RTC_A_BASE,
+			RTCRDYIFG + RTCTEVIFG + RTCAIFG);
+	RTC_A_enableInterrupt(RTC_A_BASE,
+			RTCRDYIE + RTCTEVIE + RTCAIE);
+
+	//Start RTC Clock
+	RTC_A_startClock(RTC_A_BASE);
 }
 
 
 void init_watchdog() {
 	WDT_A_hold(WDT_A_BASE);
+}
+
+
+#if defined(__TI_COMPILER_VERSION__) || defined(__IAR_SYSTEMS_ICC__)
+#pragma vector=RTC_VECTOR
+__interrupt
+#elif defined(__GNUC__)
+__attribute__((interrupt(RTC_VECTOR)))
+#endif
+void RTC_A_ISR(void)
+{
+        switch (__even_in_range(RTCIV, 16)) {
+        case 0: break;  //No interrupts
+        case 2:         //RTCRDYIFG
+                //Toggle P1.0 every second
+//                GPIO_toggleOutputOnPin(
+//                        GPIO_PORT_P1,
+//                        GPIO_PIN0);
+                break;
+        case 4:         //RTCEVIFG
+                //Interrupts every minute
+                f_new_minute = 1;
+                break;
+        case 6:         //RTCAIFG
+                //Interrupts 5:00pm on 5th day of week
+                __no_operation();
+                break;
+        case 8: break;  //RT0PSIFG
+        case 10: break; //RT1PSIFG
+        case 12: break; //Reserved
+        case 14: break; //Reserved
+        case 16: break; //Reserved
+        default: break;
+        }
 }
