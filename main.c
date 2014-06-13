@@ -4,16 +4,12 @@
 #include "clocks.h"
 #include "leds.h"
 
-extern uint8_t returnValue; // TODO: remove
-
-#define DEBUG_SERIAL 1
-
-// Declare functions
-void delay(unsigned int);
-void led_enable(uint16_t);
-void led_disable(void);
-void led_display_bits(uint16_t*);
-void led_on();
+// Interrupt flags to signal the main thread:
+volatile uint8_t f_new_minute = 0;
+volatile uint8_t f_timer = 0;
+volatile uint8_t f_tx_done = 0;
+volatile uint8_t f_rx_ready = 0;
+volatile uint8_t f_rfm_job_done = 0;
 
 void init_power() {
 	// Set Vcore to 1.8 V - NB: allows MCLK up to 8 MHz only
@@ -90,7 +86,13 @@ void init_gpio() {
 	// serial debug:
 	GPIO_setAsPeripheralModuleFunctionInputPin(GPIO_PORT_P4, GPIO_PIN5); // 4.5: RXD
 	GPIO_setAsPeripheralModuleFunctionOutputPin(GPIO_PORT_P4, GPIO_PIN4); // 4.4: TXD
+	///////////////////////////////////////////////////////////////////////////
 
+	// Interrupt pin for radio:
+	GPIO_setAsInputPin(GPIO_PORT_P2, GPIO_PIN0);
+	GPIO_enableInterrupt(GPIO_PORT_P2, GPIO_PIN0);
+	GPIO_interruptEdgeSelect(GPIO_PORT_P2, GPIO_PIN0, GPIO_LOW_TO_HIGH_TRANSITION);
+	GPIO_clearInterruptFlag(GPIO_PORT_P2, GPIO_PIN0);
 }
 
 void init_serial() {
@@ -166,11 +168,7 @@ uint8_t reg_reads[2] = {0, 0};
 uint8_t reg_data[65] = {0};
 uint8_t test_data[65] = {0};
 
-
-volatile Calendar currentTime;
 char time[6] = "00:00";
-
-volatile uint8_t f_new_minute = 0;
 
 uint8_t receive_status;
 
@@ -190,88 +188,79 @@ int main( void )
 	init_gpio();
 	init_clocks();
 	init_timers();
+	init_rtc();
 	init_serial();
-	init_radio();
-
-	// Enable global interrupt:
 	__bis_SR_register(GIE);
+	init_radio(); // requires interrupts enabled.
 
-	led_disable();
-	print("qcxi  QCXI");
-	print("Hello Evan!");
-	led_disp_bit_to_values(0, 0);
-	led_display_bits(values);
-//	led_on();
-	led_enable(1);
 
 	// TODO
 	uint16_t i = 0b0000000000011111;
 	uint16_t buffer_offset = 0;
-	while (1) {
-		led_set_rainbow(i);
-		led_disp_bit_to_values(buffer_offset, 0);
-		led_display_bits(values);
-		buffer_offset = (buffer_offset + 1) % BACK_BUFFER_WIDTH;
-		i = _rotl(i, 1);
-		delay(100);
-	}
-
-    //Setup Current Time for Calendar
-    currentTime.Seconds    = 0x00;
-    currentTime.Minutes    = 0x19;
-    currentTime.Hours      = 0x18;
-    currentTime.DayOfWeek  = 0x03;
-    currentTime.DayOfMonth = 0x20;
-    currentTime.Month      = 0x07;
-    currentTime.Year       = 0x2011;
-
-    //Initialize Calendar Mode of RTC
-    /*
-     * Base Address of the RTC_A_A
-     * Pass in current time, intialized above
-     * Use BCD as Calendar Register Format
-     */
-    RTC_A_calendarInit(RTC_A_BASE,
-                       currentTime,
-                       RTC_A_FORMAT_BCD);
-
-    //Specify an interrupt to assert every minute
-    RTC_A_setCalendarEvent(RTC_A_BASE,
-                           RTC_A_CALENDAREVENT_MINUTECHANGE);
-
-    //Enable interrupt for RTC Ready Status, which asserts when the RTC
-    //Calendar registers are ready to read.
-    //Also, enable interrupts for the Calendar alarm and Calendar event.
-    RTC_A_clearInterrupt(RTC_A_BASE,
-                         RTCRDYIFG + RTCTEVIFG + RTCAIFG);
-    RTC_A_enableInterrupt(RTC_A_BASE,
-                          RTCRDYIE + RTCTEVIE + RTCAIE);
-
-    //Start RTC Clock
-    RTC_A_startClock(RTC_A_BASE);
-
-    // End clock startup
-
 
 	for (int i=0; i<64; i++) {
 		test_data[i] = (uint8_t)'Q';
 	}
 
-//    // Radio startup
-//	mode_rx_sync();
-//	print("RX mode");
-//	led_disp_bit_to_values(0, 0);
-//	led_display_bits(values);
+	// Enable global interrupt:
 
-	// TODO: loop
+	print("Startup");
+	led_disp_bit_to_values(0, 0);
+	led_display_bits(values);
+	led_enable(1);
+	delay(2000);
 
+	char hex[4] = "AA";
+	uint8_t val = read_single_register_sync(0x1a);
+	hex[0] = (val/16 < 10)? '0' + val/16 : 'A' - 10 + val/16;
+	hex[1] = (val%16 < 10)? '0' + val%16 : 'A' - 10 + val%16;
+	print(hex);
+	led_disp_bit_to_values(0, 0);
+	led_display_bits(values);
+	delay(2000);
 
-//	while (!rfm_crcok());
-//	write_serial("We seem to have gotten something!");
-//	read_register_sync(RFM_FIFO, 64, reg_data);
+	uint8_t sent = 0;
 
-	//		write_serial("Receive mode!");
-	//		write_serial(reg_data);
+	while (1) {
+		mode_sb_sync();
+		led_disp_bit_to_values(0, 0);
+		led_display_bits(values);
+		print(" TX");
+		led_disp_bit_to_values(0, 0);
+		led_display_bits(values);
+		write_single_register(0x25, 0b00000000); // GPIO map to default
+		write_register(RFM_FIFO, test_data, 64);
+		print("TX");
+		f_rfm_job_done = 0;
+		mode_tx_async();
+		while (!f_rfm_job_done);
+		f_rfm_job_done = 0;
+		mode_sb_sync();
+//		write_single_register(0x29, 228); // RssiThreshold = -this/2 in dB
+		write_single_register(0x25, 0b00000000); // GPIO map
+		print("...");
+		delay(100);
+		mode_rx_sync();
+		led_disp_bit_to_values(0, 0);
+		led_display_bits(values);
+		delay(1000);
+		if (f_rfm_job_done) {
+			f_rfm_job_done = 0;
+			val = read_single_register_sync(0x24);
+			read_register_sync(RFM_FIFO, 64, test_data);
+			mode_sb_sync();
+//			print("RX!");
+			hex[0] = (val/16 < 10)? '0' + val/16 : 'A' - 10 + val/16;
+			hex[1] = (val%16 < 10)? '0' + val%16 : 'A' - 10 + val%16;
+			print((char *)test_data);
+			led_disp_bit_to_values(0, 0);
+			led_display_bits(values);
+			led_disp_bit_to_values(0, 0);
+			led_display_bits(values);
+			delay(1000);
+		}
+	}
+
 
 	while (1) {
 		mode_rx_sync();
@@ -292,75 +281,8 @@ int main( void )
 			led_disp_bit_to_values(i, 0);
 			led_display_bits(values);
 			delay(100);
-			if (rfm_crcok()) {
-				read_register_sync(RFM_FIFO, 64, reg_data);
-				//print((char *)reg_data);
-				print("recv");
-			}
 		}
-		mode_tx_sync();
-		print(" TX");
-		led_disp_bit_to_values(0, 0);
-		led_display_bits(values);
-
-		write_register(RFM_FIFO, test_data, 64);
-		delay(500);
-		// check 0x28 & BIT3, AKA "PacketSent"
-		packet_sent = read_single_register_sync(0x28);
-		packet_sent &= BIT3;
-		print((packet_sent >> 3) ? "snt" : "ntx?");
-		led_disp_bit_to_values(0, 0);
-		led_display_bits(values);
-		delay(500);
-
-
-
 		// TODO: "scroll" flag w/ configgable ISR
-	}
-
-	//write_single_register(RFM_OPMODE, 0b00010000);
-
-//	led_display_bits(zeroes);
-	led_enable(10);
-
-	delay(2000);
-	while (1) {
-		for (int i=0; i<BACK_BUFFER_WIDTH; i++) {
-//			led_disp_to_values(i, 0);
-			led_disp_bit_to_values(i, 0);
-			led_display_bits(values);
-			delay(100);
-		}
-//		print("test");
-	}
-
-//	uint8_t receive_status = read_single_register_sync(RFM_IRQ1);
-	while (1) {
-		receive_status = read_single_register_sync(RFM_IRQ1);
-		delay(100);
-		write_single_register(RFM_OPMODE, 0b00010000);
-		reg_data[0] = receive_status;
-		write_serial(reg_data);
-		receive_status &= BIT7;
-		if (!receive_status) {
-			write_serial("No receive");
-		}
-		else {
-			write_serial("Receive.");
-		}
-		delay(1500);
-	}
-
-	while (1) {
-		// LPM3
-		// __bis_SR_register(LPM3_bits + GIE);
-		reg_reads[0] = reg_read;
-		write_serial(reg_reads); // Address
-		read_register_sync(reg_read, 1, reg_data);
-		write_serial(reg_data);
-		delay(500);
-		reg_read = (reg_read + 1) % 0x72;
-		delay(500);
 	}
 }
 
@@ -404,35 +326,12 @@ __interrupt void USCI_A1_ISR(void)
 	}
 }
 
-#if defined(__TI_COMPILER_VERSION__) || defined(__IAR_SYSTEMS_ICC__)
-#pragma vector=RTC_VECTOR
-__interrupt
-#elif defined(__GNUC__)
-__attribute__((interrupt(RTC_VECTOR)))
-#endif
-void RTC_A_ISR(void)
+#pragma vector=PORT2_VECTOR
+__interrupt void radio_interrupt_0(void)
 {
-        switch (__even_in_range(RTCIV, 16)) {
-        case 0: break;  //No interrupts
-        case 2:         //RTCRDYIFG
-                //Toggle P1.0 every second
-//                GPIO_toggleOutputOnPin(
-//                        GPIO_PORT_P1,
-//                        GPIO_PIN0);
-                break;
-        case 4:         //RTCEVIFG
-                //Interrupts every minute
-                f_new_minute = 1;
-                break;
-        case 6:         //RTCAIFG
-                //Interrupts 5:00pm on 5th day of week
-                __no_operation();
-                break;
-        case 8: break;  //RT0PSIFG
-        case 10: break; //RT1PSIFG
-        case 12: break; //Reserved
-        case 14: break; //Reserved
-        case 16: break; //Reserved
-        default: break;
-        }
+	f_rfm_job_done = 1;
+//	print("done");
+//	led_disp_bit_to_values(0, 0);
+//	led_display_bits(values);
+	GPIO_clearInterruptFlag(GPIO_PORT_P2, GPIO_PIN0);
 }

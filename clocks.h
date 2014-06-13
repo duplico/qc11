@@ -24,6 +24,6 @@ void init_timers();
 void init_rtc();
 void init_watchdog();
 
-
+extern volatile Calendar currentTime;
 
 #endif /* CLOCKS_H_ */
