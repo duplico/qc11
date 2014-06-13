@@ -11,6 +11,8 @@ volatile uint8_t f_tx_done = 0;
 volatile uint8_t f_rx_ready = 0;
 volatile uint8_t f_rfm_job_done = 0;
 
+uint8_t received_data = 0;
+
 void init_power() {
 	// Set Vcore to 1.8 V - NB: allows MCLK up to 8 MHz only
 	PMM_setVCore(PMM_CORE_LEVEL_0);
@@ -136,17 +138,12 @@ void init_serial() {
 			USCI_A_UART_LOW_FREQUENCY_BAUDRATE_GENERATION
 	);
 
-//	UCA1CTL0 = 0x0;
-//	UCA1CTL1 = UCSSEL1;
-//	UCA1BR0 = 0x41;
-//	UCA1BR1 = 0x03;
-//	UCA1MCTL = 0x04;
-
 	UCA1IRTCTL = UCIREN + UCIRTXPL5;
 #endif
 
 	USCI_A_UART_enable(USCI_A1_BASE);
 
+	USCI_A_UART_clearInterruptFlag(USCI_A1_BASE, USCI_A_UART_RECEIVE_INTERRUPT_FLAG);
 	USCI_A_UART_enableInterrupt(
 			USCI_A1_BASE,
 			USCI_A_UART_RECEIVE_INTERRUPT
@@ -211,79 +208,87 @@ int main( void )
 	delay(2000);
 
 	char hex[4] = "AA";
-	uint8_t val = read_single_register_sync(0x1a);
-	hex[0] = (val/16 < 10)? '0' + val/16 : 'A' - 10 + val/16;
-	hex[1] = (val%16 < 10)? '0' + val%16 : 'A' - 10 + val%16;
-	print(hex);
-	led_disp_bit_to_values(0, 0);
-	led_display_bits(values);
-	delay(2000);
+//	delay(2000);
 
-	uint8_t sent = 0;
-
+	uint8_t val;
 	while (1) {
-		mode_sb_sync();
-		led_disp_bit_to_values(0, 0);
-		led_display_bits(values);
-		print(" TX");
-		led_disp_bit_to_values(0, 0);
-		led_display_bits(values);
-		write_single_register(0x25, 0b00000000); // GPIO map to default
-		write_register(RFM_FIFO, test_data, 64);
-		print("TX");
-		f_rfm_job_done = 0;
-		mode_tx_async();
-		while (!f_rfm_job_done);
-		f_rfm_job_done = 0;
-		mode_sb_sync();
-//		write_single_register(0x29, 228); // RssiThreshold = -this/2 in dB
-		write_single_register(0x25, 0b00000000); // GPIO map
-		print("...");
-		delay(100);
-		mode_rx_sync();
-		led_disp_bit_to_values(0, 0);
-		led_display_bits(values);
-		delay(1000);
-		if (f_rfm_job_done) {
-			f_rfm_job_done = 0;
-			val = read_single_register_sync(0x24);
-			read_register_sync(RFM_FIFO, 64, test_data);
-			mode_sb_sync();
-//			print("RX!");
+		if (f_rx_ready) {
+			f_rx_ready = 0;
+			val = received_data;
 			hex[0] = (val/16 < 10)? '0' + val/16 : 'A' - 10 + val/16;
 			hex[1] = (val%16 < 10)? '0' + val%16 : 'A' - 10 + val%16;
-			print((char *)test_data);
-			led_disp_bit_to_values(0, 0);
-			led_display_bits(values);
-			led_disp_bit_to_values(0, 0);
-			led_display_bits(values);
-			delay(1000);
-		}
-	}
-
-
-	while (1) {
-		mode_rx_sync();
-		print("RX mode");
-		led_disp_bit_to_values(0, 0);
-		led_display_bits(values);
-
-		if (f_new_minute) {
-			currentTime = RTC_A_getCalendarTime(RTC_A_BASE);
-			time[0] = '0' + ((currentTime.Hours & 0b11110000) >> 4);
-			time[1] = '0' + (currentTime.Hours & 0b1111);
-			time[3] = '0' + ((currentTime.Minutes & 0b11110000) >> 4);
-			time[4] = '0' + (currentTime.Minutes & 0b1111);
-			print(time);
-			f_new_minute = 0;
-		}
-		for (int i=0; i<BACK_BUFFER_WIDTH; i++) {
-			led_disp_bit_to_values(i, 0);
-			led_display_bits(values);
+			print(hex);
 			delay(100);
 		}
-		// TODO: "scroll" flag w/ configgable ISR
+		write_serial("QQQ");
+		delay(1000);
 	}
+
+
+
+//	while (1) {
+//		mode_sb_sync();
+//		led_disp_bit_to_values(0, 0);
+//		led_display_bits(values);
+//		print(" TX");
+//		led_disp_bit_to_values(0, 0);
+//		led_display_bits(values);
+//		write_single_register(0x25, 0b00000000); // GPIO map to default
+//		write_register(RFM_FIFO, test_data, 64);
+//		print("TX");
+//		f_rfm_job_done = 0;
+//		mode_tx_async();
+//		while (!f_rfm_job_done);
+//		f_rfm_job_done = 0;
+//		mode_sb_sync();
+////		write_single_register(0x29, 228); // RssiThreshold = -this/2 in dB
+//		write_single_register(0x25, 0b00000000); // GPIO map
+//		print("...");
+//		delay(100);
+//		mode_rx_sync();
+//		led_disp_bit_to_values(0, 0);
+//		led_display_bits(values);
+//		delay(1000);
+//		if (f_rfm_job_done) {
+//			f_rfm_job_done = 0;
+//			val = read_single_register_sync(0x24);
+//			read_register_sync(RFM_FIFO, 64, test_data);
+//			mode_sb_sync();
+////			print("RX!");
+//			hex[0] = (val/16 < 10)? '0' + val/16 : 'A' - 10 + val/16;
+//			hex[1] = (val%16 < 10)? '0' + val%16 : 'A' - 10 + val%16;
+//			print((char *)test_data);
+//			led_disp_bit_to_values(0, 0);
+//			led_display_bits(values);
+//			led_disp_bit_to_values(0, 0);
+//			led_display_bits(values);
+//			delay(1000);
+//		}
+//	}
+
+
+//	while (1) {
+//		mode_rx_sync();
+//		print("RX mode");
+//		led_disp_bit_to_values(0, 0);
+//		led_display_bits(values);
+//
+//		if (f_new_minute) {
+//			currentTime = RTC_A_getCalendarTime(RTC_A_BASE);
+//			time[0] = '0' + ((currentTime.Hours & 0b11110000) >> 4);
+//			time[1] = '0' + (currentTime.Hours & 0b1111);
+//			time[3] = '0' + ((currentTime.Minutes & 0b11110000) >> 4);
+//			time[4] = '0' + (currentTime.Minutes & 0b1111);
+//			print(time);
+//			f_new_minute = 0;
+//		}
+//		for (int i=0; i<BACK_BUFFER_WIDTH; i++) {
+//			led_disp_bit_to_values(i, 0);
+//			led_display_bits(values);
+//			delay(100);
+//		}
+//		// TODO: "scroll" flag w/ configgable ISR
+//	}
 }
 
 void delay(uint16_t ms)
@@ -305,8 +310,6 @@ __interrupt void NMI_ISR(void)
 	} while (status != 0);
 }
 
-uint8_t received_data = 0;
-
 // Echo back RXed character, confirm TX buffer is ready first
 #pragma vector=USCI_A1_VECTOR
 __interrupt void USCI_A1_ISR(void)
@@ -317,7 +320,7 @@ __interrupt void USCI_A1_ISR(void)
 	case 2:                                   // Vector 2 - RXIFG
 		while (!USCI_A_UART_getInterruptStatus(USCI_A1_BASE, UCTXIFG));
 		received_data = USCI_A_UART_receiveData(USCI_A1_BASE);
-		USCI_A_UART_transmitData(USCI_A1_BASE, received_data);
+		volatile uint8_t f_rx_ready = 1;
 
 		break;
 	case 4:                             // Vector 4 - TXIFG // Ready for another character...
@@ -330,8 +333,5 @@ __interrupt void USCI_A1_ISR(void)
 __interrupt void radio_interrupt_0(void)
 {
 	f_rfm_job_done = 1;
-//	print("done");
-//	led_disp_bit_to_values(0, 0);
-//	led_display_bits(values);
 	GPIO_clearInterruptFlag(GPIO_PORT_P2, GPIO_PIN0);
 }
