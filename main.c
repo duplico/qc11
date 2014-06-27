@@ -125,20 +125,24 @@ void init_serial() {
 
 	// IR Interface ///////////////////////////////////////////////////////////
 	//
+	USCI_A_UART_disable(USCI_A1_BASE);
 	USCI_A_UART_initAdvance(
 			USCI_A1_BASE,
 			USCI_A_UART_CLOCKSOURCE_SMCLK,
-			833,
+			416,
 			0,
-			2,
+			6,
 			USCI_A_UART_NO_PARITY,
 			USCI_A_UART_MSB_FIRST,
 			USCI_A_UART_ONE_STOP_BIT,
 			USCI_A_UART_MODE,
 			USCI_A_UART_LOW_FREQUENCY_BAUDRATE_GENERATION
 	);
+	USCI_A_UART_disable(USCI_A1_BASE);
 
-	UCA1IRTCTL = UCIREN + UCIRTXPL5;
+	UCA1IRTCTL = UCIREN + UCIRTXPL2 + UCIRTXPL0;
+	//UCA1STAT |= UCLISTEN; // loopback
+	UCA1IRRCTL |= UCIRRXPL;
 #endif
 
 	USCI_A_UART_enable(USCI_A1_BASE);
@@ -190,16 +194,7 @@ int main( void )
 	__bis_SR_register(GIE);
 	init_radio(); // requires interrupts enabled.
 
-
-	// TODO
-	uint16_t i = 0b0000000000011111;
-	uint16_t buffer_offset = 0;
-
-	for (int i=0; i<64; i++) {
-		test_data[i] = (uint8_t)'Q';
-	}
-
-	// Enable global interrupt:
+	uint8_t test_char = 0;
 
 	print("Startup");
 	led_disp_bit_to_values(0, 0);
@@ -218,77 +213,16 @@ int main( void )
 			hex[0] = (val/16 < 10)? '0' + val/16 : 'A' - 10 + val/16;
 			hex[1] = (val%16 < 10)? '0' + val%16 : 'A' - 10 + val%16;
 			print(hex);
-			delay(100);
+			delay(250);
 		}
-		write_serial("QQQ");
-		delay(1000);
+		for (int i=0; i<64; i++) {
+			test_data[i] = test_char;
+		}
+		test_char++;
+		write_serial(test_data);
+		print("...");
+		delay(2000);
 	}
-
-
-
-//	while (1) {
-//		mode_sb_sync();
-//		led_disp_bit_to_values(0, 0);
-//		led_display_bits(values);
-//		print(" TX");
-//		led_disp_bit_to_values(0, 0);
-//		led_display_bits(values);
-//		write_single_register(0x25, 0b00000000); // GPIO map to default
-//		write_register(RFM_FIFO, test_data, 64);
-//		print("TX");
-//		f_rfm_job_done = 0;
-//		mode_tx_async();
-//		while (!f_rfm_job_done);
-//		f_rfm_job_done = 0;
-//		mode_sb_sync();
-////		write_single_register(0x29, 228); // RssiThreshold = -this/2 in dB
-//		write_single_register(0x25, 0b00000000); // GPIO map
-//		print("...");
-//		delay(100);
-//		mode_rx_sync();
-//		led_disp_bit_to_values(0, 0);
-//		led_display_bits(values);
-//		delay(1000);
-//		if (f_rfm_job_done) {
-//			f_rfm_job_done = 0;
-//			val = read_single_register_sync(0x24);
-//			read_register_sync(RFM_FIFO, 64, test_data);
-//			mode_sb_sync();
-////			print("RX!");
-//			hex[0] = (val/16 < 10)? '0' + val/16 : 'A' - 10 + val/16;
-//			hex[1] = (val%16 < 10)? '0' + val%16 : 'A' - 10 + val%16;
-//			print((char *)test_data);
-//			led_disp_bit_to_values(0, 0);
-//			led_display_bits(values);
-//			led_disp_bit_to_values(0, 0);
-//			led_display_bits(values);
-//			delay(1000);
-//		}
-//	}
-
-
-//	while (1) {
-//		mode_rx_sync();
-//		print("RX mode");
-//		led_disp_bit_to_values(0, 0);
-//		led_display_bits(values);
-//
-//		if (f_new_minute) {
-//			currentTime = RTC_A_getCalendarTime(RTC_A_BASE);
-//			time[0] = '0' + ((currentTime.Hours & 0b11110000) >> 4);
-//			time[1] = '0' + (currentTime.Hours & 0b1111);
-//			time[3] = '0' + ((currentTime.Minutes & 0b11110000) >> 4);
-//			time[4] = '0' + (currentTime.Minutes & 0b1111);
-//			print(time);
-//			f_new_minute = 0;
-//		}
-//		for (int i=0; i<BACK_BUFFER_WIDTH; i++) {
-//			led_disp_bit_to_values(i, 0);
-//			led_display_bits(values);
-//			delay(100);
-//		}
-//		// TODO: "scroll" flag w/ configgable ISR
-//	}
 }
 
 void delay(uint16_t ms)
@@ -320,7 +254,7 @@ __interrupt void USCI_A1_ISR(void)
 	case 2:                                   // Vector 2 - RXIFG
 		while (!USCI_A_UART_getInterruptStatus(USCI_A1_BASE, UCTXIFG));
 		received_data = USCI_A_UART_receiveData(USCI_A1_BASE);
-		volatile uint8_t f_rx_ready = 1;
+		f_rx_ready = 1;
 
 		break;
 	case 4:                             // Vector 4 - TXIFG // Ready for another character...
