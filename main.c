@@ -130,73 +130,24 @@ void init_serial() {
 
 	// IR Interface ///////////////////////////////////////////////////////////
 	//
-//	USCI_A_UART_initAdvance(
-//			USCI_A1_BASE,
-//			USCI_A_UART_CLOCKSOURCE_SMCLK, // Use the 8 MHz clock
-//			8,
-//			0,
-//			11, // 57600 bps
-//			USCI_A_UART_EVEN_PARITY,
-//			USCI_A_UART_MSB_FIRST,
-//			USCI_A_UART_ONE_STOP_BIT,
-//			USCI_A_UART_MODE, // UART mode
-//			USCI_A_UART_OVERSAMPLING_BAUDRATE_GENERATION // UCOS = 1, oversample.
-//	);
-//
-//	UCA1CTL0 = 0x0;
-//	UCA1CTL1 = UCSSEL1;
-//
-//	UCA1IRTCTL |= UCIREN; // IR Enable
-//	UCA1IRTCTL |= UCIRTXCLK; // TXCLK = 1, meaning
-//	UCA1IRTCTL |= UCIRTXPL2 + UCIRTXPL0; // UCIRTXPL = 5, so this is 5 << 2 TODO.
-//	UCA1IRRCTL |= UCIRRXFL1; // Filter length: 1 (see family guide p901)
-//	UCA1IRRCTL |= UCIRRXPL; // Active low.
-//	UCA1IRRCTL |= UCIRRXFE; // Use filter
-
-
-	// msb first, no parity, one stop, 8 bit
-//	UCA1CTL0 = 0x0;
-//	UCA1CTL1 = UCSSEL1;
-	// Set 9600 baud rate
-	// UCBRx  = 833
-	// UCBRSx = 2
-	// UCBRFx = 0
-	// SMCLK  = 8 MHz
-
-
-//	UCA1BR0   = 0x41;
-//	UCA1BR1   = 0x03;
-//	UCA1MCTL  = 0x04;
-//	UCA1IRTCTL = UCIREN + UCIRTXPL5;
-
-
-
-//#endif
-//
-//	USCI_A_UART_enable(USCI_A1_BASE);
-//
-//	USCI_A_UART_enableInterrupt(
-//			USCI_A1_BASE,
-//			USCI_A_UART_RECEIVE_INTERRUPT
-//	);
-
-
-	// IR Interface ///////////////////////////////////////////////////////////
-	//
+	USCI_A_UART_disable(USCI_A1_BASE);
 	USCI_A_UART_initAdvance(
 			USCI_A1_BASE,
 			USCI_A_UART_CLOCKSOURCE_SMCLK,
-			833,
+			416,
 			0,
-			2,
+			6,
 			USCI_A_UART_NO_PARITY,
 			USCI_A_UART_MSB_FIRST,
 			USCI_A_UART_ONE_STOP_BIT,
 			USCI_A_UART_MODE,
 			USCI_A_UART_LOW_FREQUENCY_BAUDRATE_GENERATION
 	);
+	USCI_A_UART_disable(USCI_A1_BASE);
 
 	UCA1IRTCTL = UCIREN + UCIRTXPL2 + UCIRTXPL0;
+	//UCA1STAT |= UCLISTEN; // loopback
+	UCA1IRRCTL |= UCIRRXPL;
 #endif
 
 	USCI_A_UART_enable(USCI_A1_BASE);
@@ -256,6 +207,11 @@ int main( void )
 	uint16_t i = 0b0000000000011111;
 	uint16_t buffer_offset = 0;
 
+	for (int i=0; i<64; i++) {
+		test_data[i] = (uint8_t)'Q';
+	}
+
+	// Enable global interrupt:
 	print("Startup");
 	led_on();
 
@@ -269,77 +225,16 @@ int main( void )
 			hex[0] = (val/16 < 10)? '0' + val/16 : 'A' - 10 + val/16;
 			hex[1] = (val%16 < 10)? '0' + val%16 : 'A' - 10 + val%16;
 			print(hex);
-			delay(100);
+			delay(250);
 		}
-		write_serial("QQQ");
-		delay(1000);
+		for (int i=0; i<64; i++) {
+			test_data[i] = test_char;
+		}
+		test_char++;
+		write_serial(test_data);
+		print("...");
+		delay(2000);
 	}
-
-
-
-//	while (1) {
-//		mode_sb_sync();
-//		led_disp_bit_to_values(0, 0);
-//		led_display_bits(values);
-//		print(" TX");
-//		led_disp_bit_to_values(0, 0);
-//		led_display_bits(values);
-//		write_single_register(0x25, 0b00000000); // GPIO map to default
-//		write_register(RFM_FIFO, test_data, 64);
-//		print("TX");
-//		f_rfm_job_done = 0;
-//		mode_tx_async();
-//		while (!f_rfm_job_done);
-//		f_rfm_job_done = 0;
-//		mode_sb_sync();
-//		//		write_single_register(0x29, 228); // RssiThreshold = -this/2 in dB
-//		write_single_register(0x25, 0b00000000); // GPIO map
-//		print("...");
-////		delay(100);
-////		mode_rx_sync();
-//		delay(1000);
-////		if (f_rfm_job_done) {
-////			f_rfm_job_done = 0;
-////			val = read_single_register_sync(0x24);
-////			read_register_sync(RFM_FIFO, 64, test_data);
-////			mode_sb_sync();
-////			//			print("RX!");
-////			hex[0] = (val/16 < 10)? '0' + val/16 : 'A' - 10 + val/16;
-////			hex[1] = (val%16 < 10)? '0' + val%16 : 'A' - 10 + val%16;
-////			print((char *)test_data);
-////			led_disp_bit_to_values(0, 0);
-////			led_display_bits(values);
-////			led_disp_bit_to_values(0, 0);
-////			led_display_bits(values);
-////			delay(1000);
-////		}
-//	}
-
-
-//	delay(2000);
-
-//	while (1) {
-//		mode_rx_sync();
-//		print("RX mode");
-//		led_disp_bit_to_values(0, 0);
-//		led_display_bits(values);
-//
-//		if (f_new_minute) {
-//			currentTime = RTC_A_getCalendarTime(RTC_A_BASE);
-//			time[0] = '0' + ((currentTime.Hours & 0b11110000) >> 4);
-//			time[1] = '0' + (currentTime.Hours & 0b1111);
-//			time[3] = '0' + ((currentTime.Minutes & 0b11110000) >> 4);
-//			time[4] = '0' + (currentTime.Minutes & 0b1111);
-//			print(time);
-//			f_new_minute = 0;
-//		}
-//		for (int i=0; i<BACK_BUFFER_WIDTH; i++) {
-//			led_disp_bit_to_values(i, 0);
-//			led_display_bits(values);
-//			delay(100);
-//		}
-//		// TODO: "scroll" flag w/ configgable ISR
-//	}
 }
 
 void delay(uint16_t ms)
