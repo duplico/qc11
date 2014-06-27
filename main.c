@@ -12,6 +12,7 @@ volatile uint8_t f_rx_ready = 0;
 volatile uint8_t f_rfm_job_done = 0;
 
 uint8_t received_data = 0;
+uint8_t test_data[65] = {0};
 
 void init_power() {
 	// Set Vcore to 1.8 V - NB: allows MCLK up to 8 MHz only
@@ -86,8 +87,8 @@ void init_gpio() {
 
 	// ALTERNATE FOR IR: serial debug interface ///////////////////////////////
 	// serial debug:
-	GPIO_setAsPeripheralModuleFunctionInputPin(GPIO_PORT_P4, GPIO_PIN5); // 4.5: RXD
-	GPIO_setAsPeripheralModuleFunctionOutputPin(GPIO_PORT_P4, GPIO_PIN4); // 4.4: TXD
+//	GPIO_setAsPeripheralModuleFunctionInputPin(GPIO_PORT_P4, GPIO_PIN5); // 4.5: RXD
+//	GPIO_setAsPeripheralModuleFunctionOutputPin(GPIO_PORT_P4, GPIO_PIN4); // 4.4: TXD
 	///////////////////////////////////////////////////////////////////////////
 
 	// Interrupt pin for radio:
@@ -95,6 +96,10 @@ void init_gpio() {
 	GPIO_enableInterrupt(GPIO_PORT_P2, GPIO_PIN0);
 	GPIO_interruptEdgeSelect(GPIO_PORT_P2, GPIO_PIN0, GPIO_LOW_TO_HIGH_TRANSITION);
 	GPIO_clearInterruptFlag(GPIO_PORT_P2, GPIO_PIN0);
+
+	for (int i=0; i<64; i++) { // TODO: Here's a test.
+		test_data[i] = (uint8_t)'Q';
+	}
 }
 
 void init_serial() {
@@ -125,6 +130,59 @@ void init_serial() {
 
 	// IR Interface ///////////////////////////////////////////////////////////
 	//
+//	USCI_A_UART_initAdvance(
+//			USCI_A1_BASE,
+//			USCI_A_UART_CLOCKSOURCE_SMCLK, // Use the 8 MHz clock
+//			8,
+//			0,
+//			11, // 57600 bps
+//			USCI_A_UART_EVEN_PARITY,
+//			USCI_A_UART_MSB_FIRST,
+//			USCI_A_UART_ONE_STOP_BIT,
+//			USCI_A_UART_MODE, // UART mode
+//			USCI_A_UART_OVERSAMPLING_BAUDRATE_GENERATION // UCOS = 1, oversample.
+//	);
+//
+//	UCA1CTL0 = 0x0;
+//	UCA1CTL1 = UCSSEL1;
+//
+//	UCA1IRTCTL |= UCIREN; // IR Enable
+//	UCA1IRTCTL |= UCIRTXCLK; // TXCLK = 1, meaning
+//	UCA1IRTCTL |= UCIRTXPL2 + UCIRTXPL0; // UCIRTXPL = 5, so this is 5 << 2 TODO.
+//	UCA1IRRCTL |= UCIRRXFL1; // Filter length: 1 (see family guide p901)
+//	UCA1IRRCTL |= UCIRRXPL; // Active low.
+//	UCA1IRRCTL |= UCIRRXFE; // Use filter
+
+
+	// msb first, no parity, one stop, 8 bit
+//	UCA1CTL0 = 0x0;
+//	UCA1CTL1 = UCSSEL1;
+	// Set 9600 baud rate
+	// UCBRx  = 833
+	// UCBRSx = 2
+	// UCBRFx = 0
+	// SMCLK  = 8 MHz
+
+
+//	UCA1BR0   = 0x41;
+//	UCA1BR1   = 0x03;
+//	UCA1MCTL  = 0x04;
+//	UCA1IRTCTL = UCIREN + UCIRTXPL5;
+
+
+
+//#endif
+//
+//	USCI_A_UART_enable(USCI_A1_BASE);
+//
+//	USCI_A_UART_enableInterrupt(
+//			USCI_A1_BASE,
+//			USCI_A_UART_RECEIVE_INTERRUPT
+//	);
+
+
+	// IR Interface ///////////////////////////////////////////////////////////
+	//
 	USCI_A_UART_initAdvance(
 			USCI_A1_BASE,
 			USCI_A_UART_CLOCKSOURCE_SMCLK,
@@ -138,7 +196,7 @@ void init_serial() {
 			USCI_A_UART_LOW_FREQUENCY_BAUDRATE_GENERATION
 	);
 
-	UCA1IRTCTL = UCIREN + UCIRTXPL5;
+	UCA1IRTCTL = UCIREN + UCIRTXPL2 + UCIRTXPL0;
 #endif
 
 	USCI_A_UART_enable(USCI_A1_BASE);
@@ -156,6 +214,8 @@ void write_serial(uint8_t* text) {
 	do {
 		while (!USCI_A_UART_getInterruptStatus(USCI_A1_BASE, UCTXIFG));
 		USCI_A_UART_transmitData(USCI_A1_BASE, text[sendchar]);
+//		if (f_rx_ready) while(!f_rx_ready);
+//		f_rx_ready = 0;
 	} while (text[++sendchar]);
 }
 
@@ -163,7 +223,6 @@ uint8_t reg_read = 0;
 uint8_t reg_reads[2] = {0, 0};
 
 uint8_t reg_data[65] = {0};
-uint8_t test_data[65] = {0};
 
 char time[6] = "00:00";
 
@@ -183,11 +242,13 @@ int main( void )
 	init_watchdog();
 	init_power();
 	init_gpio();
+//	led_post(); // TODO: Let's try to incorporate this once we have
+				//       hardware that supports it.
 	init_clocks();
 	init_timers();
 	init_rtc();
 	init_serial();
-	__bis_SR_register(GIE);
+	__bis_SR_register(GIE); // enable interrupts
 	init_radio(); // requires interrupts enabled.
 
 
@@ -195,21 +256,11 @@ int main( void )
 	uint16_t i = 0b0000000000011111;
 	uint16_t buffer_offset = 0;
 
-	for (int i=0; i<64; i++) {
-		test_data[i] = (uint8_t)'Q';
-	}
-
-	// Enable global interrupt:
-
 	print("Startup");
-	led_disp_bit_to_values(0, 0);
-	led_display_bits(values);
-	led_enable(1);
-	delay(2000);
+	led_on();
+
 
 	char hex[4] = "AA";
-//	delay(2000);
-
 	uint8_t val;
 	while (1) {
 		if (f_rx_ready) {
@@ -241,31 +292,31 @@ int main( void )
 //		while (!f_rfm_job_done);
 //		f_rfm_job_done = 0;
 //		mode_sb_sync();
-////		write_single_register(0x29, 228); // RssiThreshold = -this/2 in dB
+//		//		write_single_register(0x29, 228); // RssiThreshold = -this/2 in dB
 //		write_single_register(0x25, 0b00000000); // GPIO map
 //		print("...");
-//		delay(100);
-//		mode_rx_sync();
-//		led_disp_bit_to_values(0, 0);
-//		led_display_bits(values);
+////		delay(100);
+////		mode_rx_sync();
 //		delay(1000);
-//		if (f_rfm_job_done) {
-//			f_rfm_job_done = 0;
-//			val = read_single_register_sync(0x24);
-//			read_register_sync(RFM_FIFO, 64, test_data);
-//			mode_sb_sync();
-////			print("RX!");
-//			hex[0] = (val/16 < 10)? '0' + val/16 : 'A' - 10 + val/16;
-//			hex[1] = (val%16 < 10)? '0' + val%16 : 'A' - 10 + val%16;
-//			print((char *)test_data);
-//			led_disp_bit_to_values(0, 0);
-//			led_display_bits(values);
-//			led_disp_bit_to_values(0, 0);
-//			led_display_bits(values);
-//			delay(1000);
-//		}
+////		if (f_rfm_job_done) {
+////			f_rfm_job_done = 0;
+////			val = read_single_register_sync(0x24);
+////			read_register_sync(RFM_FIFO, 64, test_data);
+////			mode_sb_sync();
+////			//			print("RX!");
+////			hex[0] = (val/16 < 10)? '0' + val/16 : 'A' - 10 + val/16;
+////			hex[1] = (val%16 < 10)? '0' + val%16 : 'A' - 10 + val%16;
+////			print((char *)test_data);
+////			led_disp_bit_to_values(0, 0);
+////			led_display_bits(values);
+////			led_disp_bit_to_values(0, 0);
+////			led_display_bits(values);
+////			delay(1000);
+////		}
 //	}
 
+
+//	delay(2000);
 
 //	while (1) {
 //		mode_rx_sync();
@@ -320,7 +371,7 @@ __interrupt void USCI_A1_ISR(void)
 	case 2:                                   // Vector 2 - RXIFG
 		while (!USCI_A_UART_getInterruptStatus(USCI_A1_BASE, UCTXIFG));
 		received_data = USCI_A_UART_receiveData(USCI_A1_BASE);
-		volatile uint8_t f_rx_ready = 1;
+		f_rx_ready = 1;
 
 		break;
 	case 4:                             // Vector 4 - TXIFG // Ready for another character...
