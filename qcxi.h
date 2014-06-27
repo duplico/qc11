@@ -30,6 +30,7 @@
 #define NSS_PIN GPIO_PIN7
 #endif
 
+void write_ir_byte(uint8_t);
 void write_serial(uint8_t*);
 void delay(unsigned int);
 

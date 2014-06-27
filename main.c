@@ -141,7 +141,6 @@ void init_serial() {
 	USCI_A_UART_disable(USCI_A1_BASE);
 
 	UCA1IRTCTL = UCIREN + UCIRTXPL2 + UCIRTXPL0;
-	//UCA1STAT |= UCLISTEN; // loopback
 	UCA1IRRCTL |= UCIRRXPL;
 #endif
 
@@ -153,13 +152,27 @@ void init_serial() {
 			USCI_A_UART_RECEIVE_INTERRUPT
 	);
 
+	USCI_A_UART_clearInterruptFlag(USCI_A1_BASE, USCI_A_UART_TRANSMIT_INTERRUPT_FLAG);
+	USCI_A_UART_enableInterrupt(
+				USCI_A1_BASE,
+				USCI_A_UART_TRANSMIT_INTERRUPT
+		);
+}
+
+void write_ir_byte(uint8_t payload) {
+//		while (!USCI_A_UART_getInterruptStatus(USCI_A1_BASE, UCTXIFG));
+		USCI_A_UART_transmitData(USCI_A1_BASE, payload);
+//		while (!f_rx_ready);
+//		f_rx_ready = 0;
 }
 
 void write_serial(uint8_t* text) {
 	uint16_t sendchar = 0;
 	do {
-		while (!USCI_A_UART_getInterruptStatus(USCI_A1_BASE, UCTXIFG));
-		USCI_A_UART_transmitData(USCI_A1_BASE, text[sendchar]);
+//		while (!USCI_A_UART_getInterruptStatus(USCI_A1_BASE, UCTXIFG));
+		write_ir_byte(text[sendchar]);
+//		while (!f_rx_ready);
+//		f_rx_ready = 0;
 	} while (text[++sendchar]);
 }
 
@@ -215,11 +228,7 @@ int main( void )
 			print(hex);
 			delay(250);
 		}
-		for (int i=0; i<64; i++) {
-			test_data[i] = test_char;
-		}
-		test_char++;
-		write_serial(test_data);
+		write_ir_byte(test_char++);
 		print("...");
 		delay(2000);
 	}
@@ -244,20 +253,36 @@ __interrupt void NMI_ISR(void)
 	} while (status != 0);
 }
 
-// Echo back RXed character, confirm TX buffer is ready first
 #pragma vector=USCI_A1_VECTOR
 __interrupt void USCI_A1_ISR(void)
 {
+	/*
+	 * NOTE: The RX interrupt has priority over TX interrupt. As a result,
+	 * although normally after transmitting over IR we'll see the TX interrupt
+	 * first, then the corresponding RX interrupt (because the transceiver
+	 * echoes TX to RX), when stepping through in debug mode it will often
+	 * be the case the the order is reversed: RXI, followed by the corresponding
+	 * TX interrupt.
+	 */
 	switch(__even_in_range(UCA1IV,4))
 	{
-	case 0:break;                             // Vector 0 - no interrupt
-	case 2:                                   // Vector 2 - RXIFG
-		while (!USCI_A_UART_getInterruptStatus(USCI_A1_BASE, UCTXIFG));
-		received_data = USCI_A_UART_receiveData(USCI_A1_BASE);
-		f_rx_ready = 1;
+	case 0:	// 0: No interrupt.
+		break;
+	case 2:	// RXIFG: RX buffer ready to read.
+		if (f_rx_ready == 2) {
+			f_rx_ready = 0;
+			// don't clobber what we may have actually read, because we just sent something:
+			USCI_A_UART_clearInterruptFlag(USCI_A1_BASE, USCI_A_UART_RECEIVE_INTERRUPT_FLAG);
+		}
+		else {
+			f_rx_ready = 1;
+			received_data = USCI_A_UART_receiveData(USCI_A1_BASE);
+		}
 
 		break;
-	case 4:                             // Vector 4 - TXIFG // Ready for another character...
+	case 4:	// TXIFG: TX buffer is sent.
+		if (!f_rx_ready)
+			f_rx_ready = 2;
 		break;
 	default: break;
 	}
