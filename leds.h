@@ -28,6 +28,7 @@ void led_display_bits(uint16_t* val);
 void led_enable(uint16_t duty_cycle);
 void led_on();
 void led_disable( void );
+void led_post();
 inline void led_toggle( void );
 
 #endif /* LEDS_H_ */
