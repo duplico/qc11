@@ -17,9 +17,9 @@ volatile uint8_t ir_rx_frame[64] = {0};
 volatile uint8_t ir_rx_index = 0;
 volatile uint8_t ir_rx_len = 0;
 
-// Protocol: SYNC0, SYNC1, LEN, DATA, [TODO: CRC], SYNC1, SYNC0
+// Protocol: SYNC0, SYNC1, LEN, DATA, CRC_MSB, CRC_LSB, SYNC1, SYNC0
 //  Max length: 56 bytes
-uint8_t ir_tx_frame[64] = {SYNC0, SYNC1, 1, 0, SYNC1, SYNC0, 0};
+uint8_t ir_tx_frame[64] = {SYNC0, SYNC1, 1, 0, 0, 0, SYNC1, SYNC0, 0};
 volatile uint8_t ir_xmit = 0;
 volatile uint8_t ir_xmit_index = 0;
 volatile uint8_t ir_xmit_len = 0;
@@ -67,24 +67,23 @@ void init_serial() {
 
 // Single byte, encapsulated in our IR datagram:
 void write_ir_byte(uint8_t payload) {
+	uint16_t crc = 0;
 	ir_tx_frame[0] = SYNC0;
 	ir_tx_frame[1] = SYNC1;
 	ir_tx_frame[2] = 1; // len
 	ir_tx_frame[3] = payload;
-	ir_tx_frame[4] = SYNC1;
-	ir_tx_frame[5] = SYNC0;
+	ir_tx_frame[4] = 0; // CRC0
+	ir_tx_frame[5] = 0; // CRC0
+	ir_tx_frame[6] = SYNC1;
+	ir_tx_frame[7] = SYNC0;
 
-//	CRC_setSeed(CRC_BASE,
-//			crcSeed);
-//
-//	for (i = 0; i < 5; i++) {
-//		//Add all of the values into the CRC signature
-//		CRC_set16BitData(CRC_BASE,
-//			data[i]);
-//	}
-//
-//	//Save the current CRC signature checksum to be compared for later
-//	crcResult = CRC_getResult(CRC_BASE);
+	CRC_setSeed(CRC_BASE, 0xBEEF);
+	CRC_set8BitData(CRC_BASE, payload);
+
+	crc = CRC_getResult(CRC_BASE);
+
+	ir_tx_frame[4] = (uint8_t) (crc & 0xFF);
+	ir_tx_frame[5] = (uint8_t) ((crc & 0xFF00) >> 8);
 
 	ir_xmit = 1;
 	ir_xmit_index = 0;
@@ -92,6 +91,21 @@ void write_ir_byte(uint8_t payload) {
 
 //	while (!USCI_A_UART_getInterruptStatus(USCI_A1_BASE, UCTXIFG)); // ?????
 	USCI_A_UART_transmitData(USCI_A1_BASE, ir_tx_frame[0]);
+}
+
+uint8_t check_crc() {
+	uint16_t crc = 0;
+
+	CRC_setSeed(CRC_BASE, 0xBEEF);
+
+	for (uint8_t i=0; i<ir_rx_len; i++) {
+		CRC_set8BitData(CRC_BASE, ir_rx_frame[i]);
+	}
+
+	crc = CRC_getResult(CRC_BASE);
+
+	return ir_rx_frame[ir_rx_len] == (crc & 0xFF) &&
+			ir_rx_frame[ir_rx_len+1] == ((crc & 0xFF00) >> 8);
 }
 
 // TODO: This is wrong now.
@@ -103,6 +117,13 @@ void write_serial(uint8_t* text) {
 //		while (!f_rx_ready);
 //		f_rx_ready = 0;
 	} while (text[++sendchar]);
+
+	//	for (i = 0; i < 5; i++) {
+	//		//Add all of the values into the CRC signature
+	//		CRC_set16BitData(CRC_BASE,
+	//			data[i]);
+	//	}
+
 }
 
 volatile uint8_t ir_rx_state = 0;
@@ -171,7 +192,12 @@ __interrupt void ir_isr(void)
 			// TODO: get the checksum, but don't actually verify it.
 			//  We'll set the f_ir_rx_ready flag, and it will be the
 			//  responsibility of the main thread to verify the checksum.
-			ir_rx_state++;
+			ir_rx_frame[ir_rx_index] = received_data;
+			ir_rx_index++; // the crc will be the last two bytes of the buffer
+			if (ir_rx_index == ir_rx_len+2) { // crc is 2 bytes
+				ir_rx_state++;
+			}
+			break;
 			// fall through to next case:
 		case 5: // CRC received and checked, waiting for SYNC1
 			if (received_data == SYNC1)
@@ -191,7 +217,7 @@ __interrupt void ir_isr(void)
 		break;
 	case 4:	// TXIFG: TX buffer is sent.
 		ir_xmit_index++;
-		if (ir_xmit_index >= ir_xmit_len+5) {
+		if (ir_xmit_index >= ir_xmit_len+7) {
 			ir_xmit = 0;
 		}
 
