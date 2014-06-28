@@ -37,7 +37,25 @@ void write_ir_byte(uint8_t);
 void write_serial(uint8_t*);
 void delay(unsigned int);
 
+
+
+extern uint8_t frame_index;
+extern uint8_t ir_tx_frame[4];
+extern uint8_t ir_rx_frame[4];
+
+extern uint8_t ir_rx_index;
+extern uint8_t ir_rx_len;
+
+extern volatile uint8_t ir_xmit;
+extern volatile uint8_t ir_xmit_index;
+extern volatile uint8_t ir_xmit_len;
+extern volatile uint8_t ir_xmit_payload;
+
+
+
 // Interrupt flags:
 extern volatile uint8_t f_new_minute;
+extern volatile uint8_t f_ir_tx_done;
+extern volatile uint8_t f_ir_rx_ready;
 
 #endif /* MAIN_H_ */
