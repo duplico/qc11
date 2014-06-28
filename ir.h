@@ -11,8 +11,8 @@
 #include <stdint.h>
 
 void init_serial();
-void write_ir_byte(uint8_t);
-void write_serial(uint8_t*);
-uint8_t check_crc();
+void ir_write_single_byte(uint8_t);
+void ir_write(uint8_t*, uint8_t );
+uint8_t ir_check_crc();
 
 #endif /* IR_H_ */

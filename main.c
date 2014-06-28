@@ -127,40 +127,33 @@ int main( void )
 	__bis_SR_register(GIE);
 	init_radio(); // requires interrupts enabled.
 
-	uint8_t test_char = 0;
-
 	print("Startup");
 	led_disp_bit_to_values(0, 0);
 	led_display_bits(values);
 	led_enable(1);
 	delay(2000);
 
-	char hex[4] = "AA";
 //	delay(2000);
 
-	uint8_t val;
 	uint8_t seen_j = 255;
 	while (1) {
 		seen_j = 255;
 		for (uint8_t j=1; j<3; j++) {
 			for (uint16_t i=1; i!=0; i++)
 				if (f_ir_rx_ready) {
-					if (!check_crc()) {
+					if (!ir_check_crc()) {
 						f_ir_rx_ready = 0;
 						continue;
 					}
 					seen_j = j;
 					f_ir_rx_ready = 0;
-					val = ir_rx_frame[0];
-					hex[0] = (val/16 < 10)? '0' + val/16 : 'A' - 10 + val/16;
-					hex[1] = (val%16 < 10)? '0' + val%16 : 'A' - 10 + val%16;
-					print(hex);
+					print((char *)ir_rx_frame);
 				}
 			if (seen_j != j) {
 				print("...");
 			}
 		}
-		write_ir_byte(test_char++);
+		ir_write("qcxi", 0);
 	}
 }
 

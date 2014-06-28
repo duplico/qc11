@@ -65,35 +65,7 @@ void init_serial() {
 		);
 }
 
-// Single byte, encapsulated in our IR datagram:
-void write_ir_byte(uint8_t payload) {
-	uint16_t crc = 0;
-	ir_tx_frame[0] = SYNC0;
-	ir_tx_frame[1] = SYNC1;
-	ir_tx_frame[2] = 1; // len
-	ir_tx_frame[3] = payload;
-	ir_tx_frame[4] = 0; // CRC0
-	ir_tx_frame[5] = 0; // CRC0
-	ir_tx_frame[6] = SYNC1;
-	ir_tx_frame[7] = SYNC0;
-
-	CRC_setSeed(CRC_BASE, 0xBEEF);
-	CRC_set8BitData(CRC_BASE, payload);
-
-	crc = CRC_getResult(CRC_BASE);
-
-	ir_tx_frame[4] = (uint8_t) (crc & 0xFF);
-	ir_tx_frame[5] = (uint8_t) ((crc & 0xFF00) >> 8);
-
-	ir_xmit = 1;
-	ir_xmit_index = 0;
-	ir_xmit_len = ir_tx_frame[2];
-
-//	while (!USCI_A_UART_getInterruptStatus(USCI_A1_BASE, UCTXIFG)); // ?????
-	USCI_A_UART_transmitData(USCI_A1_BASE, ir_tx_frame[0]);
-}
-
-uint8_t check_crc() {
+uint8_t ir_check_crc() {
 	uint16_t crc = 0;
 
 	CRC_setSeed(CRC_BASE, 0xBEEF);
@@ -108,21 +80,53 @@ uint8_t check_crc() {
 			ir_rx_frame[ir_rx_len+1] == ((crc & 0xFF00) >> 8);
 }
 
-// TODO: This is wrong now.
-void write_serial(uint8_t* text) {
-	uint16_t sendchar = 0;
-	do {
-//		while (!USCI_A_UART_getInterruptStatus(USCI_A1_BASE, UCTXIFG));
-		write_ir_byte(text[sendchar]);
-//		while (!f_rx_ready);
-//		f_rx_ready = 0;
-	} while (text[++sendchar]);
 
-	//	for (i = 0; i < 5; i++) {
-	//		//Add all of the values into the CRC signature
-	//		CRC_set16BitData(CRC_BASE,
-	//			data[i]);
-	//	}
+// Single byte, encapsulated in our IR datagram:
+void ir_write_single_byte(uint8_t payload) {
+	ir_write(&payload, 1);
+}
+
+void ir_write(uint8_t* payload, uint8_t len) {
+	if (len==0) {
+		while (payload[len++]); // If len=0, it's a null-termed string
+		// It's len++ instead of ++len because we DO want to send the
+		// terminator character, so we can just print it on the other side
+		// without any extra processing.
+	}
+
+	if (len>56) {
+		len=56;
+	}
+
+	uint16_t crc = 0;
+
+	// Packet header:
+	ir_tx_frame[0] = SYNC0;
+	ir_tx_frame[1] = SYNC1;
+	ir_tx_frame[2] = len;
+
+	// Packet payload & CRC:
+	CRC_setSeed(CRC_BASE, 0xBEEF);
+	for (uint8_t i=0; i<len; i++) {
+		CRC_set8BitData(CRC_BASE, payload[i]);
+		ir_tx_frame[3+i] = payload[i];
+	}
+
+	crc = CRC_getResult(CRC_BASE);
+
+	ir_tx_frame[3+len] = (uint8_t) (crc & 0xFF);
+	ir_tx_frame[4+len] = (uint8_t) ((crc & 0xFF00) >> 8);
+
+	// Packet footer:
+	ir_tx_frame[5 + len] = SYNC1;
+	ir_tx_frame[6 + len] = SYNC0;
+
+	// Start the transmission:
+	ir_xmit = 1;
+	ir_xmit_index = 0;
+	ir_xmit_len = len;
+
+	USCI_A_UART_transmitData(USCI_A1_BASE, ir_tx_frame[0]);
 
 }
 
