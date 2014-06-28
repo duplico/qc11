@@ -13,17 +13,16 @@
 
 volatile uint8_t received_data = 0;
 
-uint8_t frame_index = 0;
-uint8_t ir_tx_frame[4] = {SYNC0, SYNC1, 0, 0};
-uint8_t ir_rx_frame[4] = {0};
+volatile uint8_t ir_rx_frame[64] = {0};
+volatile uint8_t ir_rx_index = 0;
+volatile uint8_t ir_rx_len = 0;
 
-uint8_t ir_rx_index = 0;
-uint8_t ir_rx_len = 4;
-
+// Protocol: SYNC0, SYNC1, LEN, DATA, [TODO: CRC], SYNC1, SYNC0
+//  Max length: 56 bytes
+uint8_t ir_tx_frame[64] = {SYNC0, SYNC1, 1, 0, SYNC1, SYNC0, 0};
 volatile uint8_t ir_xmit = 0;
 volatile uint8_t ir_xmit_index = 0;
 volatile uint8_t ir_xmit_len = 0;
-volatile uint8_t ir_xmit_payload = 0;
 
 
 void init_serial() {
@@ -66,16 +65,36 @@ void init_serial() {
 		);
 }
 
+// Single byte, encapsulated in our IR datagram:
 void write_ir_byte(uint8_t payload) {
-//		while (!USCI_A_UART_getInterruptStatus(USCI_A1_BASE, UCTXIFG));
-//		USCI_A_UART_transmitData(USCI_A1_BASE, SYNC2);
-//		USCI_A_UART_transmitData(USCI_A1_BASE, SYNC1);
-		USCI_A_UART_transmitData(USCI_A1_BASE, payload);
-//		USCI_A_UART_transmitData(USCI_A1_BASE, 0);
-//		while (!f_rx_ready);
-//		f_rx_ready = 0;
+	ir_tx_frame[0] = SYNC0;
+	ir_tx_frame[1] = SYNC1;
+	ir_tx_frame[2] = 1; // len
+	ir_tx_frame[3] = payload;
+	ir_tx_frame[4] = SYNC1;
+	ir_tx_frame[5] = SYNC0;
+
+//	CRC_setSeed(CRC_BASE,
+//			crcSeed);
+//
+//	for (i = 0; i < 5; i++) {
+//		//Add all of the values into the CRC signature
+//		CRC_set16BitData(CRC_BASE,
+//			data[i]);
+//	}
+//
+//	//Save the current CRC signature checksum to be compared for later
+//	crcResult = CRC_getResult(CRC_BASE);
+
+	ir_xmit = 1;
+	ir_xmit_index = 0;
+	ir_xmit_len = ir_tx_frame[2];
+
+//	while (!USCI_A_UART_getInterruptStatus(USCI_A1_BASE, UCTXIFG)); // ?????
+	USCI_A_UART_transmitData(USCI_A1_BASE, ir_tx_frame[0]);
 }
 
+// TODO: This is wrong now.
 void write_serial(uint8_t* text) {
 	uint16_t sendchar = 0;
 	do {
@@ -85,6 +104,19 @@ void write_serial(uint8_t* text) {
 //		f_rx_ready = 0;
 	} while (text[++sendchar]);
 }
+
+volatile uint8_t ir_rx_state = 0;
+
+/*
+ * 0 - base state, waiting for sync0
+ * 1 = sync0 received, waiting for sync1
+ * 2 = sync1 received, waiting for len
+ * 3 = len received, listening to payload
+ * 4 = len payload received, waiting for crc
+ * 5 = len payload received, waiting for sync0
+ * 6 = waiting for sync1
+ * return to 0 on receive of sync0
+ */
 
 #pragma vector=USCI_A1_VECTOR
 __interrupt void ir_isr(void)
@@ -102,46 +134,64 @@ __interrupt void ir_isr(void)
 	case 0:	// 0: No interrupt.
 		break;
 	case 2:	// RXIFG: RX buffer ready to read.
-//		if (f_rx_ready == 2) {
-//			f_rx_ready = 0;
-//			// don't clobber what we may have actually read, because we just sent something:
+
+//		if (ir_xmit) {
 //			USCI_A_UART_clearInterruptFlag(USCI_A1_BASE, USCI_A_UART_RECEIVE_INTERRUPT_FLAG);
+//			break;
 //		}
-//		else {
-
-
-		if (ir_xmit) {
-			USCI_A_UART_clearInterruptFlag(USCI_A1_BASE, USCI_A_UART_RECEIVE_INTERRUPT_FLAG);
-			break;
-		}
 
 		received_data = USCI_A_UART_receiveData(USCI_A1_BASE);
 
-		if (ir_rx_index == 0 && received_data == SYNC0) {
-			// do stuff
-		} else if (ir_rx_index == 1 && received_data == SYNC1) {
-			// do stuff
-		}
-		else if (ir_rx_index == 2) {
-			// do stuff, payload
-		} else if (ir_rx_index == 3 && received_data==0) {
-			f_ir_rx_ready = 1;
-			ir_rx_index = 0;
-			// do stuff, successful receive
-		} else {
-			// malformed
-			ir_rx_index = 0;
+		switch (ir_rx_state) {
+		case 0: // IDLE, this should be SYNC0
+			if (received_data == SYNC0) {
+				ir_rx_state++;
+			}
 			break;
-		}
-		ir_rx_frame[ir_rx_index] = received_data;
-		if (!f_ir_rx_ready)
+		case 1: // Have SYNC0, this should be SYNC1
+			if (received_data == SYNC1) {
+				ir_rx_state++;
+			} else {
+				ir_rx_state = 0;
+			}
+			break;
+		case 2: // SYNC, this should be len
+			ir_rx_len = received_data;
+			ir_rx_index = 0;
+			ir_rx_state++;
+			break;
+		case 3: // LISTEN, this should be part of the payload
+			ir_rx_frame[ir_rx_index] = received_data;
 			ir_rx_index++;
-//		}
+			if (ir_rx_index == ir_rx_len) { // Received len bytes (ir frames):
+				ir_rx_state++;
+			}
+			break;
+		case 4: // Payload received, waiting for CRC
+			// TODO: get the checksum, but don't actually verify it.
+			//  We'll set the f_ir_rx_ready flag, and it will be the
+			//  responsibility of the main thread to verify the checksum.
+			ir_rx_state++;
+			// fall through to next case:
+		case 5: // CRC received and checked, waiting for SYNC1
+			if (received_data == SYNC1)
+				ir_rx_state++;
+			else
+				ir_rx_state = 0;
+			break;
+		case 6: // SYNC1 received, waiting for SYNC0
+			if (received_data == SYNC0) {
+				ir_rx_state = 0;
+				f_ir_rx_ready = 1; // Successful receive
+			} else {
+				ir_rx_state = 0;
+			}
+		} // switch (ir_rx_state)
 
 		break;
 	case 4:	// TXIFG: TX buffer is sent.
 		ir_xmit_index++;
-		if (ir_xmit_index >= ir_xmit_len) {
+		if (ir_xmit_index >= ir_xmit_len+5) {
 			ir_xmit = 0;
 		}
 
