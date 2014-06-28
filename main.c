@@ -147,7 +147,7 @@ int main( void )
 				if (f_ir_rx_ready) {
 					seen_j = j;
 					f_ir_rx_ready = 0;
-					val = ir_rx_frame[2];
+					val = ir_rx_frame[0];
 					hex[0] = (val/16 < 10)? '0' + val/16 : 'A' - 10 + val/16;
 					hex[1] = (val%16 < 10)? '0' + val%16 : 'A' - 10 + val%16;
 					print(hex);
@@ -156,15 +156,7 @@ int main( void )
 				print("...");
 			}
 		}
-//		write_ir_byte(test_char++);
-
-		ir_tx_frame[2] = test_char++;
-//		uint8_t ir_rx_frame[4] = {0};
-		ir_xmit = 1;
-		ir_xmit_index = 0;
-		ir_xmit_len = 4;
-		USCI_A_UART_transmitData(USCI_A1_BASE, ir_tx_frame[0]);
-//		delay(2000);
+		write_ir_byte(test_char++);
 	}
 }
 
