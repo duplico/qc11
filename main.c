@@ -304,26 +304,32 @@ __interrupt void USCI_A1_ISR(void)
 //			USCI_A_UART_clearInterruptFlag(USCI_A1_BASE, USCI_A_UART_RECEIVE_INTERRUPT_FLAG);
 //		}
 //		else {
-			received_data = USCI_A_UART_receiveData(USCI_A1_BASE);
-			if (ir_rx_index == 0 && received_data == SYNC0) {
-				// do stuff
-			} else if (ir_rx_index == 1 && received_data == SYNC1) {
-				// do stuff
-			}
-			else if (ir_rx_index == 2) {
-				// do stuff, payload
-			} else if (ir_rx_index == 3 && received_data==0) {
-				f_rx_ready = 1;
-				ir_rx_index = 0;
-				// do stuff, successful receive
-			} else {
-				// malformed
-				ir_rx_index = 0;
-				break;
-			}
-			ir_rx_frame[ir_rx_index] = received_data;
-			if (!f_rx_ready)
-				ir_rx_index++;
+		if (ir_xmit) {
+			USCI_A_UART_clearInterruptFlag(USCI_A1_BASE, USCI_A_UART_RECEIVE_INTERRUPT_FLAG);
+			break;
+		}
+
+		received_data = USCI_A_UART_receiveData(USCI_A1_BASE);
+
+		if (ir_rx_index == 0 && received_data == SYNC0) {
+			// do stuff
+		} else if (ir_rx_index == 1 && received_data == SYNC1) {
+			// do stuff
+		}
+		else if (ir_rx_index == 2) {
+			// do stuff, payload
+		} else if (ir_rx_index == 3 && received_data==0) {
+			f_rx_ready = 1;
+			ir_rx_index = 0;
+			// do stuff, successful receive
+		} else {
+			// malformed
+			ir_rx_index = 0;
+			break;
+		}
+		ir_rx_frame[ir_rx_index] = received_data;
+		if (!f_rx_ready)
+			ir_rx_index++;
 //		}
 
 		break;
