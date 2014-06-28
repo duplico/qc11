@@ -62,8 +62,8 @@ void init_clocks() {
 	//  (this will set SMCLK and MCLK to use DCO, so we'll need to reinitialize
 	//   them after we setup the DCO/FLL)
 	UCS_initFLLSettle(
-			MCLK_DESIRED_FREQUENCY_IN_KHZ, // 8000
-			MCLK_FLLREF_RATIO			   // 8 MHz / 32KHz
+			DCO_DESIRED_FREQUENCY_IN_KHZ, // 8000
+			DCO_FLLREF_RATIO			   // 8 MHz / 32KHz
 	);
 
 	// Use the DCO as the master clock.
