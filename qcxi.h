@@ -12,6 +12,9 @@
 #define BADGE_TARGET 1
 #define DEBUG_SERIAL 0
 
+#define SYNC0 0b11001100
+#define SYNC1 0b01010101
+
 #include <stdint.h>
 #include "driverlib.h"
 
