@@ -30,7 +30,7 @@ void init_clocks() {
 	);
 
 
-	if (xt1_status == STATUS_FAIL) { // TODO remove compare and switch if around
+	if (xt1_status == STATUS_FAIL) {
 		// XT1 is broken.
 		// Fall back to REFO ////////////////////////////////////
 		UCS_XT1Off();                                          //
@@ -45,6 +45,7 @@ void init_clocks() {
 		/////////////////////////////////////////////////////////
 	}
 	else { // XT1 is not broken:
+		// REFO is automatically disabled when not sourcing anything.
 		// Select XT1 as ACLK source
 		UCS_clockSignalInit(
 			UCS_ACLK,
@@ -56,39 +57,50 @@ void init_clocks() {
 				UCS_CLOCK_DIVIDER_1);
 	}
 
+	// Initializes the DCO to operate at the given frequency below,
+	//  using the FLL (note XT1 is its input above)
+	//  (this will set SMCLK and MCLK to use DCO, so we'll need to reinitialize
+	//   them after we setup the DCO/FLL)
+	UCS_initFLLSettle(
+			MCLK_DESIRED_FREQUENCY_IN_KHZ, // 8000
+			MCLK_FLLREF_RATIO			   // 8 MHz / 32KHz
+	);
+
+	// Use the DCO as the master clock.
+	// Divide by 8 to get a MCLK of 1 MHz
+	// TODO: Decide if this is the right frequency or not.
+	UCS_clockSignalInit(UCS_MCLK, UCS_DCOCLKDIV_SELECT,
+			UCS_CLOCK_DIVIDER_8);
+
 	// Init XT2:
 	xt2_status = UCS_XT2StartWithTimeout(
 			UCS_XT2DRIVE_8MHZ_16MHZ,
 			UCS_XT2_TIMEOUT
 	);
-
-	// Setup the clocks:
-
-
-	//Select XT2 as SMCLK source
-	UCS_clockSignalInit(
+	if (xt2_status == STATUS_FAIL) {
+		// XT2 is broken.
+		// Fall back to using the DCO at 8 MHz (ish)
+		UCS_clockSignalInit(
+			UCS_SMCLK,
+			UCS_DCOCLKDIV_SELECT,
+			UCS_CLOCK_DIVIDER_1
+		);
+	}
+	else {
+		// XT2 is not broken:
+		// Select XT2 as SMCLK source
+		UCS_clockSignalInit(
 			UCS_SMCLK,
 			UCS_XT2CLK_SELECT,
 			UCS_CLOCK_DIVIDER_2 // Divide by 2 to get 8 MHz.
-	);
-
-
-	UCS_initFLLSettle(
-			MCLK_DESIRED_FREQUENCY_IN_KHZ,
-			MCLK_FLLREF_RATIO
-	);
-
-	// Use the DCO paired with XT1+FLL as the master clock
-	// This will run at around 1 MHz. This is the default.
-	//                     (1,048,576 Hz)
-	UCS_clockSignalInit(UCS_MCLK, UCS_DCOCLKDIV_SELECT,
-			UCS_CLOCK_DIVIDER_1);
+		);
+	}
 
 	// Enable global oscillator fault flag
 	SFR_clearInterrupt(SFR_OSCILLATOR_FAULT_INTERRUPT);
 	SFR_enableInterrupt(SFR_OSCILLATOR_FAULT_INTERRUPT);
 
-	uint32_t clockValue;
+	volatile uint32_t clockValue;
 	// TODO: Verify if the clock settings are as expected:
 	clockValue = UCS_getMCLK();
 	clockValue = UCS_getACLK();
