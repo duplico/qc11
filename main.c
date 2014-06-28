@@ -145,6 +145,10 @@ int main( void )
 		for (uint8_t j=1; j<3; j++) {
 			for (uint16_t i=1; i!=0; i++)
 				if (f_ir_rx_ready) {
+					if (!check_crc()) {
+						f_ir_rx_ready = 0;
+						continue;
+					}
 					seen_j = j;
 					f_ir_rx_ready = 0;
 					val = ir_rx_frame[0];
