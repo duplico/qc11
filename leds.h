@@ -14,6 +14,8 @@
 #define LED_LATCH	GPIO_PIN7
 #define LED_BLANK	GPIO_PIN3
 
+#define LED_PERIOD 64
+
 #define BACK_BUFFER_HEIGHT 16
 #define BACK_BUFFER_WIDTH 255
 
@@ -33,7 +35,7 @@ void led_display_bits(uint16_t* val);
 void led_enable(uint16_t duty_cycle);
 void led_on();
 void led_disable( void );
-void led_post();
+uint8_t led_post();
 void led_anim_init();
 void led_animate();
 inline void led_toggle( void );
