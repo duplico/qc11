@@ -158,7 +158,7 @@ void mode_rx_sync() {
 }
 
 void mode_sb_sync() {
-	write_single_register(RFM_OPMODE, 0b00000100); // Receive mode.
+	write_single_register(RFM_OPMODE, 0b00000100);
 	uint8_t reg_read;
 	do {
 		reg_read = read_single_register_sync(RFM_IRQ1);

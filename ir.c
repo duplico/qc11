@@ -17,6 +17,8 @@ volatile uint8_t ir_rx_frame[64] = {0};
 volatile uint8_t ir_rx_index = 0;
 volatile uint8_t ir_rx_len = 0;
 
+uint8_t ir_reject_loopback = 0;
+
 // Protocol: SYNC0, SYNC1, LEN, DATA, CRC_MSB, CRC_LSB, SYNC1, SYNC0
 //  Max length: 56 bytes
 uint8_t ir_tx_frame[64] = {SYNC0, SYNC1, 1, 0, 0, 0, SYNC1, SYNC0, 0};
@@ -160,10 +162,10 @@ __interrupt void ir_isr(void)
 		break;
 	case 2:	// RXIFG: RX buffer ready to read.
 
-//		if (ir_xmit) {
-//			USCI_A_UART_clearInterruptFlag(USCI_A1_BASE, USCI_A_UART_RECEIVE_INTERRUPT_FLAG);
-//			break;
-//		}
+		if (ir_reject_loopback && ir_xmit) {
+			USCI_A_UART_clearInterruptFlag(USCI_A1_BASE, USCI_A_UART_RECEIVE_INTERRUPT_FLAG);
+			break;
+		}
 
 		received_data = USCI_A_UART_receiveData(USCI_A1_BASE);
 

@@ -1,3 +1,5 @@
+#include <string.h>
+
 #include "qcxi.h"
 #include "radio.h"
 #include "fonts.h"
@@ -58,10 +60,9 @@ void init_gpio() {
 			LED_DATA + LED_CLOCK + LED_LATCH // + LED_BLANK
 	);
 
-	//   PWM-enabled BLANK pin:
-//	GPIO_setAsPeripheralModuleFunctionOutputPin(LED_PORT, LED_BLANK);
+	// BLANK pin (we turn on PWM later as needed):
 	GPIO_setAsOutputPin(LED_PORT, LED_BLANK);
-	// TODO: Also, there's an input FROM the LED controllers on pin 1.6
+	// Shift register input from LED controllers:
 	GPIO_setAsInputPin(LED_PORT, GPIO_PIN6);
 
 	// IR pins ////////////////////////////////////////////////////////////////
@@ -82,12 +83,6 @@ void init_gpio() {
 	// Shutdown (SD) for IR
 	GPIO_setAsOutputPin(GPIO_PORT_P4, GPIO_PIN6);
 	GPIO_setOutputLowOnPin(GPIO_PORT_P4, GPIO_PIN6); // shutdown low = on
-
-	// ALTERNATE FOR IR: serial debug interface ///////////////////////////////
-	// serial debug:
-	GPIO_setAsPeripheralModuleFunctionInputPin(GPIO_PORT_P4, GPIO_PIN5); // 4.5: RXD
-	GPIO_setAsPeripheralModuleFunctionOutputPin(GPIO_PORT_P4, GPIO_PIN4); // 4.4: TXD
-	///////////////////////////////////////////////////////////////////////////
 
 	// Interrupt pin for radio:
 	GPIO_setAsInputPin(GPIO_PORT_P2, GPIO_PIN0);
@@ -114,6 +109,82 @@ uint16_t _rotl(uint16_t value, int shift) {
     return (value << shift) | (value >> (sizeof(value)*8 - shift));
 }
 
+#define POST_XT1F 	0b1
+#define POST_XT2F 	0b10
+#define POST_SHIFTF 0b100
+#define POST_IRIF 	0b1000
+#define POST_IRVF 	0b10000
+#define POST_RRF	0b100000
+#define POST_RTF	0b1000000
+
+uint8_t post() {
+	__bic_SR_register(GIE);
+	uint8_t post_result = 0;
+	uint16_t tp0[5] = {0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF};
+	uint16_t tp1[5] = {0xFF00, 0xFF00, 0xFF00, 0xFF00, 0xFF00};
+	uint16_t tp2[5] = {0x00FF, 0x00FF, 0x00FF, 0x00FF, 0x00FF};
+	// Clocks
+	if (xt1_status == STATUS_FAIL) {
+		post_result |= POST_XT1F;
+	}
+	if (xt2_status == STATUS_FAIL) {
+		post_result |= POST_XT2F;
+	}
+	if (led_post() == STATUS_FAIL) {
+		post_result |= POST_SHIFTF;
+	}
+	// LED test pattern
+	led_display_bits(tp0);
+	for (uint8_t i=LED_PERIOD; i>0; i--) {
+		led_enable(i);
+		delay(8);
+	}
+	led_display_bits(tp1);
+	for (uint8_t i=LED_PERIOD; i>0; i--) {
+		led_enable(i);
+		delay(8);
+	}
+	led_display_bits(tp2);
+	for (uint8_t i=LED_PERIOD; i>0; i--) {
+		led_enable(i);
+		delay(8);
+	}
+	led_disable();
+	delay(500);
+	__bis_SR_register(GIE);
+
+	ir_reject_loopback = 0;
+	// IR loopback
+	char test_str[] = "qcxi";
+	ir_write((uint8_t *) test_str, 0);
+	delay(100);
+	if (f_ir_rx_ready) {
+		f_ir_rx_ready = 0;
+		if (!ir_check_crc()) {
+			// IR loopback integrity fault
+			post_result |= POST_IRIF;
+		} else {
+			if (strcmp(test_str, (char *) ir_rx_frame) != 0)
+				post_result |= POST_IRVF; // IR value fault
+		}
+	}
+	// Radio - TODO
+
+	// Display error code:
+	if (post_result != 0) {
+		char hex[4] = "AA";
+		hex[0] = (post_result/16 < 10)? '0' + post_result/16 : 'A' - 10 + post_result/16;
+		hex[1] = (post_result%16 < 10)? '0' + post_result%16 : 'A' - 10 + post_result%16;
+		led_print(hex);
+		for (uint8_t i=LED_PERIOD; i>0; i--) {
+			led_enable(i);
+			delay(25);
+		}
+	}
+
+	return post_result;
+}
+
 int main( void )
 {
 	// TODO: check to see what powerup mode we're in.
@@ -128,6 +199,11 @@ int main( void )
 	init_radio(); // requires interrupts enabled.
 
 	uint8_t startup_test = 0;
+
+	//////////////////////////
+	// Power on self-test
+	startup_test = post();
+
 	led_on();
 
 	led_print_scroll("Startup", (startup_test & 0b10) >> 1, startup_test & 0b01, 1);

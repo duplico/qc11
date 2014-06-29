@@ -195,7 +195,7 @@ void led_display_bits(uint16_t* val)
 	GPIO_pulse(LED_PORT, LED_LATCH);
 }
 
-void led_post()
+uint8_t led_post()
 {
 	//Set latch to low (should be already)
 	GPIO_setOutputLowOnPin(LED_PORT, LED_LATCH);
@@ -203,7 +203,7 @@ void led_post()
 	uint16_t i;
 	uint8_t j;
 
-	uint16_t test_pattern = 0b1010101010101010;
+	uint16_t test_pattern = 0b1111101010100001;
 	uint16_t test_response = 0;
 	for (j=0; j<5; j++) { // Fill all the registers with the test pattern.
 		for (i = 0; i < 16; i++)  {
@@ -222,12 +222,10 @@ void led_post()
 			GPIO_pulse(LED_PORT, LED_CLOCK);
 		}
 		if (test_response != test_pattern) {
-			GPIO_pulse(LED_PORT, LED_LATCH); // TODO
-		} else {
-			GPIO_pulse(LED_PORT, LED_CLOCK); // TODO
+			return STATUS_FAIL;
 		}
 	}
-	GPIO_pulse(LED_PORT, LED_LATCH);
+	return STATUS_SUCCESS;
 }
 
 void led_enable(uint16_t duty_cycle) {
@@ -238,10 +236,10 @@ void led_enable(uint16_t duty_cycle) {
 		TIMER_A0_BASE,
 		TIMER_A_CLOCKSOURCE_ACLK,
 		TIMER_A_CLOCKSOURCE_DIVIDER_1,
-		20, // period
+		LED_PERIOD, // period
 		TIMER_A_CAPTURECOMPARE_REGISTER_2,
 		TIMER_A_OUTPUTMODE_RESET_SET,
-		20 - duty_cycle // duty cycle
+		LED_PERIOD - duty_cycle // duty cycle
 	);
 
 	TIMER_A_startCounter(TIMER_A0_BASE, TIMER_A_UP_MODE);
