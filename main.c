@@ -198,18 +198,44 @@ int main( void )
 	__bis_SR_register(GIE);
 	init_radio(); // requires interrupts enabled.
 
-	uint8_t startup_test = 0;
-
-	//////////////////////////
-	// Power on self-test
-	startup_test = post();
+	post();
 
 	led_on();
-
-	led_print_scroll("Startup", (startup_test & 0b10) >> 1, startup_test & 0b01, 1);
-	startup_test++;
+	uint8_t startup_test = 0;
 
 	led_anim_init(); // start a-blinkin.
+	f_animation_done = 1;
+
+	char hex[4] = "AA";
+	uint8_t val;
+
+	while (1) {
+		mode_sb_sync();
+		led_print(" TX");
+		write_single_register(0x25, 0b00000000); // GPIO map to default
+		write_register(RFM_FIFO, test_data, 64);
+		led_print("TX");
+		f_rfm_job_done = 0;
+		mode_tx_async();
+		while (!f_rfm_job_done);
+		f_rfm_job_done = 0;
+		mode_sb_sync();
+		//		write_single_register(0x29, 228); // RssiThreshold = -this/2 in dB
+		led_print("...");
+		delay(100);
+		mode_rx_sync();
+		delay(1000);
+		if (f_rfm_job_done) {
+			f_rfm_job_done = 0;
+			val = read_single_register_sync(0x24);
+			read_register_sync(RFM_FIFO, 64, test_data);
+			mode_sb_sync();
+			hex[0] = (val/16 < 10)? '0' + val/16 : 'A' - 10 + val/16;
+			hex[1] = (val%16 < 10)? '0' + val%16 : 'A' - 10 + val%16;
+			led_print((char *)test_data);
+			delay(1000);
+		}
+	}
 
 	while (1) {
 		if (f_animate) {
@@ -223,29 +249,6 @@ int main( void )
 			startup_test++;
 		}
 		__bis_SR_register(LPM3_bits + GIE);
-	}
-
-//	delay(2000);
-
-	uint8_t seen_j = 255;
-	while (1) {
-		seen_j = 255;
-		for (uint8_t j=1; j<3; j++) {
-			for (uint16_t i=1; i!=0; i++)
-				if (f_ir_rx_ready) {
-					if (!ir_check_crc()) {
-						f_ir_rx_ready = 0;
-						continue;
-					}
-					seen_j = j;
-					f_ir_rx_ready = 0;
-					led_print((char *)ir_rx_frame);
-				}
-			if (seen_j != j) {
-				led_print("...");
-			}
-		}
-		ir_write("qcxi", 0);
 	}
 }
 

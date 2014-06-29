@@ -26,6 +26,9 @@ void mode_rx_sync();
 void mode_sb_sync();
 void mode_tx_sync();
 void mode_tx_async();
+
+void radio_send(uint8_t*, uint8_t);
+
 uint8_t rfm_crcok();
 void init_radio();
 
