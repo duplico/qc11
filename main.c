@@ -127,11 +127,27 @@ int main( void )
 	__bis_SR_register(GIE);
 	init_radio(); // requires interrupts enabled.
 
-	print("Startup");
-	led_disp_bit_to_values(0, 0);
-	led_display_bits(values);
-	led_enable(1);
-	delay(2000);
+	uint8_t startup_test = 0;
+	led_on();
+
+	led_print_scroll("Startup", (startup_test & 0b10) >> 1, startup_test & 0b01, 1);
+	startup_test++;
+
+	led_anim_init(); // start a-blinkin.
+
+	while (1) {
+		if (f_animate) {
+			f_animate = 0;
+			led_animate();
+		}
+
+		if (f_animation_done) {
+			f_animation_done = 0;
+			led_print_scroll("Startup", (startup_test & 0b10) >> 1, startup_test & 0b01, 1);
+			startup_test++;
+		}
+		__bis_SR_register(LPM3_bits + GIE);
+	}
 
 //	delay(2000);
 
@@ -147,10 +163,10 @@ int main( void )
 					}
 					seen_j = j;
 					f_ir_rx_ready = 0;
-					print((char *)ir_rx_frame);
+					led_print((char *)ir_rx_frame);
 				}
 			if (seen_j != j) {
-				print("...");
+				led_print("...");
 			}
 		}
 		ir_write("qcxi", 0);

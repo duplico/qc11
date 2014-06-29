@@ -147,37 +147,3 @@ void init_rtc() {
 void init_watchdog() {
 	WDT_A_hold(WDT_A_BASE);
 }
-
-
-#if defined(__TI_COMPILER_VERSION__) || defined(__IAR_SYSTEMS_ICC__)
-#pragma vector=RTC_VECTOR
-__interrupt
-#elif defined(__GNUC__)
-__attribute__((interrupt(RTC_VECTOR)))
-#endif
-void RTC_A_ISR(void)
-{
-        switch (__even_in_range(RTCIV, 16)) {
-        case 0: break;  //No interrupts
-        case 2:         //RTCRDYIFG
-                //Toggle P1.0 every second
-//                GPIO_toggleOutputOnPin(
-//                        GPIO_PORT_P1,
-//                        GPIO_PIN0);
-                break;
-        case 4:         //RTCEVIFG
-                //Interrupts every minute
-                f_new_minute = 1;
-                break;
-        case 6:         //RTCAIFG
-                //Interrupts 5:00pm on 5th day of week
-                __no_operation();
-                break;
-        case 8: break;  //RT0PSIFG
-        case 10: break; //RT1PSIFG
-        case 12: break; //Reserved
-        case 14: break; //Reserved
-        case 16: break; //Reserved
-        default: break;
-        }
-}

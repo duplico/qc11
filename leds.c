@@ -9,13 +9,20 @@
 #include "leds.h"
 #include "fonts.h"
 
-uint16_t values[5] = {65535, 65535, 65535, 65535, 65535};
+uint16_t led_values[5] = {65535, 65535, 65535, 65535, 65535};
 
-uint16_t zeroes[5] = {0, 0, 0, 0, 0};
+uint16_t led_zeroes[5] = {0, 0, 0, 0, 0};
 
 uint16_t disp_bit_buffer[BACK_BUFFER_WIDTH] = { 0 };
 
-void print(char* text) {
+volatile uint8_t f_animate = 0;
+uint8_t print_pixel_len = 0;
+uint8_t print_pixel_index = 0;
+
+uint8_t led_animating = 0;
+uint8_t f_animation_done = 0;
+
+void led_print(char* text) {
 	uint8_t character = 0;
 	uint8_t cursor = 0;
 	do {
@@ -35,7 +42,49 @@ void print(char* text) {
 		disp_bit_buffer[cursor++] = 0;
 	}
 	led_disp_bit_to_values(0, 0);
-	led_display_bits(values);
+	led_display_bits(led_values);
+}
+
+void led_print_scroll(char* text, uint8_t scroll_on, uint8_t scroll_off, uint8_t speed) {
+	uint8_t character = 0;
+	uint8_t cursor = 0;
+	if (scroll_on) {
+		while (cursor < SCREEN_WIDTH) { // empty everything before the text.
+			disp_bit_buffer[cursor++] = 0;
+		}
+//		print_pixel_len = SCREEN_WIDTH;
+	} else {
+//		print_pixel_len = 0;
+	}
+
+	do {
+		for (uint16_t i = d3_5ptFontInfo.charInfo[text[character] - d3_5ptFontInfo.startChar].offset; i < d3_5ptFontInfo.charInfo[text[character] - d3_5ptFontInfo.startChar].offset + d3_5ptFontInfo.charInfo[text[character] - d3_5ptFontInfo.startChar].widthBits; i++) {
+			disp_bit_buffer[cursor++] = d3_5ptFontInfo.data[i];
+			if (cursor == BACK_BUFFER_WIDTH)
+				break;
+		}
+		if (cursor == BACK_BUFFER_WIDTH)
+			break; // TODO: Clean this up
+		disp_bit_buffer[cursor++] = 0; // gap between letters
+		character++;
+		if (cursor == BACK_BUFFER_WIDTH)
+			break;
+	} while (text[character]);
+
+	print_pixel_len = cursor;
+
+	if (!scroll_off) {
+		print_pixel_len -= SCREEN_WIDTH; // TODO: Bounds checking
+	}
+
+	while (cursor < BACK_BUFFER_WIDTH) { // empty everything else.
+		disp_bit_buffer[cursor++] = 0;
+	}
+
+	print_pixel_index = 0;
+	led_disp_bit_to_values(print_pixel_index, 0);
+	led_display_bits(led_values);
+	led_animating = 1;
 }
 
 void led_set_rainbow(uint16_t value) {
@@ -50,21 +99,21 @@ void led_set_rainbow(uint16_t value) {
 	// 2.0 = value.2
 	// 4.8 = value.1
 	// 4.0 = value.0
-	values[0] &= 0b0111111111111110;
-	values[1] &= 0b0111111101111111;
-	values[2] &= 0b1111111011111110;
-	values[3] &= 0b0111111101111111;
-	values[4] &= 0b1111111011111110;
+	led_values[0] &= 0b0111111111111110;
+	led_values[1] &= 0b0111111101111111;
+	led_values[2] &= 0b1111111011111110;
+	led_values[3] &= 0b0111111101111111;
+	led_values[4] &= 0b1111111011111110;
 
-	values[0] |= (value & BIT9)? BIT15 : 0;
-	values[1] |= (value & BIT8)? BIT15 : 0;
-	values[1] |= (value & BIT7)? BIT7 : 0;
-	values[3] |= (value & BIT6)? BIT15 : 0;
-	values[3] |= (value & BIT5)? BIT7 : 0;
-	values[0] |= (value & BIT4)? BIT0 : 0;
-	values[2] |= (value & BIT3)? BIT8 : 0;
-	values[2] |= (value & BIT2)? BIT0 : 0;
-	values[4] |= ((value & BIT1)? BIT8 : 0) | ((value & BIT0)? BIT0 : 0);
+	led_values[0] |= (value & BIT9)? BIT15 : 0;
+	led_values[1] |= (value & BIT8)? BIT15 : 0;
+	led_values[1] |= (value & BIT7)? BIT7 : 0;
+	led_values[3] |= (value & BIT6)? BIT15 : 0;
+	led_values[3] |= (value & BIT5)? BIT7 : 0;
+	led_values[0] |= (value & BIT4)? BIT0 : 0;
+	led_values[2] |= (value & BIT3)? BIT8 : 0;
+	led_values[2] |= (value & BIT2)? BIT0 : 0;
+	led_values[4] |= ((value & BIT1)? BIT8 : 0) | ((value & BIT0)? BIT0 : 0);
 }
 
 uint16_t rainbow_values;
@@ -73,12 +122,12 @@ void led_disp_bit_to_values(uint8_t left, uint8_t top) {
 
 	// TODO: This will be handled in another routine later. But for
 	//  now, we'll light the whole rainbow in this one:
-	values[0] &= 0b1000000000000001;
+	led_values[0] &= 0b1000000000000001;
 	for (int i=1; i<5; i++) {
 		if (i & 1) {
-			values[i] &= 0b1000000010000000;
+			led_values[i] &= 0b1000000010000000;
 		} else {
-			values[i] &= 0b0000000100000001;
+			led_values[i] &= 0b0000000100000001;
 		}
 	}
 
@@ -122,7 +171,7 @@ void led_disp_bit_to_values(uint8_t left, uint8_t top) {
 			// segment: 	led_segment
 			// bit: 		x_offset + x
 			if (disp_bit_buffer[(x + left) % BACK_BUFFER_WIDTH] & (1 << ((y + top) % BACK_BUFFER_HEIGHT)))
-				values[led_segment] |= (1 << (15 - led_index));
+				led_values[led_segment] |= (1 << (15 - led_index));
 
 		}
 	}
@@ -209,6 +258,33 @@ void led_on()
 	GPIO_setOutputLowOnPin(LED_PORT, LED_BLANK);
 }
 
+void led_anim_init() {
+	// In RTC calendar mode (which we're using), PRESCALE_1 starts sourced with
+	// a 128 Hz signal.
+	RTC_A_definePrescaleEvent(
+		RTC_A_BASE,
+		RTC_A_PRESCALE_1,
+		RTC_A_PSEVENTDIVIDER_16 // 128 Hz / 16 = 16 Hz.
+	);
+
+	// Interrupt 8 times per second for animation purposes:
+	RTC_A_enableInterrupt(RTC_A_BASE, RTC_A_PRESCALE_TIMER1_INTERRUPT);
+}
+
+void led_animate() {
+	if (!led_animating) return;
+	print_pixel_index++;
+	if (print_pixel_index < print_pixel_len) {
+		led_disp_bit_to_values(print_pixel_index, 0);
+		led_display_bits(led_values);
+	} else {
+		//stop animating
+//		led_toggle();
+		f_animation_done = 1;
+		led_animating = 0;
+	}
+}
+
 void led_disable( void )
 {
 	GPIO_setAsOutputPin(
@@ -221,4 +297,38 @@ void led_disable( void )
 
 inline void led_toggle( void ) {
 	GPIO_toggleOutputOnPin(LED_PORT, LED_BLANK);
+}
+
+
+
+#pragma vector=RTC_VECTOR
+__interrupt
+void RTC_A_ISR(void)
+{
+	switch (__even_in_range(RTCIV, 16)) {
+	case 0: break;  //No interrupts
+	case 2:         //RTCRDYIFG
+		//Toggle P1.0 every second
+		//                GPIO_toggleOutputOnPin(
+		//                        GPIO_PORT_P1,
+		//                        GPIO_PIN0);
+		break;
+	case 4:         //RTCEVIFG
+		//Interrupts every minute
+		f_new_minute = 1;
+		break;
+	case 6:         //RTCAIFG
+		//Interrupts 5:00pm on 5th day of week
+		__no_operation();
+		break;
+	case 8: break;  //RT0PSIFG
+	case 10:
+		f_animate = 1;
+		__bic_SR_register_on_exit(LPM0_bits);
+		break; //RT1PSIFG
+	case 12: break; //Reserved
+	case 14: break; //Reserved
+	case 16: break; //Reserved
+	default: break;
+	}
 }
