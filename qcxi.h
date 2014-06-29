@@ -51,5 +51,7 @@ extern volatile uint8_t ir_xmit_len;
 extern volatile uint8_t f_new_minute;
 extern volatile uint8_t f_ir_tx_done;
 extern volatile uint8_t f_ir_rx_ready;
+extern volatile uint8_t f_animate;
+extern uint8_t f_animation_done; // not actually set from interrupt
 
 #endif /* MAIN_H_ */
