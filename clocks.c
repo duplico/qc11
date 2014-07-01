@@ -72,6 +72,9 @@ void init_clocks() {
 	UCS_clockSignalInit(UCS_MCLK, UCS_DCOCLKDIV_SELECT,
 			UCS_CLOCK_DIVIDER_8);
 
+	// if not badge_target we'll need to use DCO for SMCLK too, probably:
+
+#if BADGE_TARGET
 	// Init XT2:
 	xt2_status = UCS_XT2StartWithTimeout(
 			UCS_XT2DRIVE_8MHZ_16MHZ,
@@ -95,6 +98,9 @@ void init_clocks() {
 			UCS_CLOCK_DIVIDER_2 // Divide by 2 to get 8 MHz.
 		);
 	}
+#else
+	xt2_status = STATUS_SUCCESS;
+#endif
 
 	// Enable global oscillator fault flag
 	SFR_clearInterrupt(SFR_OSCILLATOR_FAULT_INTERRUPT);

@@ -23,6 +23,7 @@ uint8_t led_animating = 0;
 uint8_t f_animation_done = 0;
 
 void led_print(char* text) {
+#if BADGE_TARGET
 	uint8_t character = 0;
 	uint8_t cursor = 0;
 	do {
@@ -43,6 +44,7 @@ void led_print(char* text) {
 	}
 	led_disp_bit_to_values(0, 0);
 	led_display_bits(led_values);
+#endif
 }
 
 void led_print_scroll(char* text, uint8_t scroll_on, uint8_t scroll_off, uint8_t speed) {
@@ -248,12 +250,14 @@ void led_enable(uint16_t duty_cycle) {
 
 void led_on()
 {
+#if BADGE_TARGET
 	GPIO_setAsOutputPin(
 			LED_PORT,
 			LED_BLANK
 	);
 
 	GPIO_setOutputLowOnPin(LED_PORT, LED_BLANK);
+#endif
 }
 
 void led_anim_init() {

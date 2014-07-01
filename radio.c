@@ -53,8 +53,8 @@ void init_radio() {
 			GPIO_PIN1 + GPIO_PIN3
 	);
 
-	GPIO_setAsOutputPin(NSS_PORT, NSS_PIN);
-	GPIO_setOutputHighOnPin(NSS_PORT, NSS_PIN); // NSS is active low.
+	GPIO_setAsOutputPin(RFM_NSS_PORT, RFM_NSS_PIN);
+	GPIO_setOutputHighOnPin(RFM_NSS_PORT, RFM_NSS_PIN); // NSS is active low.
 
 	// SPI to RFM /////////////////////////////////////////////////////////////
 	//
@@ -121,14 +121,14 @@ void cmd_register(uint8_t cmd, uint8_t *data, uint8_t len) {
 	rfm_reg_data_ready = 0;
 
 	// NSS low and deliver the command.
-	GPIO_setOutputLowOnPin(NSS_PORT, NSS_PIN);
+	GPIO_setOutputLowOnPin(RFM_NSS_PORT, RFM_NSS_PIN);
 	USCI_B_SPI_transmitData(USCI_B1_BASE, cmd);
 
 	while (!rfm_reg_data_ready);
 	rfm_reg_data_ready = 0;
 
 //
-//	GPIO_setOutputLowOnPin(NSS_PORT, NSS_PIN); // Hold NSS low.
+//	GPIO_setOutputLowOnPin(RFM_NSS_PORT, RFM_NSS_PIN); // Hold NSS low.
 //	USCI_B_SPI_transmitData(USCI_B1_BASE, cmd); // Send our command.
 //
 //	// Now busy-wait while the ISR takes care of writing this command for us.
@@ -241,7 +241,7 @@ __interrupt void USCI_B1_ISR(void)
 	}
 	if (rfm_reg_data_ready) {
 		rfm_writing = 0;
-		GPIO_setOutputHighOnPin(NSS_PORT, NSS_PIN); // NSS high to end frame
+		GPIO_setOutputHighOnPin(RFM_NSS_PORT, RFM_NSS_PIN); // NSS high to end frame
 	}
 
 }

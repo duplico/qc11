@@ -32,11 +32,11 @@ void init_serial() {
 	// We'll use SMCLK, which is 8 MHz.
 	// See: http://software-dl.ti.com/msp430/msp430_public_sw/mcu/msp430/MSP430BaudRateConverter/index.html
 
-	USCI_A_UART_disable(USCI_A1_BASE);
+	USCI_A_UART_disable(IR_USCI_BASE);
 
 	// 19200 baud: non-oversampled.
 	USCI_A_UART_initAdvance(
-			USCI_A1_BASE,
+			IR_USCI_BASE,
 			USCI_A_UART_CLOCKSOURCE_SMCLK,
 			416,
 			0,
@@ -47,22 +47,22 @@ void init_serial() {
 			USCI_A_UART_MODE,
 			USCI_A_UART_LOW_FREQUENCY_BAUDRATE_GENERATION
 	);
-	USCI_A_UART_disable(USCI_A1_BASE);
+	USCI_A_UART_disable(IR_USCI_BASE);
 
 	UCA1IRTCTL = UCIREN + UCIRTXPL2 + UCIRTXPL0;
 	UCA1IRRCTL |= UCIRRXPL;
 
-	USCI_A_UART_enable(USCI_A1_BASE);
+	USCI_A_UART_enable(IR_USCI_BASE);
 
-	USCI_A_UART_clearInterruptFlag(USCI_A1_BASE, USCI_A_UART_RECEIVE_INTERRUPT_FLAG);
+	USCI_A_UART_clearInterruptFlag(IR_USCI_BASE, USCI_A_UART_RECEIVE_INTERRUPT_FLAG);
 	USCI_A_UART_enableInterrupt(
-			USCI_A1_BASE,
+			IR_USCI_BASE,
 			USCI_A_UART_RECEIVE_INTERRUPT
 	);
 
-	USCI_A_UART_clearInterruptFlag(USCI_A1_BASE, USCI_A_UART_TRANSMIT_INTERRUPT_FLAG);
+	USCI_A_UART_clearInterruptFlag(IR_USCI_BASE, USCI_A_UART_TRANSMIT_INTERRUPT_FLAG);
 	USCI_A_UART_enableInterrupt(
-				USCI_A1_BASE,
+			IR_USCI_BASE,
 				USCI_A_UART_TRANSMIT_INTERRUPT
 		);
 }
@@ -128,7 +128,7 @@ void ir_write(uint8_t* payload, uint8_t len) {
 	ir_xmit_index = 0;
 	ir_xmit_len = len;
 
-	USCI_A_UART_transmitData(USCI_A1_BASE, ir_tx_frame[0]);
+	USCI_A_UART_transmitData(IR_USCI_BASE, ir_tx_frame[0]);
 
 }
 
@@ -145,7 +145,7 @@ volatile uint8_t ir_rx_state = 0;
  * return to 0 on receive of sync0
  */
 
-#pragma vector=USCI_A1_VECTOR
+#pragma vector=IR_USCI_VECTOR
 __interrupt void ir_isr(void)
 {
 	/*
@@ -156,18 +156,18 @@ __interrupt void ir_isr(void)
 	 * be the case the the order is reversed: RXI, followed by the corresponding
 	 * TX interrupt.
 	 */
-	switch(__even_in_range(UCA1IV,4))
+	switch(__even_in_range(IRIV,4))
 	{
 	case 0:	// 0: No interrupt.
 		break;
 	case 2:	// RXIFG: RX buffer ready to read.
 
 		if (ir_reject_loopback && ir_xmit) {
-			USCI_A_UART_clearInterruptFlag(USCI_A1_BASE, USCI_A_UART_RECEIVE_INTERRUPT_FLAG);
+			USCI_A_UART_clearInterruptFlag(IR_USCI_BASE, USCI_A_UART_RECEIVE_INTERRUPT_FLAG);
 			break;
 		}
 
-		received_data = USCI_A_UART_receiveData(USCI_A1_BASE);
+		received_data = USCI_A_UART_receiveData(IR_USCI_BASE);
 
 		switch (ir_rx_state) {
 		case 0: // IDLE, this should be SYNC0
@@ -228,7 +228,7 @@ __interrupt void ir_isr(void)
 		}
 
 		if (ir_xmit) {
-			USCI_A_UART_transmitData(USCI_A1_BASE, ir_tx_frame[ir_xmit_index]);
+			USCI_A_UART_transmitData(IR_USCI_BASE, ir_tx_frame[ir_xmit_index]);
 		}
 		break;
 	default: break;
