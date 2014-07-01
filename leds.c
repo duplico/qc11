@@ -322,7 +322,7 @@ void RTC_A_ISR(void)
 	case 8: break;  //RT0PSIFG
 	case 10:
 		f_animate = 1;
-		__bic_SR_register_on_exit(LPM0_bits);
+		__bic_SR_register_on_exit(LPM3_bits);
 		break; //RT1PSIFG
 	case 12: break; //Reserved
 	case 14: break; //Reserved

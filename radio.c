@@ -26,10 +26,9 @@ volatile uint8_t rfm_write_index = 0;
 uint8_t rfm_zeroes[64] = {0};
 uint8_t rfm_reg_data_index = 0;
 uint8_t rfm_reg_data_length = 0;
-volatile uint8_t rfm_reg_data_ready = 0;
 uint8_t frame_bytes_remaining = 0;
 
-void init_radio() {
+void rfm_init() {
 
 	// SPI for radio //////////////////////////////////////////////////////////
 	//
@@ -83,27 +82,27 @@ void init_radio() {
 	USCI_B_SPI_enableInterrupt(USCI_B1_BASE, USCI_B_SPI_TRANSMIT_INTERRUPT);
 
 	// init radio to recommended "defaults" per datasheet:
-	write_single_register(0x18, 0x88);
-	write_single_register(0x19, 0x55);
-	write_single_register(0x1a, 0x8b);
-	write_single_register(0x26, 0x07);
-	write_single_register(0x29, 0xe0);
+	rfm_write_single_register_sync(0x18, 0x88);
+	rfm_write_single_register_sync(0x19, 0x55);
+	rfm_write_single_register_sync(0x1a, 0x8b);
+	rfm_write_single_register_sync(0x26, 0x07);
+	rfm_write_single_register_sync(0x29, 0xe0);
 //	write_single_register(0x29, 0xd0);
 
 	for (uint8_t sync_addr=0x2f; sync_addr<=0x36; sync_addr++) {
-		write_single_register(sync_addr, 0x01);
+		rfm_write_single_register_sync(sync_addr, 0x01);
 	}
 
-	write_single_register(0x3c, 0x8f);
-	write_single_register(0x6f, 0x30);
+	rfm_write_single_register_sync(0x3c, 0x8f);
+	rfm_write_single_register_sync(0x6f, 0x30);
 
-	write_single_register(0x25, 0b00000000); // GPIO map to default
+	rfm_write_single_register_sync(0x25, 0b00000000); // GPIO map to default
 
 }
 
-volatile uint8_t f_radio_xmitted = 0;
+///// Primitive communications with radio:
 
-void cmd_register(uint8_t cmd, uint8_t *data, uint8_t len) {
+void rfm_cmd_register_async(uint8_t cmd, uint8_t *data, uint8_t len) {
 	frame_bytes_remaining = len;
 	rfm_reg_data_length = len;
 
@@ -113,104 +112,121 @@ void cmd_register(uint8_t cmd, uint8_t *data, uint8_t len) {
 	memcpy((void *) rfm_write_reg_data, (void *) data, rfm_write_len);
 	rfm_writing = 1;
 
-	// Remove if TX interrupts are enabled:
-//	while (!USCI_B_SPI_getInterruptStatus(USCI_B1_BASE,
-//		USCI_B_SPI_TRANSMIT_INTERRUPT)); // Make sure we can send
-	f_radio_xmitted = 0;
-
-	rfm_reg_data_ready = 0;
+	f_rfm_reg_finished = 0;
 
 	// NSS low and deliver the command.
 	GPIO_setOutputLowOnPin(NSS_PORT, NSS_PIN);
 	USCI_B_SPI_transmitData(USCI_B1_BASE, cmd);
-
-	while (!rfm_reg_data_ready);
-	rfm_reg_data_ready = 0;
-
-//
-//	GPIO_setOutputLowOnPin(NSS_PORT, NSS_PIN); // Hold NSS low.
-//	USCI_B_SPI_transmitData(USCI_B1_BASE, cmd); // Send our command.
-//
-//	// Now busy-wait while the ISR takes care of writing this command for us.
-//	while (rfm_writing);
 }
 
-void write_register(uint8_t addr, uint8_t *data, uint8_t len) {
+void rfm_cmd_register_sync(uint8_t cmd, uint8_t *data, uint8_t len) {
+	rfm_cmd_register_async(cmd, data, len);
+	while (!f_rfm_reg_finished);
+	f_rfm_reg_finished = 0;
+}
+
+void rfm_write_register_sync(uint8_t addr, uint8_t *data, uint8_t len) {
 	/*
 	 * You can use this like a blocking call.
 	 */
 	// MSB=1 is a write command:
 	addr |= 0b10000000;
-	cmd_register(addr, data, len);
+	rfm_cmd_register_sync(addr, data, len);
 }
 
-void write_single_register(uint8_t addr, uint8_t data) {
+void rfm_write_single_register_sync(uint8_t addr, uint8_t data) {
 	/*
 	 * You can use set_register like a blocking call.
 	 */
 	// MSB=1 is a write command:
 	uint8_t buf[1] = {data};
-	write_register(addr, buf, 1);
+	rfm_write_register_sync(addr, buf, 1);
 }
 
-void read_register(uint8_t addr, uint8_t len) {
+void rfm_read_register_sync(uint8_t addr, uint8_t len) {
 	// MSB=0 is a read command:
 	addr = 0b01111111 & addr;
-	cmd_register(addr, rfm_zeroes, len);
+	rfm_cmd_register_sync(addr, rfm_zeroes, len);
 }
 
-uint8_t read_register_sync(uint8_t addr, uint8_t len, uint8_t *target) { // TODO: Refactor to be the same as write.
-	read_register(addr, len);
+uint8_t rfm_read_single_register_sync(uint8_t addr) {
+	rfm_read_register_sync(addr, 1);
+	return rfm_read_reg_data[0];
+}
+
+uint8_t rfm_copy_register_sync(uint8_t addr, uint8_t len, uint8_t *target) { // TODO: Refactor to be the same as write.
+	rfm_read_register_sync(addr, len);
 	memcpy(target, rfm_read_reg_data, len);
 	return len;
 }
 
-uint8_t read_single_register_sync(uint8_t addr) {
-	read_register(addr, 1);
-	return rfm_read_reg_data[0];
+////// Radio modes:
+volatile uint8_t rfm_mode = 0;
+
+void rfm_mode_async(uint8_t mode) {
+	// In some sense this is not so much asynchronous as it doesn't check to
+	// make sure it took. It actually blocks while sending the two bytes to
+	// the RFM module. TODO: let's see if we need to optimize this later.
+	rfm_write_single_register_sync(RFM_OPMODE, mode);
+	rfm_mode = mode;
 }
 
-void mode_rx_sync() {
-	write_single_register(RFM_OPMODE, 0b00010000); // Receive mode.
+void rfm_mode_sync(uint8_t mode) {
+	rfm_mode_async(mode);
 	uint8_t reg_read;
 	do {
-		reg_read = read_single_register_sync(RFM_IRQ1);
-	}
-	while (!(BIT7 & reg_read) || !(BIT6 & reg_read));
-}
-
-void mode_sb_sync() {
-	uint8_t reg_read;
-	write_single_register(RFM_OPMODE, 0b00000100);
-	do {
-		reg_read = read_single_register_sync(RFM_IRQ1);
+		reg_read = rfm_read_single_register_sync(RFM_IRQ1);
 	}
 	while (!(BIT7 & reg_read));
 }
 
-void mode_tx_sync() {
-	write_single_register(RFM_OPMODE, 0b00001100); // TX mode.
-	uint8_t reg_read;
-	do {
-		reg_read = read_single_register_sync(RFM_IRQ1);
-	}
-	while (!(BIT7 & reg_read) || !(BIT5 & reg_read));
+/////// Radio send/receive commands:
+
+void rfm_send_sync(uint8_t * data, uint8_t len) {
+	rfm_mode_sync(RFM_MODE_SB); // Enter standby to load up the FIFO
+	rfm_write_single_register_sync(0x25, 0b00000000); // GPIO map to default
+	rfm_write_register_sync(RFM_FIFO, data, len); // Load up the FIFO
+	f_rfm_job_done = 0;
+	rfm_mode_async(RFM_MODE_TX);
+	while (!f_rfm_job_done); // Busywait until an interrupt that we've sent it. TODO
+	f_rfm_job_done = 0;
+	rfm_mode_sync(RFM_MODE_SB); // Back to standby.
 }
 
-void mode_tx_async() {
-	write_single_register(RFM_OPMODE, 0b00001100); // TX mode.
-}
+volatile uint8_t rfm_mode_after_send = 0;
+volatile uint8_t rfm_mode_after_reg = 0;
 
-void radio_send(uint8_t *data, uint8_t len) {
-	write_register(RFM_FIFO, data, len);
+// TODO: state machine.
+
+void rfm_send_async(uint8_t * data, uint8_t len, uint8_t mode_after_send) {
+	rfm_mode_sync(RFM_MODE_SB); // Enter standby to load up the FIFO
+	rfm_write_single_register_sync(0x25, 0b00000000); // GPIO map to default
+	rfm_mode_after_reg = RFM_MODE_TX;
+	rfm_write_register_sync(RFM_FIFO, data, len); // Load up the FIFO
+	f_rfm_job_done = 0;
+	rfm_mode_after_send = mode_after_send;
+	rfm_mode_async(RFM_MODE_TX);
 }
 
 uint8_t rfm_crcok() {
 	uint8_t status = 0;
-	read_register(RFM_IRQ2, 1);
+	rfm_read_register_sync(RFM_IRQ2, 1);
 	status = rfm_read_reg_data[0] & BIT1;
 	return status ? 1 : 0;
 }
+
+uint8_t rfm_process_async() {
+	if (rfm_mode == RFM_MODE_TX) {
+		if (f_rfm_job_done && rfm_mode_after_send != 0) {
+			rfm_mode_sync(rfm_mode_after_send);
+			f_rfm_job_done = 0;
+		}
+	} else if (rfm_mode == RFM_MODE_RX) {
+
+	}
+}
+
+volatile uint8_t temp_debug_flag = 0;
 
 #pragma vector=USCI_B1_VECTOR
 __interrupt void USCI_B1_ISR(void)
@@ -227,11 +243,10 @@ __interrupt void USCI_B1_ISR(void)
 					USCI_B_SPI_receiveData(USCI_B1_BASE);
 		}
 		if (!(frame_bytes_remaining--)) {
-			rfm_reg_data_ready = 1;
+			f_rfm_reg_finished = 1;
 		}
 		break;
 	case 4: // Vector 4 - TXIFG // Ready for another character...
-		f_radio_xmitted = 1;
 		if (rfm_writing = 1 && rfm_write_index < rfm_write_len) {
 			USCI_B_SPI_transmitData(USCI_B1_BASE, rfm_write_reg_data[rfm_write_index]);
 			rfm_write_index++;
@@ -239,9 +254,24 @@ __interrupt void USCI_B1_ISR(void)
 		break;
 	default: break;
 	}
-	if (rfm_reg_data_ready) {
+	if (f_rfm_reg_finished) {
 		rfm_writing = 0;
 		GPIO_setOutputHighOnPin(NSS_PORT, NSS_PIN); // NSS high to end frame
 	}
+}
 
+#pragma vector=PORT2_VECTOR
+__interrupt void radio_interrupt_0(void)
+{
+	// Called on CrcOK and on PacketSent.
+	f_rfm_job_done = 1;
+
+	if (rfm_mode == RFM_MODE_TX) {
+		// Just finished sending a packet
+	} else if (rfm_mode == RFM_MODE_RX) {
+		// Just received a packet.
+	}
+
+	GPIO_clearInterruptFlag(GPIO_PORT_P2, GPIO_PIN0);
+	__bic_SR_register_on_exit(LPM3_bits);
 }
