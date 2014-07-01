@@ -191,6 +191,80 @@ uint8_t post() {
 	return post_result;
 }
 
+
+
+
+
+
+
+
+#include <msp430f5529.h>
+#include "ws2812.h"
+#include "driverlib.h"
+
+#define NUMBEROFLEDS	16
+#define ENCODING 		3		// possible values 3 and 4
+
+void sendBuffer(uint8_t* buffer, ledcount_t ledCount);
+void sendBuffer(uint8_t* buffer, ledcount_t ledCount);
+void shiftLed(ledcolor_t* leds, ledcount_t ledCount);
+
+
+void shiftLed(ledcolor_t* leds, ledcount_t ledCount) {
+	ledcolor_t tmpLed;
+	ledcount_t ledIdx;
+
+	tmpLed = leds[ledCount-1];
+	for(ledIdx=(ledCount-1); ledIdx > 0; ledIdx--) {
+		leds[ledIdx] = leds[ledIdx-1];
+	}
+	leds[0] = tmpLed;
+}
+
+// copy bytes from the buffer to SPI transmit register
+// should be reworked to use DMA
+void sendBuffer(uint8_t* buffer, ledcount_t ledCount) {
+	uint16_t bufferIdx;
+	__bic_SR_register(GIE); // TODO: need to make this interrupt based:
+	for (bufferIdx=0; bufferIdx < (ENCODING * sizeof(ledcolor_t) * ledCount); bufferIdx++) {
+		while (!(UCB0IFG & UCTXIFG));		// wait for TX buffer to be ready
+		UCB0TXBUF = buffer[bufferIdx];
+	}
+	__bis_SR_register(GIE);
+	__delay_cycles(300);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 int main( void )
 {
 	// TODO: check to see what powerup mode we're in.
@@ -205,6 +279,93 @@ int main( void )
 	init_radio(); // requires interrupts enabled.
 
 	post();
+
+
+
+
+
+
+
+	// buffer to store encoded transport data
+	uint8_t frameBuffer[(ENCODING * sizeof(ledcolor_t) * NUMBEROFLEDS)] = { 0, };
+
+	ledcolor_t leds[NUMBEROFLEDS] = {
+			// rainbow colors
+			{ 0x80, 0xf3, 0x1f },
+			{ 0xa5, 0xde, 0xb },
+			{ 0xc7, 0xc1, 0x1 },
+			{ 0xe3, 0x9e, 0x3 },
+			{ 0xf6, 0x78, 0xf },
+			{ 0xfe, 0x53, 0x26 },
+			{ 0xfb, 0x32, 0x44 },
+			{ 0xed, 0x18, 0x68 },
+			{ 0xd5, 0x7, 0x8e },
+			{ 0xb6, 0x1, 0xb3 },
+			{ 0x91, 0x6, 0xd3 },
+			{ 0x6b, 0x16, 0xec },
+			{ 0x47, 0x2f, 0xfa },
+			{ 0x28, 0x50, 0xfe },
+			{ 0x11, 0x75, 0xf7 },
+			{ 0x3, 0x9b, 0xe5 },
+	};
+
+	uint8_t update;
+	ledcolor_t blankLed = {0x00, 0x00, 0x00};
+	uint8_t colorIdx;
+	ledcolor_t led;
+
+
+
+	USCI_B_SPI_masterInit(
+			USCI_B0_BASE,
+			USCI_B_SPI_CLOCKSOURCE_SMCLK,
+			8000000,
+			2666666,
+			USCI_B_SPI_MSB_FIRST,
+			USCI_B_SPI_PHASE_DATA_CHANGED_ONFIRST_CAPTURED_ON_NEXT,
+			USCI_B_SPI_CLOCKPOLARITY_INACTIVITY_LOW
+	);
+
+	USCI_B_SPI_enable(USCI_B0_BASE);
+
+	GPIO_setAsPeripheralModuleFunctionOutputPin(GPIO_PORT_P3, GPIO_PIN0);
+
+	while(1) {
+		// blank all LEDs
+		fillFrameBufferSingleColor(&blankLed, NUMBEROFLEDS, frameBuffer, ENCODING);
+		sendBuffer(frameBuffer, NUMBEROFLEDS);
+		__delay_cycles(0x100000);
+
+		// Animation - Part1
+		// set one LED after an other (one more with each round) with the colors from the LEDs array
+		fillFrameBuffer(leds, NUMBEROFLEDS, frameBuffer, ENCODING);
+		for(update=1; update <= NUMBEROFLEDS; update++) {
+			sendBuffer(frameBuffer, update);
+			__delay_cycles(0xFFFFF);
+		}
+		__delay_cycles(0xFFFFFF);
+
+		// Animation - Part2
+		// shift previous LED pattern
+		for(update=0; update < 15*8; update++) {
+			shiftLed(leds, NUMBEROFLEDS);
+			fillFrameBuffer(leds, NUMBEROFLEDS, frameBuffer, ENCODING);
+			sendBuffer(frameBuffer, NUMBEROFLEDS);
+			__delay_cycles(0x7FFFF);
+		}
+	}
+	return 0;
+
+
+
+
+
+
+
+
+
+
+
 
 	led_on();
 	uint8_t startup_test = 0;
