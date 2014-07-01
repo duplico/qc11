@@ -69,9 +69,13 @@ void init_clocks() {
 	// Use the DCO as the master clock.
 	// Divide by 8 to get a MCLK of 1 MHz
 	// TODO: Decide if this is the right frequency or not.
+#if BADGE_TARGET
 	UCS_clockSignalInit(UCS_MCLK, UCS_DCOCLKDIV_SELECT,
 			UCS_CLOCK_DIVIDER_8);
-
+#else
+	UCS_clockSignalInit(UCS_MCLK, UCS_DCOCLKDIV_SELECT,
+			UCS_CLOCK_DIVIDER_1);
+#endif
 	// if not badge_target we'll need to use DCO for SMCLK too, probably:
 
 #if BADGE_TARGET
