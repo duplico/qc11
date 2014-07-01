@@ -16,20 +16,27 @@
 #define RFM_IRQ1 0x27
 #define RFM_IRQ2 0x28
 
+#define RFM_MODE_TX 0b00001100
+#define RFM_MODE_RX 0b00010000
+#define RFM_MODE_SB 0b00000100
 
-void write_register(uint8_t, uint8_t*, uint8_t);
-void write_single_register(uint8_t, uint8_t);
-void read_register(uint8_t, uint8_t);
-uint8_t read_register_sync(uint8_t, uint8_t, uint8_t*);
-uint8_t read_single_register_sync(uint8_t);
-void mode_rx_sync();
-void mode_sb_sync();
-void mode_tx_sync();
-void mode_tx_async();
+void rfm_write_register_sync(uint8_t, uint8_t*, uint8_t);
+void rfm_write_single_register_sync(uint8_t, uint8_t);
+void rfm_read_register_sync(uint8_t, uint8_t);
+uint8_t rfm_copy_register_sync(uint8_t, uint8_t, uint8_t*);
+uint8_t rfm_read_single_register_sync(uint8_t);
+void rfm_mode_rx_sync();
+void rfm_mode_sb_sync();
+void rfm_mode_tx_sync();
+void rfm_mode_tx_async();
+void rfm_mode_async(uint8_t);
+void rfm_mode_sync(uint8_t);
+uint8_t rfm_process_async();
 
-void radio_send(uint8_t*, uint8_t);
+void rfm_send_sync(uint8_t *, uint8_t);
+void rfm_send_async(uint8_t *, uint8_t, uint8_t);
 
 uint8_t rfm_crcok();
-void init_radio();
+void rfm_init();
 
 #endif /* RADIO_H_ */

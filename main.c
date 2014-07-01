@@ -13,6 +13,7 @@ volatile uint8_t f_timer = 0;
 volatile uint8_t f_rfm_job_done = 0;
 volatile uint8_t f_ir_tx_done = 0;
 volatile uint8_t f_ir_rx_ready = 0;
+volatile uint8_t f_rfm_reg_finished = 0;
 
 void init_power() {
 	// Set Vcore to 1.8 V - NB: allows MCLK up to 8 MHz only
@@ -196,7 +197,7 @@ int main( void )
 	init_rtc();
 	init_serial();
 	__bis_SR_register(GIE);
-	init_radio(); // requires interrupts enabled.
+	rfm_init(); // requires interrupts enabled.
 
 	post();
 
@@ -209,35 +210,25 @@ int main( void )
 	char hex[4] = "AA";
 	uint8_t val;
 
-	while (1) {
-		mode_sb_sync();
-		led_print(" TX");
-		write_single_register(0x25, 0b00000000); // GPIO map to default
-		write_register(RFM_FIFO, test_data, 64);
-		led_print("TX");
-		f_rfm_job_done = 0;
-		mode_tx_async();
-		while (!f_rfm_job_done);
-		f_rfm_job_done = 0;
-		mode_sb_sync();
-		//		write_single_register(0x29, 228); // RssiThreshold = -this/2 in dB
-		led_print("...");
-		delay(100);
-		mode_rx_sync();
-		delay(1000);
-		if (f_rfm_job_done) {
-			f_rfm_job_done = 0;
-			val = read_single_register_sync(0x24);
-			read_register_sync(RFM_FIFO, 64, test_data);
-			mode_sb_sync();
-			hex[0] = (val/16 < 10)? '0' + val/16 : 'A' - 10 + val/16;
-			hex[1] = (val%16 < 10)? '0' + val%16 : 'A' - 10 + val%16;
-			led_print((char *)test_data);
-			delay(1000);
-		}
-	}
+	uint8_t accum = 0;
 
+	rfm_mode_sync(RFM_MODE_RX);
 	while (1) {
+		accum++;
+		rfm_process_async();
+
+		if (accum==16) {
+//			rfm_send_sync("Queercon 2014 qcxi", 64);
+//			rfm_mode_sync(RFM_MODE_RX);
+			rfm_send_async("Queercon 2014 qcxi", 64, RFM_MODE_RX);
+//			led_print_scroll("xmit", 0, 1, 1);
+			accum = 0;
+		}
+		if (f_rfm_job_done) { // received something
+			f_rfm_job_done = 0;
+			rfm_copy_register_sync(RFM_FIFO, 64, test_data);
+			led_print_scroll((char *) test_data, 0, 1, 1);
+		}
 		if (f_animate) {
 			f_animate = 0;
 			led_animate();
@@ -245,8 +236,8 @@ int main( void )
 
 		if (f_animation_done) {
 			f_animation_done = 0;
-			led_print_scroll("Startup", (startup_test & 0b10) >> 1, startup_test & 0b01, 1);
-			startup_test++;
+//			led_print_scroll("Startup", (startup_test & 0b10) >> 1, startup_test & 0b01, 1);
+//			startup_test++;
 		}
 		__bis_SR_register(LPM3_bits + GIE);
 	}
@@ -298,9 +289,3 @@ __interrupt void NMI_ISR(void)
 	} while (status != 0);
 }
 
-#pragma vector=PORT2_VECTOR
-__interrupt void radio_interrupt_0(void)
-{
-	f_rfm_job_done = 1;
-	GPIO_clearInterruptFlag(GPIO_PORT_P2, GPIO_PIN0);
-}
