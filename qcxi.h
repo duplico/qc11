@@ -24,13 +24,48 @@
 #define GPIO_pulse(port, pin) do { GPIO_setOutputHighOnPin(port, pin); GPIO_setOutputLowOnPin(port, pin); } while (0)
 
 #if BADGE_TARGET
+// Target is the actual badge:
 #include <msp430f5308.h>
-#define NSS_PORT GPIO_PORT_P4
-#define NSS_PIN GPIO_PIN7
+
+// IR:
+#define IR_USCI_BASE USCI_A1_BASE
+#define IR_USCI_VECTOR USCI_A1_VECTOR
+#define IR_TXRX_PORT 4
+#define IR_SD_PORT 4
+#define IR_TX_PIN 4
+#define IR_RX_PIN 5
+#define IR_SD_PIN 6
+#define IRIV UCA1IV
+
+// Radio:
+#define RFM_NSS_PORT GPIO_PORT_P4
+#define RFM_NSS_PIN GPIO_PIN7
+
+// Crystal:
+#define UCS_XT2_CRYSTAL_FREQUENCY 16000000
+
 #else
 #include <msp430f5529.h>
-#define NSS_PORT GPIO_PORT_P3
-#define NSS_PIN GPIO_PIN7
+// Target is the Launchpad+shield:
+#include <msp430f5308.h>
+
+// IR:
+#define IR_USCI_BASE USCI_A0_BASE
+#define IR_USCI_VECTOR USCI_A0_VECTOR
+#define IRIV UCA0IV
+#define IR_TXRX_PORT 3
+#define IR_SD_PORT 8
+#define IR_TX_PIN 3
+#define IR_RX_PIN 4
+#define IR_SD_PIN 1
+
+// Radio:
+#define RFM_NSS_PORT GPIO_PORT_P3
+#define RFM_NSS_PIN GPIO_PIN7
+
+// Crystal:
+#define UCS_XT2_CRYSTAL_FREQUENCY 4000000
+
 #endif
 
 void delay(unsigned int);

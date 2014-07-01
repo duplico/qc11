@@ -50,6 +50,8 @@ void init_gpio() {
 	   // + GPIO_PIN4 + GPIO_PIN5 // XT1 // TODO
 	);
 
+#if BADGE_TARGET
+
 	// Setup LED module pins //////////////////////////////////////////////////
 	//   bit-banged serial data output:
 	//
@@ -64,25 +66,25 @@ void init_gpio() {
 	GPIO_setAsOutputPin(LED_PORT, LED_BLANK);
 	// Shift register input from LED controllers:
 	GPIO_setAsInputPin(LED_PORT, GPIO_PIN6);
-
+#endif
 	// IR pins ////////////////////////////////////////////////////////////////
 	//
 	// P4.4, 4.5, 4.6
 	//
 	// TX for IR
 	GPIO_setAsPeripheralModuleFunctionOutputPin(
-			GPIO_PORT_P4,
-			GPIO_PIN4
+			IR_TXRX_PORT,
+			IR_TX_PIN
 	);
 	// RX for IR
 	GPIO_setAsPeripheralModuleFunctionInputPin(
-			GPIO_PORT_P4,
-			GPIO_PIN5
+			IR_TXRX_PORT,
+			IR_RX_PIN
 	);
 
 	// Shutdown (SD) for IR
-	GPIO_setAsOutputPin(GPIO_PORT_P4, GPIO_PIN6);
-	GPIO_setOutputLowOnPin(GPIO_PORT_P4, GPIO_PIN6); // shutdown low = on
+	GPIO_setAsOutputPin(IR_SD_PORT, IR_SD_PIN);
+	GPIO_setOutputLowOnPin(IR_SD_PORT, IR_SD_PIN); // shutdown low = on
 
 	// Interrupt pin for radio:
 	GPIO_setAsInputPin(GPIO_PORT_P2, GPIO_PIN0);
@@ -133,6 +135,7 @@ uint8_t post() {
 	if (led_post() == STATUS_FAIL) {
 		post_result |= POST_SHIFTF;
 	}
+#if BADGE_TARGET
 	// LED test pattern
 	led_display_bits(tp0);
 	for (uint8_t i=LED_PERIOD; i>0; i--) {
@@ -151,6 +154,7 @@ uint8_t post() {
 	}
 	led_disable();
 	delay(500);
+#endif
 	__bis_SR_register(GIE);
 
 	ir_reject_loopback = 0;
@@ -169,7 +173,7 @@ uint8_t post() {
 		}
 	}
 	// Radio - TODO
-
+#if BADGE_TARGET
 	// Display error code:
 	if (post_result != 0) {
 		char hex[4] = "AA";
@@ -181,6 +185,7 @@ uint8_t post() {
 			delay(25);
 		}
 	}
+#endif
 
 	return post_result;
 }
@@ -208,6 +213,27 @@ int main( void )
 
 	char hex[4] = "AA";
 	uint8_t val;
+
+	uint8_t seen_j = 255;
+	while (1) {
+		seen_j = 255;
+		for (uint8_t j=1; j<3; j++) {
+			for (uint16_t i=1; i!=0; i++)
+				if (f_ir_rx_ready) {
+					if (!ir_check_crc()) {
+						f_ir_rx_ready = 0;
+						continue;
+					}
+					seen_j = j;
+					f_ir_rx_ready = 0;
+					led_print((char *)ir_rx_frame);
+				}
+			if (seen_j != j) {
+				led_print("...");
+			}
+		}
+		ir_write("qcxi", 0);
+	}
 
 	while (1) {
 		mode_sb_sync();
