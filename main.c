@@ -172,6 +172,7 @@ uint8_t post() {
 				post_result |= POST_IRVF; // IR value fault
 		}
 	}
+	ir_reject_loopback = 1;
 	// Radio - TODO
 #if BADGE_TARGET
 	// Display error code:
