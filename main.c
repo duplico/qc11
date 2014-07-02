@@ -16,8 +16,12 @@ volatile uint8_t f_ir_tx_done = 0;
 volatile uint8_t f_ir_rx_ready = 0;
 
 void init_power() {
+#if BADGE_TARGET
 	// Set Vcore to 1.8 V - NB: allows MCLK up to 8 MHz only
 	PMM_setVCore(PMM_CORE_LEVEL_0);
+#else
+	PMM_setVCore(PMM_CORE_LEVEL_3);
+#endif
 }
 
 void init_gpio() {
@@ -276,14 +280,15 @@ int main( void )
 	ledcolor_t blankLed = {0x00, 0x00, 0x00};
 
 	// Blank LEDs:
-	fillFrameBufferSingleColor(&blankLed, NUMBEROFLEDS, ws_frameBuffer, ENCODING);
-	sendBuffer(ws_frameBuffer, NUMBEROFLEDS);
+//	fillFrameBufferSingleColor(&blankLed, NUMBEROFLEDS, ws_frameBuffer, ENCODING);
+//	sendBuffer(ws_frameBuffer, NUMBEROFLEDS);
 
 	while(1) {
 
 		for (uint8_t color = 0; color<21; color++) {
 			fillFrameBufferSingleColor(&leds[color], NUMBEROFLEDS, ws_frameBuffer, ENCODING);
-			sendBuffer(ws_frameBuffer, NUMBEROFLEDS);
+//			sendBuffer(ws_frameBuffer, NUMBEROFLEDS);
+			sendBufferAsync(NUMBEROFLEDS);
 			__delay_cycles(0x7FFFF);
 		}
 

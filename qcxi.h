@@ -44,9 +44,6 @@
 #define RFM_NSS_PORT GPIO_PORT_P4
 #define RFM_NSS_PIN GPIO_PIN7
 
-// Crystal:
-#define UCS_XT2_CRYSTAL_FREQUENCY 16000000
-
 #else
 // Target is the Launchpad+shield:
 #include <msp430f5329.h>
@@ -67,9 +64,6 @@
 // Radio:
 #define RFM_NSS_PORT GPIO_PORT_P3
 #define RFM_NSS_PIN GPIO_PIN7
-
-// Crystal:
-#define UCS_XT2_CRYSTAL_FREQUENCY 4000000
 
 // WS2812 LEDs:
 extern uint8_t ws_frameBuffer[];
