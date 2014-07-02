@@ -1,3 +1,9 @@
+"""
+Script to generate arrays of RGB values to make rainbows.
+
+Acknowledgment: <http://krazydad.com/tutorials/makecolors.php>
+"""
+
 import math
 
 frequency = 0.3

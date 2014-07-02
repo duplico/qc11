@@ -10,15 +10,14 @@
 #include "qcxi.h"
 #include "ws2812.h"
 
-
 uint8_t ws_frameBuffer[(ENCODING * sizeof(ledcolor_t) * NUMBEROFLEDS)] = { 0, };
 
 void ws2812_init() {
 	USCI_B_SPI_masterInit(
 		USCI_B0_BASE,
 		USCI_B_SPI_CLOCKSOURCE_SMCLK,
-		8000000, // should always be so.
-		2666666,
+		12000000, // should always be so.
+		2400000, // we're really going for 2400000 but sometimes rounding happens
 		USCI_B_SPI_MSB_FIRST,
 		USCI_B_SPI_PHASE_DATA_CHANGED_ONFIRST_CAPTURED_ON_NEXT,
 		USCI_B_SPI_CLOCKPOLARITY_INACTIVITY_LOW
@@ -27,6 +26,10 @@ void ws2812_init() {
 	USCI_B_SPI_enable(USCI_B0_BASE);
 
 	GPIO_setAsPeripheralModuleFunctionOutputPin(GPIO_PORT_P3, GPIO_PIN0);
+
+
+//	USCI_B_SPI_clearInterruptFlag(USCI_B0_BASE, USCI_B_SPI_TRANSMIT_INTERRUPT);
+//	USCI_B_SPI_enableInterrupt(USCI_B0_BASE, USCI_B_SPI_TRANSMIT_INTERRUPT);
 }
 
 void shiftLed(ledcolor_t* leds, ledcount_t ledCount) {
@@ -40,14 +43,27 @@ void shiftLed(ledcolor_t* leds, ledcount_t ledCount) {
 	leds[0] = tmpLed;
 }
 
+volatile ledcount_t ws_bytes_to_send = 0;
+volatile ledcount_t ws_byte_index = 0;
+
+void sendBufferAsync(ledcount_t ledCount) {
+	ws_bytes_to_send = (ENCODING * sizeof(ledcolor_t) * ledCount);
+	USCI_B_SPI_clearInterruptFlag(USCI_B0_BASE, USCI_B_SPI_TRANSMIT_INTERRUPT);
+	USCI_B_SPI_enableInterrupt(USCI_B0_BASE, USCI_B_SPI_TRANSMIT_INTERRUPT);
+	ws_byte_index = 0;
+//	UCB0TXBUF = ws_frameBuffer[ws_byte_index];
+	//USCI_B_SPI_transmitData(USCI_B0_BASE, ws_frameBuffer[0]);
+	USCI_B_SPI_transmitData(USCI_B0_BASE, 0);
+}
+
 // copy bytes from the buffer to SPI transmit register
 // should be reworked to use DMA
 void sendBuffer(uint8_t* buffer, ledcount_t ledCount) {
-	uint16_t bufferIdx;
 	__bic_SR_register(GIE); // TODO: need to make this interrupt based:
-	for (bufferIdx=0; bufferIdx < (ENCODING * sizeof(ledcolor_t) * ledCount); bufferIdx++) {
+	for (ws_byte_index=0; ws_byte_index < (ENCODING * sizeof(ledcolor_t) * ledCount); ws_byte_index++) {
 		while (!(UCB0IFG & UCTXIFG));		// wait for TX buffer to be ready
-		UCB0TXBUF = buffer[bufferIdx];
+//		UCB0TXBUF = buffer[ws_byte_index];
+		USCI_B_SPI_transmitData(USCI_B0_BASE,buffer[ws_byte_index]);
 	}
 	__bis_SR_register(GIE);
 	__delay_cycles(300);
@@ -159,4 +175,35 @@ void encodeData3bit(ledcolor_t* led, uint8_t* output) {
 		outputIdx += 3;	// next three bytes (color)
 	}
 }
+
+#pragma vector=USCI_B0_VECTOR
+__interrupt void ws_isr(void)
+{
+	/*
+	 * NOTE: The RX interrupt has priority over TX interrupt. As a result,
+	 * although normally after transmitting over IR we'll see the TX interrupt
+	 * first, then the corresponding RX interrupt (because the transceiver
+	 * echoes TX to RX), when stepping through in debug mode it will often
+	 * be the case the the order is reversed: RXI, followed by the corresponding
+	 * TX interrupt.
+	 */
+	switch(__even_in_range(UCB0IV,4))
+	{
+	case 0:	// 0: No interrupt.
+		break;
+	case 2:	// RXIFG: RX buffer ready to read.
+		// This will not be happening.
+		break;
+	case 4:	// TXIFG: TX buffer is sent.
+		// ws_byte_index is the index of the byte we just sent.
+		UCB0TXBUF = ws_frameBuffer[ws_byte_index];
+		ws_byte_index++;
+		if (ws_byte_index == ws_bytes_to_send) {
+			USCI_B_SPI_disableInterrupt(USCI_B0_BASE, USCI_B_SPI_TRANSMIT_INTERRUPT);
+		}
+		break;
+	default: break;
+	}
+}
+
 #endif

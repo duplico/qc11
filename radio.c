@@ -60,6 +60,8 @@ void init_radio() {
 	//
 	// Initialize the SPI for talking to the radio
 
+	// TODO: clock for radio for Launchpad? I don't think it actually matters...
+
 	returnValue = USCI_B_SPI_masterInit(
 		USCI_B1_BASE,
 		USCI_B_SPI_CLOCKSOURCE_SMCLK, // selectClockSource

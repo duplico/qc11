@@ -29,7 +29,6 @@ void init_clocks() {
 		65535
 	);
 
-
 	if (xt1_status == STATUS_FAIL) {
 		// XT1 is broken.
 		// Fall back to REFO ////////////////////////////////////
@@ -57,6 +56,17 @@ void init_clocks() {
 				UCS_CLOCK_DIVIDER_1);
 	}
 
+	// Use the DCO as the master clock.
+	// Divide by 8 to get a MCLK of 1 MHz
+	// TODO: Decide if this is the right frequency or not.
+#if BADGE_TARGET
+
+	// Init XT2:
+	xt2_status = UCS_XT2StartWithTimeout(
+			UCS_XT2DRIVE_8MHZ_16MHZ,
+			UCS_XT2_TIMEOUT
+	);
+
 	// Initializes the DCO to operate at the given frequency below,
 	//  using the FLL (note XT1 is its input above)
 	//  (this will set SMCLK and MCLK to use DCO, so we'll need to reinitialize
@@ -65,25 +75,34 @@ void init_clocks() {
 			DCO_DESIRED_FREQUENCY_IN_KHZ, // 8000
 			DCO_FLLREF_RATIO			   // 8 MHz / 32KHz
 	);
-
-	// Use the DCO as the master clock.
-	// Divide by 8 to get a MCLK of 1 MHz
-	// TODO: Decide if this is the right frequency or not.
-#if BADGE_TARGET
 	UCS_clockSignalInit(UCS_MCLK, UCS_DCOCLKDIV_SELECT,
 			UCS_CLOCK_DIVIDER_8);
 #else
-	UCS_clockSignalInit(UCS_MCLK, UCS_DCOCLKDIV_SELECT,
+
+	// Init XT2:
+	xt2_status = UCS_XT2StartWithTimeout(
+			UCS_XT2DRIVE_4MHZ_8MHZ,
+			UCS_XT2_TIMEOUT
+	);
+
+	UCS_clockSignalInit(UCS_FLLREF, UCS_XT2CLK_SELECT,
+			UCS_CLOCK_DIVIDER_1);
+	// Initializes the DCO to operate at the given frequency below,
+	//  using the FLL (note XT1 is its input above)
+	//  (this will set SMCLK and MCLK to use DCO, so we'll need to reinitialize
+	//   them after we setup the DCO/FLL)
+	UCS_initFLLSettle(
+			24000,
+			6
+	);
+//	UCS_clockSignalInit(UCS_MCLK, UCS_DCOCLKDIV_SELECT,
+//			UCS_CLOCK_DIVIDER_1);
+	UCS_clockSignalInit(UCS_SMCLK, UCS_DCOCLKDIV_SELECT,
 			UCS_CLOCK_DIVIDER_1);
 #endif
 	// if not badge_target we'll need to use DCO for SMCLK too, probably:
 
 #if BADGE_TARGET
-	// Init XT2:
-	xt2_status = UCS_XT2StartWithTimeout(
-			UCS_XT2DRIVE_8MHZ_16MHZ,
-			UCS_XT2_TIMEOUT
-	);
 	if (xt2_status == STATUS_FAIL) {
 		// XT2 is broken.
 		// Fall back to using the DCO at 8 MHz (ish)

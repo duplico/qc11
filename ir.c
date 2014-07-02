@@ -34,6 +34,7 @@ void init_serial() {
 
 	USCI_A_UART_disable(IR_USCI_BASE);
 
+#if BADGE_TARGET
 	// 19200 baud: non-oversampled.
 	USCI_A_UART_initAdvance(
 			IR_USCI_BASE,
@@ -47,6 +48,21 @@ void init_serial() {
 			USCI_A_UART_MODE,
 			USCI_A_UART_LOW_FREQUENCY_BAUDRATE_GENERATION
 	);
+#else
+	// 19200 baud: non-oversampled.
+	USCI_A_UART_initAdvance(
+			IR_USCI_BASE,
+			USCI_A_UART_CLOCKSOURCE_SMCLK,
+			625,
+			0,
+			0,
+			USCI_A_UART_NO_PARITY,
+			USCI_A_UART_MSB_FIRST,
+			USCI_A_UART_ONE_STOP_BIT,
+			USCI_A_UART_MODE,
+			USCI_A_UART_LOW_FREQUENCY_BAUDRATE_GENERATION
+	);
+#endif
 	USCI_A_UART_disable(IR_USCI_BASE);
 
 	IRTCTL = UCIREN + UCIRTXPL2 + UCIRTXPL0;
