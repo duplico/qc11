@@ -1,3 +1,4 @@
+#if !BADGE_TARGET
 /*
  * Software functions for MSP430 to drive WS2812/B RGB LEDs via one-wire bus
  *
@@ -8,6 +9,50 @@
 
 #include "qcxi.h"
 #include "ws2812.h"
+
+
+uint8_t ws_frameBuffer[(ENCODING * sizeof(ledcolor_t) * NUMBEROFLEDS)] = { 0, };
+
+void ws2812_init() {
+	USCI_B_SPI_masterInit(
+		USCI_B0_BASE,
+		USCI_B_SPI_CLOCKSOURCE_SMCLK,
+		8000000, // should always be so.
+		2666666,
+		USCI_B_SPI_MSB_FIRST,
+		USCI_B_SPI_PHASE_DATA_CHANGED_ONFIRST_CAPTURED_ON_NEXT,
+		USCI_B_SPI_CLOCKPOLARITY_INACTIVITY_LOW
+	);
+
+	USCI_B_SPI_enable(USCI_B0_BASE);
+
+	GPIO_setAsPeripheralModuleFunctionOutputPin(GPIO_PORT_P3, GPIO_PIN0);
+}
+
+void shiftLed(ledcolor_t* leds, ledcount_t ledCount) {
+	ledcolor_t tmpLed;
+	ledcount_t ledIdx;
+
+	tmpLed = leds[ledCount-1];
+	for(ledIdx=(ledCount-1); ledIdx > 0; ledIdx--) {
+		leds[ledIdx] = leds[ledIdx-1];
+	}
+	leds[0] = tmpLed;
+}
+
+// copy bytes from the buffer to SPI transmit register
+// should be reworked to use DMA
+void sendBuffer(uint8_t* buffer, ledcount_t ledCount) {
+	uint16_t bufferIdx;
+	__bic_SR_register(GIE); // TODO: need to make this interrupt based:
+	for (bufferIdx=0; bufferIdx < (ENCODING * sizeof(ledcolor_t) * ledCount); bufferIdx++) {
+		while (!(UCB0IFG & UCTXIFG));		// wait for TX buffer to be ready
+		UCB0TXBUF = buffer[bufferIdx];
+	}
+	__bis_SR_register(GIE);
+	__delay_cycles(300);
+}
+
 
 void fillFrameBuffer(ledcolor_t* leds, ledcount_t ledCount, uint8_t* buffer, uint8_t encoding) {
 	// encoding is 3, like it or not.
@@ -114,3 +159,4 @@ void encodeData3bit(ledcolor_t* led, uint8_t* output) {
 		outputIdx += 3;	// next three bytes (color)
 	}
 }
+#endif

@@ -71,6 +71,9 @@
 // Crystal:
 #define UCS_XT2_CRYSTAL_FREQUENCY 4000000
 
+// WS2812 LEDs:
+extern uint8_t ws_frameBuffer[];
+
 #endif
 
 void delay(unsigned int);
