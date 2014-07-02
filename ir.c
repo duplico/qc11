@@ -63,8 +63,8 @@ void init_serial() {
 	USCI_A_UART_clearInterruptFlag(IR_USCI_BASE, USCI_A_UART_TRANSMIT_INTERRUPT_FLAG);
 	USCI_A_UART_enableInterrupt(
 			IR_USCI_BASE,
-				USCI_A_UART_TRANSMIT_INTERRUPT
-		);
+			USCI_A_UART_TRANSMIT_INTERRUPT
+	);
 }
 
 uint8_t ir_check_crc() {
