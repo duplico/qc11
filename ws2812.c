@@ -10,9 +10,40 @@
 #include "qcxi.h"
 #include "ws2812.h"
 
+volatile ledcount_t ws_bytes_to_send = 0;
+volatile ledcount_t ws_byte_index = 0;
+
 uint8_t ws_frameBuffer[(ENCODING * sizeof(ledcolor_t) * NUMBEROFLEDS)] = { 0, };
 
+ledcolor_t leds[21] = {
+		// rainbow colors
+		{ 0xc, 0x18, 0x3 },
+		{ 0x10, 0x16, 0x1 },
+		{ 0x13, 0x13, 0x0 },
+		{ 0x16, 0xf, 0x0 },
+		{ 0x18, 0xc, 0x1 },
+		{ 0x19, 0x8, 0x3 },
+		{ 0x19, 0x5, 0x6 },
+		{ 0x17, 0x2, 0xa },
+		{ 0x15, 0x0, 0xe },
+		{ 0x12, 0x0, 0x11 },
+		{ 0xe, 0x0, 0x15 },
+		{ 0xa, 0x2, 0x17 },
+		{ 0x7, 0x4, 0x19 },
+		{ 0x4, 0x8, 0x19 },
+		{ 0x1, 0xb, 0x18 },
+		{ 0x0, 0xf, 0x16 },
+		{ 0x0, 0x13, 0x14 },
+		{ 0x1, 0x16, 0x10 },
+		{ 0x2, 0x18, 0xd },
+		{ 0x5, 0x19, 0x9 },
+		{ 0x9, 0x19, 0x5 },
+};
+
+ledcolor_t blankLed = {0x00, 0x00, 0x00};
+
 void ws2812_init() {
+
 	USCI_B_SPI_masterInit(
 		USCI_B0_BASE,
 		USCI_B_SPI_CLOCKSOURCE_SMCLK,
@@ -27,12 +58,19 @@ void ws2812_init() {
 
 	GPIO_setAsPeripheralModuleFunctionOutputPin(GPIO_PORT_P3, GPIO_PIN0);
 
+	// Note: We are specifically NOT enabling interrupts here because the
+	// 		 asynchronous functions for sending LED buffers activate them,
+	//		 then the ISR deactivates them once it's finished.
 
-//	USCI_B_SPI_clearInterruptFlag(USCI_B0_BASE, USCI_B_SPI_TRANSMIT_INTERRUPT);
-//	USCI_B_SPI_enableInterrupt(USCI_B0_BASE, USCI_B_SPI_TRANSMIT_INTERRUPT);
+	fillFrameBufferSingleColor(&blankLed, NUMBEROFLEDS, ws_frameBuffer, ENCODING);
+	ws_set_colors_blocking(ws_frameBuffer, NUMBEROFLEDS);
 }
 
-void shiftLed(ledcolor_t* leds, ledcount_t ledCount) {
+/*
+ * Shift the current LED buffer forward by 1, in a circular fashion.
+ *
+ */
+void ws_rotate(ledcolor_t* leds, ledcount_t ledCount) {
 	ledcolor_t tmpLed;
 	ledcount_t ledIdx;
 
@@ -43,26 +81,20 @@ void shiftLed(ledcolor_t* leds, ledcount_t ledCount) {
 	leds[0] = tmpLed;
 }
 
-volatile ledcount_t ws_bytes_to_send = 0;
-volatile ledcount_t ws_byte_index = 0;
-
-void sendBufferAsync(ledcount_t ledCount) {
+void ws_set_colors_async(ledcount_t ledCount) {
 	ws_bytes_to_send = (ENCODING * sizeof(ledcolor_t) * ledCount);
 	USCI_B_SPI_clearInterruptFlag(USCI_B0_BASE, USCI_B_SPI_TRANSMIT_INTERRUPT);
 	USCI_B_SPI_enableInterrupt(USCI_B0_BASE, USCI_B_SPI_TRANSMIT_INTERRUPT);
 	ws_byte_index = 0;
-//	UCB0TXBUF = ws_frameBuffer[ws_byte_index];
-	//USCI_B_SPI_transmitData(USCI_B0_BASE, ws_frameBuffer[0]);
 	USCI_B_SPI_transmitData(USCI_B0_BASE, 0);
 }
 
 // copy bytes from the buffer to SPI transmit register
 // should be reworked to use DMA
-void sendBuffer(uint8_t* buffer, ledcount_t ledCount) {
+void ws_set_colors_blocking(uint8_t* buffer, ledcount_t ledCount) {
 	__bic_SR_register(GIE); // TODO: need to make this interrupt based:
 	for (ws_byte_index=0; ws_byte_index < (ENCODING * sizeof(ledcolor_t) * ledCount); ws_byte_index++) {
 		while (!(UCB0IFG & UCTXIFG));		// wait for TX buffer to be ready
-//		UCB0TXBUF = buffer[ws_byte_index];
 		USCI_B_SPI_transmitData(USCI_B0_BASE,buffer[ws_byte_index]);
 	}
 	__bis_SR_register(GIE);

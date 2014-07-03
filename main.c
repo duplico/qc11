@@ -119,17 +119,16 @@ uint16_t _rotl(uint16_t value, int shift) {
 #define POST_XT1F 	0b1
 #define POST_XT2F 	0b10
 #define POST_SHIFTF 0b100
-#define POST_IRIF 	0b1000
-#define POST_IRVF 	0b10000
-#define POST_RRF	0b100000
-#define POST_RTF	0b1000000
+#define POST_IRGF	0b1000
+#define POST_IRIF 	0b10000
+#define POST_IRVF 	0b100000
+#define POST_RRF	0b1000000
+#define POST_RTF	0b10000000
 
 uint8_t post() {
 	__bic_SR_register(GIE);
 	uint8_t post_result = 0;
-	uint16_t tp0[5] = {0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF};
-	uint16_t tp1[5] = {0xFF00, 0xFF00, 0xFF00, 0xFF00, 0xFF00};
-	uint16_t tp2[5] = {0x00FF, 0x00FF, 0x00FF, 0x00FF, 0x00FF};
+
 	// Clocks
 	if (xt1_status == STATUS_FAIL) {
 		post_result |= POST_XT1F;
@@ -137,10 +136,15 @@ uint8_t post() {
 	if (xt2_status == STATUS_FAIL) {
 		post_result |= POST_XT2F;
 	}
+#if BADGE_TARGET
+
+	uint16_t tp0[5] = {0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF};
+	uint16_t tp1[5] = {0xFF00, 0xFF00, 0xFF00, 0xFF00, 0xFF00};
+	uint16_t tp2[5] = {0x00FF, 0x00FF, 0x00FF, 0x00FF, 0x00FF};
+
 	if (led_post() == STATUS_FAIL) {
 		post_result |= POST_SHIFTF;
 	}
-#if BADGE_TARGET
 	// LED test pattern
 	led_display_bits(tp0);
 	for (uint8_t i=LED_PERIOD; i>0; i--) {
@@ -170,71 +174,20 @@ uint8_t post() {
 	if (f_ir_rx_ready) {
 		f_ir_rx_ready = 0;
 		if (!ir_check_crc()) {
-			// IR loopback integrity fault
+			// IR integrity fault
 			post_result |= POST_IRIF;
 		} else {
 			if (strcmp(test_str, (char *) ir_rx_frame) != 0)
 				post_result |= POST_IRVF; // IR value fault
 		}
+	} else {
+		post_result |= POST_IRGF; // IR general fault
 	}
-//	ir_reject_loopback = 1;
+	ir_reject_loopback = 1;
 	// Radio - TODO
-#if BADGE_TARGET
-	// Display error code:
-	if (post_result != 0) {
-		char hex[4] = "AA";
-		hex[0] = (post_result/16 < 10)? '0' + post_result/16 : 'A' - 10 + post_result/16;
-		hex[1] = (post_result%16 < 10)? '0' + post_result%16 : 'A' - 10 + post_result%16;
-		led_print(hex);
-		for (uint8_t i=LED_PERIOD; i>0; i--) {
-			led_enable(i);
-			delay(25);
-		}
-	}
-#endif
 
 	return post_result;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 int main( void )
 {
@@ -250,50 +203,48 @@ int main( void )
 	init_radio(); // requires interrupts enabled.
 	ws2812_init();
 
-	post();
+	volatile uint8_t post_result = post();
 
-	ledcolor_t leds[21] = {
-			// rainbow colors
-			{ 0xc, 0x18, 0x3 },
-			{ 0x10, 0x16, 0x1 },
-			{ 0x13, 0x13, 0x0 },
-			{ 0x16, 0xf, 0x0 },
-			{ 0x18, 0xc, 0x1 },
-			{ 0x19, 0x8, 0x3 },
-			{ 0x19, 0x5, 0x6 },
-			{ 0x17, 0x2, 0xa },
-			{ 0x15, 0x0, 0xe },
-			{ 0x12, 0x0, 0x11 },
-			{ 0xe, 0x0, 0x15 },
-			{ 0xa, 0x2, 0x17 },
-			{ 0x7, 0x4, 0x19 },
-			{ 0x4, 0x8, 0x19 },
-			{ 0x1, 0xb, 0x18 },
-			{ 0x0, 0xf, 0x16 },
-			{ 0x0, 0x13, 0x14 },
-			{ 0x1, 0x16, 0x10 },
-			{ 0x2, 0x18, 0xd },
-			{ 0x5, 0x19, 0x9 },
-			{ 0x9, 0x19, 0x5 },
-	};
-
-	ledcolor_t blankLed = {0x00, 0x00, 0x00};
-
-	// Blank LEDs:
-//	fillFrameBufferSingleColor(&blankLed, NUMBEROFLEDS, ws_frameBuffer, ENCODING);
-//	sendBuffer(ws_frameBuffer, NUMBEROFLEDS);
+	if (post_result != 0) {
+#if BADGE_TARGET
+		// Display error code:
+		char hex[4] = "AA";
+		hex[0] = (post_result/16 < 10)? '0' + post_result/16 : 'A' - 10 + post_result/16;
+		hex[1] = (post_result%16 < 10)? '0' + post_result%16 : 'A' - 10 + post_result%16;
+		led_print(hex);
+		for (uint8_t i=LED_PERIOD; i>0; i--) {
+			led_enable(i);
+			delay(25);
+		}
+#else
+		fillFrameBufferSingleColor(&leds[6], NUMBEROFLEDS, ws_frameBuffer, ENCODING);
+		ws_set_colors_async(NUMBEROFLEDS);
+		delay(1000);
+#endif
+	}
 
 	while(1) {
 
 		for (uint8_t color = 0; color<21; color++) {
 			fillFrameBufferSingleColor(&leds[color], NUMBEROFLEDS, ws_frameBuffer, ENCODING);
 //			sendBuffer(ws_frameBuffer, NUMBEROFLEDS);
-			sendBufferAsync(NUMBEROFLEDS);
+			ws_set_colors_async(NUMBEROFLEDS);
+			if (f_ir_rx_ready) {
+				f_ir_rx_ready = 0;
+				if (!ir_check_crc()) {
+					continue;
+				}
+//				led_print((char *)ir_rx_frame);
+				fillFrameBufferSingleColor(&leds[6], NUMBEROFLEDS, ws_frameBuffer, ENCODING);
+				ws_set_colors_async(NUMBEROFLEDS);
+				delay(1000);
+				break;
+			}
 			__delay_cycles(0x7FFFF);
 		}
+		ir_write("qcxi", 0);
 
 	}
-	return 0;
 
 
 	led_on();
