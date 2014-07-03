@@ -18,6 +18,9 @@ void fillFrameBufferSingleColor(ledcolor_t* led, ledcount_t ledCount, uint8_t* b
 void encodeData3bit(ledcolor_t* led, uint8_t* output);
 void encodeData4bit(ledcolor_t* led, uint8_t* output);
 
-void sendBuffer(uint8_t* buffer, ledcount_t ledCount);
-void shiftLed(ledcolor_t* leds, ledcount_t ledCount);
-void sendBufferAsync(ledcount_t);
+void ws_set_colors_blocking(uint8_t* buffer, ledcount_t ledCount);
+void ws_rotate(ledcolor_t* leds, ledcount_t ledCount);
+void ws_set_colors_async(ledcount_t);
+
+extern ledcolor_t leds[];
+extern ledcolor_t blankLed;
