@@ -102,7 +102,7 @@ uint8_t reg_read = 0;
 uint8_t reg_reads[2] = {0, 0};
 
 uint8_t reg_data[65] = {0};
-uint8_t test_data[65] = {0};
+uint8_t test_data[65] = {'q', 'c', 'x', 'i', 0};
 
 char time[6] = "00:00";
 
@@ -223,6 +223,11 @@ int main( void )
 #endif
 	}
 
+	mode_sb_sync();
+	led_print("...");
+
+
+#if !BADGE_TARGET
 	while(1) {
 
 		for (uint8_t color = 0; color<21; color++) {
@@ -235,16 +240,42 @@ int main( void )
 					continue;
 				}
 //				led_print((char *)ir_rx_frame);
-				fillFrameBufferSingleColor(&leds[6], NUMBEROFLEDS, ws_frameBuffer, ENCODING);
+				fillFrameBufferSingleColor(&leds[1], NUMBEROFLEDS, ws_frameBuffer, ENCODING);
 				ws_set_colors_async(NUMBEROFLEDS);
 				delay(1000);
 				break;
 			}
 			__delay_cycles(0x7FFFF);
 		}
+
+		fillFrameBufferSingleColor(&leds[2], NUMBEROFLEDS, ws_frameBuffer, ENCODING);
+		ws_set_colors_async(NUMBEROFLEDS);
+
 		ir_write("qcxi", 0);
 
+		fillFrameBufferSingleColor(&leds[8], NUMBEROFLEDS, ws_frameBuffer, ENCODING);
+		ws_set_colors_async(NUMBEROFLEDS);
+
+		write_single_register(0x25, 0b00000000); // GPIO map to default
+		write_register(RFM_FIFO, test_data, 64);
+		f_rfm_job_done = 0;
+		mode_tx_async();
+
+		while (!f_rfm_job_done);
+
+		fillFrameBufferSingleColor(&leds[12], NUMBEROFLEDS, ws_frameBuffer, ENCODING);
+		ws_set_colors_async(NUMBEROFLEDS);
+
+		f_rfm_job_done = 0;
+		mode_sb_sync();
+
+		fillFrameBufferSingleColor(&leds[15], NUMBEROFLEDS, ws_frameBuffer, ENCODING);
+		ws_set_colors_async(NUMBEROFLEDS);
+
+		delay(1207);
+
 	}
+#endif
 
 
 	led_on();
@@ -275,34 +306,6 @@ int main( void )
 			}
 		}
 		ir_write("qcxi", 0);
-	}
-
-	while (1) {
-		mode_sb_sync();
-		led_print(" TX");
-		write_single_register(0x25, 0b00000000); // GPIO map to default
-		write_register(RFM_FIFO, test_data, 64);
-		led_print("TX");
-		f_rfm_job_done = 0;
-		mode_tx_async();
-		while (!f_rfm_job_done);
-		f_rfm_job_done = 0;
-		mode_sb_sync();
-		//		write_single_register(0x29, 228); // RssiThreshold = -this/2 in dB
-		led_print("...");
-		delay(100);
-		mode_rx_sync();
-		delay(1000);
-		if (f_rfm_job_done) {
-			f_rfm_job_done = 0;
-			val = read_single_register_sync(0x24);
-			read_register_sync(RFM_FIFO, 64, test_data);
-			mode_sb_sync();
-			hex[0] = (val/16 < 10)? '0' + val/16 : 'A' - 10 + val/16;
-			hex[1] = (val%16 < 10)? '0' + val%16 : 'A' - 10 + val%16;
-			led_print((char *)test_data);
-			delay(1000);
-		}
 	}
 
 	while (1) {
