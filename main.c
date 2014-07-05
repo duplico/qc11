@@ -12,6 +12,7 @@
 volatile uint8_t f_new_minute = 0;
 volatile uint8_t f_timer = 0;
 volatile uint8_t f_rfm_job_done = 0;
+volatile uint8_t f_rfm_rx_done = 0;
 volatile uint8_t f_ir_tx_done = 0;
 volatile uint8_t f_ir_rx_ready = 0;
 
@@ -170,7 +171,7 @@ uint8_t post() {
 	// IR loopback
 	char test_str[] = "qcxi";
 	ir_write((uint8_t *) test_str, 0);
-	delay(100);
+	delay(200);
 	if (f_ir_rx_ready) {
 		f_ir_rx_ready = 0;
 		if (!ir_check_crc()) {
@@ -232,14 +233,12 @@ int main( void )
 
 		for (uint8_t color = 0; color<21; color++) {
 			fillFrameBufferSingleColor(&leds[color], NUMBEROFLEDS, ws_frameBuffer, ENCODING);
-//			sendBuffer(ws_frameBuffer, NUMBEROFLEDS);
 			ws_set_colors_async(NUMBEROFLEDS);
 			if (f_ir_rx_ready) {
 				f_ir_rx_ready = 0;
 				if (!ir_check_crc()) {
 					continue;
 				}
-//				led_print((char *)ir_rx_frame);
 				fillFrameBufferSingleColor(&leds[1], NUMBEROFLEDS, ws_frameBuffer, ENCODING);
 				ws_set_colors_async(NUMBEROFLEDS);
 				delay(1000);
@@ -257,7 +256,7 @@ int main( void )
 		ws_set_colors_async(NUMBEROFLEDS);
 
 		write_single_register(0x25, 0b00000000); // GPIO map to default
-		write_register(RFM_FIFO, test_data, 64);
+		radio_send(test_data, 64);
 		f_rfm_job_done = 0;
 		mode_tx_async();
 

@@ -91,5 +91,6 @@ extern volatile uint8_t f_ir_tx_done;
 extern volatile uint8_t f_ir_rx_ready;
 extern volatile uint8_t f_animate;
 extern uint8_t f_animation_done; // not actually set from interrupt
+extern volatile uint8_t f_rfm_rx_done;
 
 #endif /* MAIN_H_ */
