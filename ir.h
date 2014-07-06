@@ -10,7 +10,7 @@
 
 #include <stdint.h>
 
-void init_serial();
+void init_ir();
 void ir_write_single_byte(uint8_t);
 void ir_write(uint8_t*, uint8_t );
 uint8_t ir_check_crc();

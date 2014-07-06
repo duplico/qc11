@@ -77,6 +77,24 @@ typedef struct {
 #define IRTCTL UCA0IRTCTL
 #define IRRCTL UCA0IRRCTL
 
+#if !BADGE_TARGET
+// Debug serial
+extern volatile uint8_t ser_buffer_rx[255];
+extern volatile uint8_t ser_buffer_tx[255];
+extern volatile uint8_t f_ser_rx;
+void ser_print(char*);
+void ser_init();
+#endif
+
+#define POST_XT1F 	0b1
+#define POST_XT2F 	0b10
+#define POST_SHIFTF 0b100
+#define POST_IRGF	0b1000
+#define POST_IRIF 	0b10000
+#define POST_IRVF 	0b100000
+#define POST_RRF	0b1000000
+#define POST_RTF	0b10000000
+
 // Radio:
 #define RFM_NSS_PORT GPIO_PORT_P3
 #define RFM_NSS_PIN GPIO_PIN7

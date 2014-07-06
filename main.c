@@ -20,6 +20,10 @@ volatile uint8_t f_ir_tx_done = 0;
 volatile uint8_t f_ir_rx_ready = 0;
 uint8_t f_config_clobbered = 0;
 
+#if !BADGE_TARGET
+volatile uint8_t f_ser_rx = 0;
+#endif
+
 void init_power() {
 #if BADGE_TARGET
 	// Set Vcore to 1.8 V - NB: allows MCLK up to 8 MHz only
@@ -120,15 +124,6 @@ uint16_t _rotl(uint16_t value, int shift) {
       return value;
     return (value << shift) | (value >> (sizeof(value)*8 - shift));
 }
-
-#define POST_XT1F 	0b1
-#define POST_XT2F 	0b10
-#define POST_SHIFTF 0b100
-#define POST_IRGF	0b1000
-#define POST_IRIF 	0b10000
-#define POST_IRVF 	0b100000
-#define POST_RRF	0b1000000
-#define POST_RTF	0b10000000
 
 uint8_t post() {
 	__bic_SR_register(GIE);
@@ -253,10 +248,13 @@ int main( void )
 	init_timers();
 	init_rtc();
 	check_config();
-	init_serial();
+	init_ir();
 	__bis_SR_register(GIE);
 	init_radio(); // requires interrupts enabled.
+#if !BADGE_TARGET
 	ws2812_init();
+	ser_init();
+#endif
 
 	volatile uint8_t post_result = post();
 
@@ -297,6 +295,12 @@ int main( void )
 				delay(1000);
 				break;
 			}
+
+			if (f_ser_rx) {
+				ser_print(ser_buffer_rx);
+				f_ser_rx = 0;
+			}
+
 			__delay_cycles(0x7FFFF);
 		}
 
@@ -325,6 +329,8 @@ int main( void )
 		ws_set_colors_async(NUMBEROFLEDS);
 
 		delay(1207);
+
+		ser_print("Hello!");
 
 	}
 #endif
@@ -382,32 +388,6 @@ void delay(uint16_t ms)
         __delay_cycles(MCLK_DESIRED_FREQUENCY_IN_KHZ);
     }
 }
-
-
-#if DEBUG_SERIAL
-void init_usb() {
-
-	// UART Serial to PC //////////////////////////////////////////////////////
-	//
-	// Initialize the UART serial, used to speak over USB.
-	// NB: This clobbers the IR interface.
-	USCI_A_UART_disable(USCI_A1_BASE);
-
-	USCI_A_UART_initAdvance(
-			USCI_A1_BASE,
-			USCI_A_UART_CLOCKSOURCE_ACLK,
-			3,
-			0,
-			3,
-			USCI_A_UART_NO_PARITY,
-			USCI_A_UART_LSB_FIRST,
-			USCI_A_UART_ONE_STOP_BIT,
-			USCI_A_UART_MODE,
-			USCI_A_UART_LOW_FREQUENCY_BAUDRATE_GENERATION
-	);
-}
-#endif
-
 
 #pragma vector=UNMI_VECTOR
 __interrupt void NMI_ISR(void)
