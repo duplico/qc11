@@ -92,109 +92,69 @@ int main( void )
 	}
 
 	mode_sb_sync();
-	led_print("...");
+	led_anim_init();
+	uint8_t color = 0;
+	while (1) {
 
-#if !BADGE_TARGET
-	while(1) {
+		// New serial message?
+		if (f_ser_rx) {
+			ser_print(ser_buffer_rx);
+			f_ser_rx = 0;
+		}
 
-		for (uint8_t color = 0; color<21; color++) {
-			fillFrameBufferSingleColor(&leds[color], NUMBEROFLEDS, ws_frameBuffer, ENCODING);
+		// New IR message?
+		if (f_ir_rx_ready) {
+			f_ir_rx_ready = 0;
+			if (!ir_check_crc()) {
+				continue;
+			}
+			fillFrameBufferSingleColor(&leds[1], NUMBEROFLEDS, ws_frameBuffer, ENCODING);
 			ws_set_colors_async(NUMBEROFLEDS);
-			if (f_ir_rx_ready) {
-				f_ir_rx_ready = 0;
-				if (!ir_check_crc()) {
-					continue;
-				}
-				fillFrameBufferSingleColor(&leds[1], NUMBEROFLEDS, ws_frameBuffer, ENCODING);
-				ws_set_colors_async(NUMBEROFLEDS);
-				delay(1000);
-				break;
-			}
-
-			if (f_ser_rx) {
-				ser_print(ser_buffer_rx);
-				f_ser_rx = 0;
-			}
-
-			__delay_cycles(0x7FFFF);
+			delay(1000);
+			break;
 		}
 
-		fillFrameBufferSingleColor(&leds[2], NUMBEROFLEDS, ws_frameBuffer, ENCODING);
-		ws_set_colors_async(NUMBEROFLEDS);
-
-		ir_write("qcxi", 0);
-
-		fillFrameBufferSingleColor(&leds[8], NUMBEROFLEDS, ws_frameBuffer, ENCODING);
-		ws_set_colors_async(NUMBEROFLEDS);
-
-		write_single_register(0x25, 0b00000000); // GPIO map to default
-		radio_send(test_data, 64);
-		f_rfm_job_done = 0;
-		mode_tx_async();
-
-		while (!f_rfm_job_done);
-
-		fillFrameBufferSingleColor(&leds[12], NUMBEROFLEDS, ws_frameBuffer, ENCODING);
-		ws_set_colors_async(NUMBEROFLEDS);
-
-		f_rfm_job_done = 0;
-		mode_sb_sync();
-
-		fillFrameBufferSingleColor(&leds[15], NUMBEROFLEDS, ws_frameBuffer, ENCODING);
-		ws_set_colors_async(NUMBEROFLEDS);
-
-		delay(1207);
-
-		ser_print("Hello!");
-
-	}
-#endif
+		// New radio message?
 
 
-	led_on();
-	uint8_t startup_test = 0;
 
-	led_anim_init(); // start a-blinkin.
-	f_animation_done = 1;
 
-	char hex[4] = "AA";
-	uint8_t val;
-
-	uint8_t seen_j = 255;
-	while (1) {
-		seen_j = 255;
-		for (uint8_t j=1; j<3; j++) {
-			for (uint16_t i=1; i!=0; i++)
-				if (f_ir_rx_ready) {
-					if (!ir_check_crc()) {
-						f_ir_rx_ready = 0;
-						continue;
-					}
-					seen_j = j;
-					f_ir_rx_ready = 0;
-					led_print((char *)ir_rx_frame);
-				}
-			if (seen_j != j) {
-				led_print("...");
-			}
-		}
-		ir_write("qcxi", 0);
-	}
-
-	while (1) {
 		if (f_animate) {
 			f_animate = 0;
+#if BADGE_TARGET
 			led_animate();
+#else
+			fillFrameBufferSingleColor(&leds[color], NUMBEROFLEDS, ws_frameBuffer, ENCODING);
+			ws_set_colors_async(NUMBEROFLEDS);
+			color++;
+			if (color==21) f_animation_done = 1;
+#endif
 		}
 
 		if (f_animation_done) {
 			f_animation_done = 0;
-			led_print_scroll("Startup", (startup_test & 0b10) >> 1, startup_test & 0b01, 1);
-			startup_test++;
+
+
+			ir_write("qcxi", 0);
+			radio_send(test_data, 64);
+			f_rfm_job_done = 0;
+			mode_tx_async();
+
+#if BADGE_TARGET
+#else
+			color = 0;
+#endif
 		}
+
+		if (f_rfm_job_done) {
+			f_rfm_job_done = 0;
+			mode_sb_sync();
+		}
+
+		// Going to sleep... mode...
 		__bis_SR_register(LPM3_bits + GIE);
 	}
-}
+} // end main()
 
 uint8_t post() {
 	__bic_SR_register(GIE);
@@ -327,11 +287,4 @@ __interrupt void NMI_ISR(void)
 		// TODO: We now should not be able to reach this point.
 		status = UCS_clearAllOscFlagsWithTimeout(1000);
 	} while (status != 0);
-}
-
-#pragma vector=PORT2_VECTOR
-__interrupt void radio_interrupt_0(void)
-{
-	f_rfm_job_done = 1;
-	GPIO_clearInterruptFlag(GPIO_PORT_P2, GPIO_PIN0);
 }

@@ -201,52 +201,44 @@ uint8_t rfm_crcok() {
 	return status ? 1 : 0;
 }
 
-//volatile uint8_t rfm_reg_index = 0;
-//volatile uint8_t rfm_reg_len = 0;
-//volatile uint8_t rfm_begin = 0;
-//volatile uint8_t rfm_rw_reading  = 0; // 0- read, 1- write
-//volatile uint8_t rfm_rw_single = 0; // 0- single, 1- fifo
-//volatile uint8_t rfm_single_msg = 0;
-//volatile uint8_t rfm_fifo[64] = {0};
-
-
+/*
+ * ISR for the SPI interface to the radio.
+ *
+ * We either just sent or just received something.
+ * Here's how this goes down.
+ *
+ * (NB: all bets are off in the debugger: the order of RXIFG and TXIFG tend
+ *      to reverse when stepping through line by line. Doh.)
+ *
+ * First RXIFG is always ignored
+ * First TXIFG is always the command
+ *
+ * We can either be reading/writing a single register, in which case:
+ *
+ *    If READ:
+ *    	RXIFG: Second byte goes into rfm_single_msg
+ *    	TXIFG: Second byte is 0
+ *
+ * 	  If WRITE:
+ * 	  	RXIFG: Second byte is ignored
+ * 	  	TXIFG: Second byte is rfm_single_msg
+ *
+ * Or we can be reading/writing the FIFO, in which case:
+ *
+ *    If READ:
+ *    	Until index==len:
+ *    		RXIFG: put the read message into rfm_fifo
+ *    		TXIFG: send 0
+ *    If WRITE:
+ *    	Until index==len:
+ *    		RXIFG: ignore
+ *    		TXIFG: send the message from rfm_fifo
+ *
+ *
+ */
 #pragma vector=USCI_B1_VECTOR
 __interrupt void USCI_B1_ISR(void)
 {
-	/*
-	 * We either just sent or just received something.
-	 * Here's how this goes down.
-	 *
-	 * (NB: all bets are off in the debugger: the order of RXIFG and TXIFG tend
-	 *      to reverse when stepping through line by line. Doh.)
-	 *
-	 * First RXIFG is always ignored
-	 * First TXIFG is always the command
-	 *
-	 * We can either be reading/writing a single register, in which case:
-	 *
-	 *    If READ:
-	 *    	RXIFG: Second byte goes into rfm_single_msg
-	 *    	TXIFG: Second byte is 0
-	 *
-	 * 	  If WRITE:
-	 * 	  	RXIFG: Second byte is ignored
-	 * 	  	TXIFG: Second byte is rfm_single_msg
-	 *
-	 * Or we can be reading/writing the FIFO, in which case:
-	 *
-	 *    If READ:
-	 *    	Until index==len:
-	 *    		RXIFG: put the read message into rfm_fifo
-	 *    		TXIFG: send 0
-	 *    If WRITE:
-	 *    	Until index==len:
-	 *    		RXIFG: ignore
-	 *    		TXIFG: send the message from rfm_fifo
-	 *
-	 *
-	 */
-
 	switch (__even_in_range(UCB1IV, 4)) {
 	//Vector 2 - RXIFG
 	case 2:
@@ -354,7 +346,7 @@ __interrupt void USCI_B1_ISR(void)
 		break; // End of TXIFG /////////////////////////////////////////////////////
 
 	default: break;
-	} // End of switch /////////////////////////////////////////////////////////////
+	} // End of ISR flag switch ////////////////////////////////////////////////////
 
 	// If it's time to switch states:
 	if (rfm_state_ifgs == 2) {
@@ -368,6 +360,7 @@ __interrupt void USCI_B1_ISR(void)
 			break;
 		case RFM_REG_RX_SINGLE_DAT:
 			rfm_reg_state = RFM_REG_IDLE;
+			__bic_SR_register(LPM3_bits);
 			break;
 		case RFM_REG_TX_SINGLE_CMD:
 			rfm_reg_state = RFM_REG_TX_SINGLE_DAT;
@@ -380,6 +373,7 @@ __interrupt void USCI_B1_ISR(void)
 			break;
 		case RFM_REG_RX_FIFO_DAT:
 			rfm_reg_state = RFM_REG_IDLE;
+			__bic_SR_register(LPM3_bits);
 			f_rfm_rx_done = 1;
 			break;
 		case RFM_REG_TX_FIFO_CMD:
@@ -397,4 +391,14 @@ __interrupt void USCI_B1_ISR(void)
 	if (rfm_reg_state == RFM_REG_IDLE) {
 		GPIO_setOutputHighOnPin(RFM_NSS_PORT, RFM_NSS_PIN); // NSS high to end frame
 	}
+}
+
+/*
+ * ISR for DIO0 from the RFM module. It's asserted when a job (TX or RX) is finished.
+ */
+#pragma vector=PORT2_VECTOR
+__interrupt void radio_interrupt_0(void)
+{
+	f_rfm_job_done = 1;
+	GPIO_clearInterruptFlag(GPIO_PORT_P2, GPIO_PIN0);
 }
