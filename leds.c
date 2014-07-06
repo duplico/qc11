@@ -286,7 +286,7 @@ void led_anim_init() {
 	RTC_A_definePrescaleEvent(
 		RTC_A_BASE,
 		RTC_A_PRESCALE_1,
-		RTC_A_PSEVENTDIVIDER_16 // 128 Hz / 16 = 16 Hz.
+		RTC_A_PSEVENTDIVIDER_8 // 128 Hz / 8 = 32 Hz.
 	);
 
 	// Interrupt 8 times per second for animation purposes:

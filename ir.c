@@ -227,7 +227,7 @@ __interrupt void ir_isr(void)
 			}
 			break;
 		case 4: // Payload received, waiting for CRC
-			// TODO: get the checksum, but don't actually verify it.
+			// Get the checksum, but don't actually verify it.
 			//  We'll set the f_ir_rx_ready flag, and it will be the
 			//  responsibility of the main thread to verify the checksum.
 			ir_rx_frame[ir_rx_index] = received_data;
@@ -247,6 +247,7 @@ __interrupt void ir_isr(void)
 			if (received_data == SYNC0) {
 				ir_rx_state = 0;
 				f_ir_rx_ready = 1; // Successful receive
+				__bic_SR_register(LPM3_bits);
 			} else {
 				ir_rx_state = 0;
 			}
