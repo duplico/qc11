@@ -64,6 +64,13 @@ void init_radio() {
 	// P2.0 --------- DIO0 <<--|
 	//
 
+	// DIO0 (interrupt pin):
+	GPIO_setAsInputPin(GPIO_PORT_P2, GPIO_PIN0);
+
+	GPIO_enableInterrupt(GPIO_PORT_P2, GPIO_PIN0);
+	GPIO_interruptEdgeSelect(GPIO_PORT_P2, GPIO_PIN0, GPIO_LOW_TO_HIGH_TRANSITION);
+	GPIO_clearInterruptFlag(GPIO_PORT_P2, GPIO_PIN0);
+
 	//P3.5,4,0 option select
 	GPIO_setAsPeripheralModuleFunctionInputPin(
 		GPIO_PORT_P4,

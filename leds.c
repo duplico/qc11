@@ -22,6 +22,26 @@ uint8_t print_pixel_index = 0;
 uint8_t led_animating = 0;
 uint8_t f_animation_done = 0;
 
+void led_init() {
+#if BADGE_TARGET
+
+	// Setup LED module pins //////////////////////////////////////////////////
+	//   bit-banged serial data output:
+	//
+	// LED_PORT.LED_DATA, LED_CLOCK, LED_LATCH
+	//
+	GPIO_setAsOutputPin(
+			LED_PORT,
+			LED_DATA + LED_CLOCK + LED_LATCH // + LED_BLANK
+	);
+
+	// BLANK pin (we turn on PWM later as needed):
+	GPIO_setAsOutputPin(LED_PORT, LED_BLANK);
+	// Shift register input from LED controllers:
+	GPIO_setAsInputPin(LED_PORT, GPIO_PIN6);
+#endif
+}
+
 void led_print(char* text) {
 #if BADGE_TARGET
 	uint8_t character = 0;
