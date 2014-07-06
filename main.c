@@ -8,6 +8,9 @@
 #include "ir.h"
 #include "ws2812.h"
 
+#pragma DATA_SECTION (my_conf, ".infoA");
+qcxiconf my_conf;
+
 // Interrupt flags to signal the main thread:
 volatile uint8_t f_new_minute = 0;
 volatile uint8_t f_timer = 0;
@@ -15,6 +18,7 @@ volatile uint8_t f_rfm_job_done = 0;
 volatile uint8_t f_rfm_rx_done = 0;
 volatile uint8_t f_ir_tx_done = 0;
 volatile uint8_t f_ir_rx_ready = 0;
+uint8_t f_config_clobbered = 0;
 
 void init_power() {
 #if BADGE_TARGET
@@ -190,6 +194,55 @@ uint8_t post() {
 	return post_result;
 }
 
+void check_config() {
+	WDT_A_hold(WDT_A_BASE);
+
+	uint16_t crc = 0;
+	uint8_t* config_bytes = (uint8_t *) &my_conf;
+
+	CRC_setSeed(CRC_BASE, 0xBEEF);
+
+	for (uint8_t i=0; i<sizeof(my_conf) - 2; i++) {
+		CRC_set8BitData(CRC_BASE, config_bytes[i]);
+	}
+
+	crc = CRC_getResult(CRC_BASE);
+
+	if (crc != my_conf.crc) {
+		qcxiconf new_conf;
+		uint8_t* new_config_bytes = (uint8_t *) &new_conf;
+		for (uint8_t i=0; i<25; i++) {
+			new_config_bytes[i] = 0;
+			// paired_ids, seen_ids, scores, events occurred and attended.
+		}
+		// TODO: set self to seen/paired, I guess.
+		new_conf.badge_id = 100;
+		new_conf.datetime[0] = 0; // TODO: Pre-con party time.
+		new_conf.datetime[1] = 0;
+		strcpy(my_conf.handle, "person");
+		strcpy(my_conf.message, "Hi new person.");
+
+		CRC_setSeed(CRC_BASE, 0xBEEF);
+
+		for (uint8_t i=0; i<sizeof(my_conf) - 2; i++) {
+			CRC_set8BitData(CRC_BASE, new_config_bytes[i]);
+		}
+
+		new_conf.crc = CRC_getResult(CRC_BASE);
+
+		FLASH_unlockInfoA();
+		uint8_t flash_status = 0;
+		do {
+			FLASH_segmentErase((uint8_t *)INFOA_START);
+			flash_status = FLASH_eraseCheck((uint8_t *)INFOA_START, 128);
+		} while (flash_status == STATUS_FAIL);
+
+		FLASH_write8(new_config_bytes, (uint8_t *)INFOA_START, sizeof(qcxiconf));
+		FLASH_lockInfoA();
+	}
+	// TODO: the opposite of WDT_A_hold(WDT_A_BASE);
+}
+
 int main( void )
 {
 	// TODO: check to see what powerup mode we're in.
@@ -199,6 +252,7 @@ int main( void )
 	init_clocks();
 	init_timers();
 	init_rtc();
+	check_config();
 	init_serial();
 	__bis_SR_register(GIE);
 	init_radio(); // requires interrupts enabled.
@@ -226,7 +280,6 @@ int main( void )
 
 	mode_sb_sync();
 	led_print("...");
-
 
 #if !BADGE_TARGET
 	while(1) {

@@ -12,6 +12,9 @@
 #define BADGE_TARGET 0
 #define DEBUG_SERIAL 0
 
+// Memory organization (same for F5529 and F5308)
+#define INFOA_START 0x001980
+
 #define SYNC0 0b11001100
 #define SYNC1 0b01010101
 
@@ -22,6 +25,19 @@
 
 #define WRITE_IF(port, pin, val) if (val) GPIO_setOutputHighOnPin(port, pin); else GPIO_setOutputLowOnPin(port, pin)
 #define GPIO_pulse(port, pin) do { GPIO_setOutputHighOnPin(port, pin); GPIO_setOutputLowOnPin(port, pin); } while (0)
+
+typedef struct {
+	uint16_t paired_ids[10];
+	uint16_t met_ids[10];
+	uint16_t scores[4];
+	uint8_t events_occurred;
+	uint8_t events_attended;
+	uint8_t badge_id;
+	uint16_t datetime[2];
+	uint8_t handle[11];
+	uint8_t message[17];
+	uint16_t crc;
+} qcxiconf;
 
 #if BADGE_TARGET
 // Target is the actual badge:
@@ -92,5 +108,6 @@ extern volatile uint8_t f_ir_rx_ready;
 extern volatile uint8_t f_animate;
 extern uint8_t f_animation_done; // not actually set from interrupt
 extern volatile uint8_t f_rfm_rx_done;
+extern uint8_t f_config_clobbered; // not actually set from interrupt
 
 #endif /* MAIN_H_ */
