@@ -17,10 +17,20 @@ void init_clocks() {
 			UCS_XT2_CRYSTAL_FREQUENCY
 	);
 
-	//Port select XT1
-	GPIO_setAsPeripheralModuleFunctionInputPin(
+
+	// External crystal pins //////////////////////////////////////////////////
+	//  __ X1 (32768 Hz)
+	// |  |----P5.4
+	// |__|----P5.5
+	//
+	//  __ X2 (16 MHz (badge) or 4 MHz (LP)
+	// |  |----P5.2
+	// |__|----P5.3
+	//
+	GPIO_setAsPeripheralModuleFunctionOutputPin(
 			GPIO_PORT_P5,
-			GPIO_PIN4 + GPIO_PIN5
+			GPIO_PIN2 + GPIO_PIN3 // XT2
+			+ GPIO_PIN4 + GPIO_PIN5 // XT1
 	);
 
 	xt1_status = UCS_LFXT1StartWithTimeout(

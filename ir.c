@@ -28,6 +28,20 @@ volatile uint8_t ir_xmit_len = 0;
 
 
 void init_ir() {
+	// TX for IR
+	GPIO_setAsPeripheralModuleFunctionOutputPin(
+			IR_TXRX_PORT,
+			IR_TX_PIN
+	);
+	// RX for IR
+	GPIO_setAsPeripheralModuleFunctionInputPin(
+			IR_TXRX_PORT,
+			IR_RX_PIN
+	);
+
+	// Shutdown (SD) for IR
+	GPIO_setAsOutputPin(IR_SD_PORT, IR_SD_PIN);
+	GPIO_setOutputLowOnPin(IR_SD_PORT, IR_SD_PIN); // shutdown low = on
 
 	// We'll use SMCLK, which is 8 MHz.
 	// See: http://software-dl.ti.com/msp430/msp430_public_sw/mcu/msp430/MSP430BaudRateConverter/index.html

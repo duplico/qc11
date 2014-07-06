@@ -26,6 +26,8 @@ extern uint16_t led_values[5];
 extern uint16_t led_zeroes[5];
 extern uint8_t led_animating;
 
+void led_init();
+
 void led_print(char* text);
 void led_print_scroll(char*, uint8_t, uint8_t, uint8_t);
 

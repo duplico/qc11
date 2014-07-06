@@ -39,6 +39,9 @@ typedef struct {
 	uint16_t crc;
 } qcxiconf;
 
+void check_config();
+uint8_t post();
+
 #if BADGE_TARGET
 // Target is the actual badge:
 #include <msp430f5308.h>
