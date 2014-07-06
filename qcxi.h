@@ -82,8 +82,8 @@ uint8_t post();
 
 #if !BADGE_TARGET
 // Debug serial
-extern volatile uint8_t ser_buffer_rx[255];
-extern volatile uint8_t ser_buffer_tx[255];
+extern volatile char ser_buffer_rx[255];
+extern volatile char ser_buffer_tx[255];
 extern volatile uint8_t f_ser_rx;
 void ser_print(char*);
 void ser_init();
