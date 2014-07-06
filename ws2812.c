@@ -9,6 +9,7 @@
 
 #include "qcxi.h"
 #include "ws2812.h"
+#include <string.h>
 
 volatile ledcount_t ws_bytes_to_send = 0;
 volatile ledcount_t ws_byte_index = 0;
@@ -209,8 +210,8 @@ void encodeData3bit(ledcolor_t* led, uint8_t* output) {
 }
 
 // SERIAL:
-volatile uint8_t ser_buffer_rx[255] = {0};
-volatile uint8_t ser_buffer_tx[255] = {0};
+volatile char ser_buffer_rx[255] = {0};
+volatile char ser_buffer_tx[255] = {0};
 volatile uint8_t ser_index_rx = 0;
 volatile uint8_t ser_index_tx = 0;
 

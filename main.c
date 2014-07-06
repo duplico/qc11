@@ -14,7 +14,6 @@ qcxiconf my_conf;
 // Interrupt flags to signal the main thread:
 volatile uint8_t f_new_minute = 0;
 volatile uint8_t f_timer = 0;
-volatile uint8_t f_rfm_job_done = 0;
 volatile uint8_t f_rfm_rx_done = 0;
 volatile uint8_t f_ir_tx_done = 0;
 volatile uint8_t f_ir_rx_ready = 0;
@@ -58,18 +57,18 @@ int main( void )
 	init_watchdog();
 	init_power();
 	init_gpio();
-	led_init();
 	init_clocks();
-	init_timers();
-	init_rtc();
 	check_config();
+	init_timers();
+	led_init();
+	init_rtc();
 	init_ir();
-	__bis_SR_register(GIE);
-	init_radio(); // requires interrupts enabled.
 #if !BADGE_TARGET
 	ws2812_init();
 	ser_init();
 #endif
+	__bis_SR_register(GIE);
+	init_radio(); // requires interrupts enabled.
 
 	volatile uint8_t post_result = post();
 
@@ -94,11 +93,12 @@ int main( void )
 	mode_sb_sync();
 	led_anim_init();
 	uint8_t color = 0;
+
 	while (1) {
 
 		// New serial message?
 		if (f_ser_rx) {
-			ser_print(ser_buffer_rx);
+			ser_print((uint8_t *) ser_buffer_rx);
 			f_ser_rx = 0;
 		}
 
@@ -115,10 +115,11 @@ int main( void )
 		}
 
 		// New radio message?
+		if (f_rfm_rx_done) {
+			// do something
+		}
 
-
-
-
+		// Time to do something because of time?
 		if (f_animate) {
 			f_animate = 0;
 #if BADGE_TARGET
@@ -131,24 +132,18 @@ int main( void )
 #endif
 		}
 
+		// Is an animation finished?
 		if (f_animation_done) {
 			f_animation_done = 0;
 
 
 			ir_write("qcxi", 0);
 			radio_send(test_data, 64);
-			f_rfm_job_done = 0;
-			mode_tx_async();
 
 #if BADGE_TARGET
 #else
 			color = 0;
 #endif
-		}
-
-		if (f_rfm_job_done) {
-			f_rfm_job_done = 0;
-			mode_sb_sync();
 		}
 
 		// Going to sleep... mode...
