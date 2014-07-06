@@ -208,6 +208,83 @@ void encodeData3bit(ledcolor_t* led, uint8_t* output) {
 	}
 }
 
+// SERIAL:
+volatile uint8_t ser_buffer_rx[255] = {0};
+volatile uint8_t ser_buffer_tx[255] = {0};
+volatile uint8_t ser_index_rx = 0;
+volatile uint8_t ser_index_tx = 0;
+
+
+void ser_init() {
+
+	GPIO_setAsPeripheralModuleFunctionOutputPin(GPIO_PORT_P4, GPIO_PIN4); // USCI_A1_TXD
+	GPIO_setAsPeripheralModuleFunctionInputPin(GPIO_PORT_P4, GPIO_PIN5);  // USCI_A1_RXD
+
+	// UART Serial to PC //////////////////////////////////////////////////////
+	//
+	// Initialize the UART serial, used to speak over USB.
+	// Debug serial. 9600 baud, 8N1:
+
+	USCI_A_UART_initAdvance(
+			USCI_A1_BASE,
+			USCI_A_UART_CLOCKSOURCE_SMCLK,
+			1250,
+			0,
+			0,
+			USCI_A_UART_NO_PARITY,
+			USCI_A_UART_LSB_FIRST,
+			USCI_A_UART_ONE_STOP_BIT,
+			USCI_A_UART_MODE,
+			USCI_A_UART_LOW_FREQUENCY_BAUDRATE_GENERATION
+	);
+
+	USCI_A_UART_enable(USCI_A1_BASE);
+
+	USCI_A_UART_clearInterruptFlag(USCI_A1_BASE, USCI_A_UART_RECEIVE_INTERRUPT_FLAG);
+	USCI_A_UART_enableInterrupt(
+			USCI_A1_BASE,
+			USCI_A_UART_RECEIVE_INTERRUPT
+	);
+
+	USCI_A_UART_clearInterruptFlag(USCI_A1_BASE, USCI_A_UART_TRANSMIT_INTERRUPT_FLAG);
+	USCI_A_UART_enableInterrupt(
+			USCI_A1_BASE,
+			USCI_A_UART_TRANSMIT_INTERRUPT
+	);
+}
+
+void ser_print(char* text) {
+	strcpy(ser_buffer_tx, text);
+	ser_index_tx = 0;
+	USCI_A_UART_transmitData(USCI_A1_BASE, ser_buffer_tx[ser_index_tx]);
+}
+
+#pragma vector=USCI_A1_VECTOR
+__interrupt void ser_debug_isr(void)
+{
+	switch(__even_in_range(UCA1IV,4))
+	{
+	case 0:	// 0: No interrupt.
+		break;
+	case 2:	// RXIFG: RX buffer ready to read.
+		ser_buffer_rx[ser_index_rx] = USCI_A_UART_receiveData(USCI_A1_BASE);
+		if (ser_buffer_rx[ser_index_rx] == 0x0d) {
+			f_ser_rx = 1;
+			ser_index_rx = 0;
+		} else {
+			ser_index_rx++;
+		}
+		break;
+	case 4:	// TXIFG: TX buffer is sent.
+		ser_index_tx++;
+		if (ser_buffer_tx[ser_index_tx]) {
+			USCI_A_UART_transmitData(USCI_A1_BASE, ser_buffer_tx[ser_index_tx]);
+		}
+		break;
+	default: break;
+	}
+}
+
 #pragma vector=USCI_B0_VECTOR
 __interrupt void ws_isr(void)
 {

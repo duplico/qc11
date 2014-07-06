@@ -27,7 +27,7 @@ volatile uint8_t ir_xmit_index = 0;
 volatile uint8_t ir_xmit_len = 0;
 
 
-void init_serial() {
+void init_ir() {
 
 	// We'll use SMCLK, which is 8 MHz.
 	// See: http://software-dl.ti.com/msp430/msp430_public_sw/mcu/msp430/MSP430BaudRateConverter/index.html
@@ -49,6 +49,7 @@ void init_serial() {
 			USCI_A_UART_LOW_FREQUENCY_BAUDRATE_GENERATION
 	);
 #else
+	// Infrared:
 	// 19200 baud: non-oversampled.
 	USCI_A_UART_initAdvance(
 			IR_USCI_BASE,
@@ -147,6 +148,7 @@ void ir_write(uint8_t* payload, uint8_t len) {
 	USCI_A_UART_transmitData(IR_USCI_BASE, ir_tx_frame[0]);
 
 }
+
 
 volatile uint8_t ir_rx_state = 0;
 
