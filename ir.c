@@ -19,7 +19,16 @@ volatile uint8_t ir_rx_len = 0;
 
 uint8_t ir_reject_loopback = 0;
 
-// Protocol: SYNC0, SYNC1, LEN, DATA, CRC_MSB, CRC_LSB, SYNC1, SYNC0
+typedef struct {
+	uint8_t sync0, sync1, from_id, to_id, len, opcode;
+	uint8_t data[54];
+	uint16_t crc;
+	uint8_t sync2, sync3;
+} qcir;
+
+qcir ir_frame;
+
+// Protocol: SYNC0, SYNC1, LEN, OPCODE, DATA, CRC_MSB, CRC_LSB, SYNC1, SYNC0
 //  Max length: 56 bytes
 uint8_t ir_tx_frame[64] = {SYNC0, SYNC1, 1, 0, 0, 0, SYNC1, SYNC0, 0};
 volatile uint8_t ir_xmit = 0;
@@ -28,6 +37,19 @@ volatile uint8_t ir_xmit_len = 0;
 
 
 void init_ir() {
+	ir_frame.sync0 = SYNC0;
+	ir_frame.sync1 = SYNC1;
+	ir_frame.len = 1;
+	ir_frame.data = {0};
+	ir_frame.crc = 0;
+	ir_frame.sync2 = SYNC1;
+	ir_frame.sync3 = SYNC0;
+
+	uint8_t sync0, sync1, len, opcode;
+	uint8_t data[56];
+	uint16_t crc;
+	uint8_t sync2, sync3;
+
 	// TX for IR
 	GPIO_setAsPeripheralModuleFunctionOutputPin(
 			IR_TXRX_PORT,
@@ -163,6 +185,34 @@ void ir_write(uint8_t* payload, uint8_t len) {
 
 }
 
+#define IR_PROTO_TTO_DEFAULT 4
+
+uint8_t ir_proto_state = 0;
+uint8_t ir_proto_cycle = 0;
+uint8_t ir_proto_tto = IR_PROTO_TTO_DEFAULT; // tries to timeout
+
+#define IR_PROTO_LISTEN 	0
+#define IR_PROTO_HELLO_C 	1
+#define IR_PROTO_ITP_C 		2
+#define IR_PROTO_PAIRING_C 	3
+#define IR_PROTO_PAIRED_C 	4
+#define IR_PROTO_HELLO_S 	5
+#define IR_PROTO_ITP_S 		6
+#define IR_PROTO_PAIRING_S 	7
+#define IR_PROTO_PAIRED_S 	8
+
+void ir_process_rx_ready() {
+	if (!ir_check_crc()) {
+		return;
+	}
+
+	switch(ir_proto_state) {
+	case IR_PROTO_LISTEN:
+
+	}
+
+
+}
 
 volatile uint8_t ir_rx_state = 0;
 

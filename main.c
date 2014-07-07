@@ -105,9 +105,8 @@ int main( void )
 		// New IR message?
 		if (f_ir_rx_ready) {
 			f_ir_rx_ready = 0;
-			if (!ir_check_crc()) {
-				continue;
-			}
+			ir_process_rx_ready();
+
 			fillFrameBufferSingleColor(&leds[1], NUMBEROFLEDS, ws_frameBuffer, ENCODING);
 			ws_set_colors_async(NUMBEROFLEDS);
 			delay(1000);
