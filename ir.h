@@ -12,7 +12,8 @@
 
 void init_ir();
 void ir_write_single_byte(uint8_t);
-void ir_write(uint8_t*, uint8_t );
+void ir_write(uint8_t*, uint8_t, uint8_t);
 void ir_process_rx_ready();
+uint8_t ir_check_crc();
 
 #endif /* IR_H_ */

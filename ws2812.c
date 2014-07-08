@@ -1,3 +1,5 @@
+#include "qcxi.h"
+
 #if !BADGE_TARGET
 /*
  * Software functions for MSP430 to drive WS2812/B RGB LEDs via one-wire bus
@@ -7,7 +9,6 @@
  *
  */
 
-#include "qcxi.h"
 #include "ws2812.h"
 #include <string.h>
 

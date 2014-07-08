@@ -9,8 +9,9 @@
 #define MAIN_H_
 
 // Configuration flags (TODO: should probably be in a make file):
-#define BADGE_TARGET 0
+#define BADGE_TARGET 1
 #define DEBUG_SERIAL 0
+
 
 // Memory organization (same for F5529 and F5308)
 #define INFOA_START 0x001980
@@ -38,9 +39,19 @@ typedef struct {
 	uint8_t message[17];
 	uint16_t crc;
 } qcxiconf;
+extern qcxiconf my_conf;
 
 void check_config();
 uint8_t post();
+
+#define POST_XT1F 	0b1
+#define POST_XT2F 	0b10
+#define POST_SHIFTF 0b100
+#define POST_IRGF	0b1000
+#define POST_IRIF 	0b10000
+#define POST_IRVF 	0b100000
+#define POST_RRF	0b1000000
+#define POST_RTF	0b10000000
 
 #if BADGE_TARGET
 // Target is the actual badge:
@@ -80,23 +91,12 @@ uint8_t post();
 #define IRTCTL UCA0IRTCTL
 #define IRRCTL UCA0IRRCTL
 
-#if !BADGE_TARGET
 // Debug serial
 extern volatile char ser_buffer_rx[255];
 extern volatile char ser_buffer_tx[255];
 extern volatile uint8_t f_ser_rx;
 void ser_print(char*);
 void ser_init();
-#endif
-
-#define POST_XT1F 	0b1
-#define POST_XT2F 	0b10
-#define POST_SHIFTF 0b100
-#define POST_IRGF	0b1000
-#define POST_IRIF 	0b10000
-#define POST_IRVF 	0b100000
-#define POST_RRF	0b1000000
-#define POST_RTF	0b10000000
 
 // Radio:
 #define RFM_NSS_PORT GPIO_PORT_P3
