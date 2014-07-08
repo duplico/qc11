@@ -239,7 +239,7 @@ uint8_t led_post()
 		// to the shift register
 		test_response = 0;
 		for (i = 0; i < 16; i++)  {
-			test_response |= GPIO_getInputPinValue(1, 6) << i; // TODO
+			test_response |= GPIO_getInputPinValue(GPIO_PORT_P1, GPIO_PIN6) << i; // TODO
 			WRITE_IF(LED_PORT, LED_DATA, 0);
 			GPIO_pulse(LED_PORT, LED_CLOCK);
 		}
@@ -286,7 +286,8 @@ void led_anim_init() {
 	RTC_A_definePrescaleEvent(
 		RTC_A_BASE,
 		RTC_A_PRESCALE_1,
-		RTC_A_PSEVENTDIVIDER_8 // 128 Hz / 8 = 32 Hz.
+//		RTC_A_PSEVENTDIVIDER_8 // 128 Hz / 8 = 32 Hz.
+		RTC_A_PSEVENTDIVIDER_16 // 128 Hz / 16 = 16 Hz.
 	);
 
 	// Interrupt 8 times per second for animation purposes:

@@ -87,28 +87,34 @@ int main( void )
 		fillFrameBufferSingleColor(&leds[6], NUMBEROFLEDS, ws_frameBuffer, ENCODING);
 		ws_set_colors_async(NUMBEROFLEDS);
 		delay(1000);
+		uint8_t color = 0;
 #endif
 	}
 
 	mode_sb_sync();
+	led_print_scroll("queercon 11", 1, 1, 0);
 	led_anim_init();
-	uint8_t color = 0;
+	led_enable(LED_PERIOD/2);
 
 	while (1) {
 
+#if !BADGE_TARGET
 		// New serial message?
 		if (f_ser_rx) {
 			ser_print((uint8_t *) ser_buffer_rx);
 			f_ser_rx = 0;
 		}
+#endif
 
 		// New IR message?
 		if (f_ir_rx_ready) {
 			f_ir_rx_ready = 0;
 			ir_process_rx_ready();
-
+#if BADGE_TARGET
+#else
 			fillFrameBufferSingleColor(&leds[1], NUMBEROFLEDS, ws_frameBuffer, ENCODING);
 			ws_set_colors_async(NUMBEROFLEDS);
+#endif
 			delay(1000);
 			break;
 		}
@@ -136,8 +142,10 @@ int main( void )
 			f_animation_done = 0;
 
 
-			ir_write("qcxi", 0);
+			ir_write("qcxi", 0xff, 0);
 			radio_send(test_data, 64);
+
+			led_print_scroll("queercon 11", 1, 1, 0);
 
 #if BADGE_TARGET
 #else
@@ -194,7 +202,7 @@ uint8_t post() {
 	ir_reject_loopback = 0;
 	// IR loopback
 	char test_str[] = "qcxi";
-	ir_write((uint8_t *) test_str, 0);
+	ir_write((uint8_t *) test_str, 0xff, 0);
 	delay(200);
 	if (f_ir_rx_ready) {
 		f_ir_rx_ready = 0;
