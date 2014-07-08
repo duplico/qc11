@@ -21,7 +21,7 @@ volatile uint8_t ir_rx_from = 0;
 
 uint8_t ir_reject_loopback = 0;
 
-// Protocol: SYNC0, SYNC1, FROM, TO, LEN, OPCODE, DATA, CRC_MSB, CRC_LSB, SYNC1, SYNC0
+// Protocol: SYNC0, SYNC1, FROM, TO, LEN, DATA, CRC_MSB, CRC_LSB, SYNC1, SYNC0
 //  Max length: 56 bytes
 uint8_t ir_tx_frame[64] = {SYNC0, SYNC1, 0, 0xFF, 1, 0, 0, 0, SYNC1, SYNC0, 0};
 volatile uint8_t ir_xmit = 0;
@@ -144,9 +144,9 @@ void ir_setup_global(uint8_t* payload, uint8_t to_addr, uint8_t len) {
 	// Packet header:
 	ir_tx_frame[0] = SYNC0;
 	ir_tx_frame[1] = SYNC1;
-	ir_tx_frame[2] = len;
-	ir_tx_frame[3] = my_conf.badge_id;
-	ir_tx_frame[4] = to_addr;
+	ir_tx_frame[2] = my_conf.badge_id;
+	ir_tx_frame[3] = to_addr;
+	ir_tx_frame[4] = len;
 
 	// Packet payload & CRC:
 	CRC_setSeed(CRC_BASE, 0xBEEF);
@@ -186,9 +186,9 @@ void ir_proto_setup(uint8_t to_addr, uint8_t opcode, uint8_t seqnum) {
 	// Packet header:
 	ir_tx_frame[0] = SYNC0;
 	ir_tx_frame[1] = SYNC1;
-	ir_tx_frame[2] = len;
-	ir_tx_frame[3] = my_conf.badge_id;
-	ir_tx_frame[4] = to_addr;
+	ir_tx_frame[2] = my_conf.badge_id;
+	ir_tx_frame[3] = to_addr;
+	ir_tx_frame[4] = len;
 	ir_tx_frame[5] = opcode;
 	CRC_set8BitData(CRC_BASE, opcode);
 	ir_tx_frame[6] = seqnum;
