@@ -145,7 +145,7 @@ int main( void )
 			ir_write("qcxi", 0xff, 0);
 			radio_send(test_data, 64);
 
-			led_print_scroll("queercon 11", 1, 1, 0);
+			led_print_scroll("0xdecafbad", 1, 1, 0);
 
 #if BADGE_TARGET
 #else
