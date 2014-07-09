@@ -168,6 +168,7 @@ void ir_setup_global(uint8_t* payload, uint8_t to_addr, uint8_t len) {
 }
 
 void ir_write_global() {
+	// Start the transmission:
 	ir_xmit = 1;
 	ir_xmit_index = 0;
 	USCI_A_UART_transmitData(IR_USCI_BASE, ir_tx_frame[0]);
@@ -179,9 +180,8 @@ void ir_write_single_byte(uint8_t payload) {
 }
 
 void ir_proto_setup(uint8_t to_addr, uint8_t opcode, uint8_t seqnum) {
-	uint8_t len=2;
 	uint16_t crc = 0;
-	CRC_setSeed(CRC_BASE, 0xBEEF);
+	uint8_t len = 2;
 
 	// Packet header:
 	ir_tx_frame[0] = SYNC0;
@@ -190,19 +190,22 @@ void ir_proto_setup(uint8_t to_addr, uint8_t opcode, uint8_t seqnum) {
 	ir_tx_frame[3] = to_addr;
 	ir_tx_frame[4] = len;
 	ir_tx_frame[5] = opcode;
-	CRC_set8BitData(CRC_BASE, opcode);
 	ir_tx_frame[6] = seqnum;
+
+	CRC_setSeed(CRC_BASE, 0xBEEF);
+	CRC_set8BitData(CRC_BASE, opcode);
 	CRC_set8BitData(CRC_BASE, seqnum);
 
 	crc = CRC_getResult(CRC_BASE);
 
-	ir_tx_frame[7] = (uint8_t) (crc & 0xFF);
-	ir_tx_frame[8] = (uint8_t) ((crc & 0xFF00) >> 8);
+	ir_tx_frame[5+len] = (uint8_t) (crc & 0xFF);
+	ir_tx_frame[6+len] = (uint8_t) ((crc & 0xFF00) >> 8);
 
 	// Packet footer:
-	ir_tx_frame[9] = SYNC1;
-	ir_tx_frame[10] = SYNC0;
-	ir_xmit_len = 2;
+	ir_tx_frame[7 + len] = SYNC1;
+	ir_tx_frame[8 + len] = SYNC0;
+
+	ir_xmit_len = len;
 }
 
 void ir_write(uint8_t* payload, uint8_t to_addr, uint8_t len) {
@@ -471,7 +474,7 @@ __interrupt void ir_isr(void)
 			ir_rx_state++;
 			break;
 		case 3: // from, this should be to
-			if (received_data & my_conf.badge_id == my_conf.badge_id) {
+			if (received_data == 0xFF || received_data == my_conf.badge_id) {
 				// it's to me!
 				ir_rx_state++;
 			} else {
@@ -497,7 +500,7 @@ __interrupt void ir_isr(void)
 			//  responsibility of the main thread to verify the checksum.
 			if (ir_rx_index == ir_rx_len) {
 				ir_rx_crc = received_data;
-				ir_rx_index++; // the crc will be the last two bytes of the buffer
+				ir_rx_index++;
 			} else {
 				ir_rx_crc |= ((uint16_t) received_data) << 8;
 				ir_rx_state++;
@@ -522,7 +525,7 @@ __interrupt void ir_isr(void)
 		break;
 	case 4:	// TXIFG: TX buffer is sent.
 		ir_xmit_index++;
-		if (ir_xmit_index >= ir_xmit_len+7) {
+		if (ir_xmit_index >= ir_xmit_len+9) {
 			ir_xmit = 0;
 		}
 
