@@ -331,10 +331,9 @@ void RTC_A_ISR(void)
 	switch (__even_in_range(RTCIV, 16)) {
 	case 0: break;  //No interrupts
 	case 2:         //RTCRDYIFG
-		//Toggle P1.0 every second
-		//                GPIO_toggleOutputOnPin(
-		//                        GPIO_PORT_P1,
-		//                        GPIO_PIN0);
+		// TODO: Only for now-ow-ow
+		f_new_second = 1;
+		__bic_SR_register_on_exit(LPM3_bits);
 		break;
 	case 4:         //RTCEVIFG
 		//Interrupts every minute
@@ -347,7 +346,7 @@ void RTC_A_ISR(void)
 	case 8: break;  //RT0PSIFG
 	case 10:
 		f_animate = 1;
-		__bic_SR_register_on_exit(LPM0_bits);
+		__bic_SR_register_on_exit(LPM3_bits);
 		break; //RT1PSIFG
 	case 12: break; //Reserved
 	case 14: break; //Reserved
