@@ -18,6 +18,8 @@ volatile uint8_t f_rfm_rx_done = 0;
 volatile uint8_t f_ir_tx_done = 0;
 volatile uint8_t f_ir_rx_ready = 0;
 uint8_t f_config_clobbered = 0;
+volatile uint8_t f_new_second = 0;
+uint8_t f_paired = 0;
 
 #if !BADGE_TARGET
 volatile uint8_t f_ser_rx = 0;
@@ -50,6 +52,8 @@ void init_gpio() {
 	P6DIR = 0xFF;
 	P6OUT = 0x00;
 }
+
+#define ANIM_HZ 16
 
 int main( void )
 {
@@ -115,8 +119,6 @@ int main( void )
 			fillFrameBufferSingleColor(&leds[1], NUMBEROFLEDS, ws_frameBuffer, ENCODING);
 			ws_set_colors_async(NUMBEROFLEDS);
 #endif
-			delay(1000);
-			break;
 		}
 
 		// New radio message?
@@ -135,6 +137,10 @@ int main( void )
 			color++;
 			if (color==21) f_animation_done = 1;
 #endif
+		}
+
+		if (f_new_second) {
+			ir_process_one_second();
 		}
 
 		// Is an animation finished?

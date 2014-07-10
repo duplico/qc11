@@ -251,6 +251,8 @@ uint8_t ir_proto_seqnum = 0;
 void ir_process_one_second() {
 	if (ir_proto_state == IR_PROTO_LISTEN) {
 		// TODO: maybe beacon
+		ir_proto_setup(0xff, IR_OP_BEACON, 0);
+		ir_write_global();
 	} else if (ir_proto_state >= IR_PROTO_HELLO_C && ir_proto_state <= IR_PROTO_PAIRED_C) {
 		if (ir_proto_cycle < ir_proto_tto) {
 			// re-send, don't time out

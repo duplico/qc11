@@ -130,5 +130,7 @@ extern volatile uint8_t f_animate;
 extern uint8_t f_animation_done; // not actually set from interrupt
 extern volatile uint8_t f_rfm_rx_done;
 extern uint8_t f_config_clobbered; // not actually set from interrupt
+extern volatile uint8_t f_new_second;
+extern uint8_t f_paired; // not actually set from interrupt
 
 #endif /* MAIN_H_ */
