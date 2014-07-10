@@ -7,6 +7,7 @@
 
 #include "ir.h"
 #include "qcxi.h"
+#include "leds.h"
 
 #include "driverlib.h"
 #include <string.h>
@@ -216,61 +217,57 @@ void ir_write(uint8_t* payload, uint8_t to_addr, uint8_t len) {
 #define IR_PROTO_TTO_DEFAULT 4
 
 uint8_t ir_proto_state = 0;
-uint8_t ir_proto_cycle = 0;
 uint8_t ir_proto_tto = IR_PROTO_TTO_DEFAULT; // tries to timeout
 uint8_t ir_partner = 0;
+uint8_t ir_proto_seqnum = 0;
 
 #define IR_PROTO_LISTEN 	0
-#define IR_PROTO_HELLO_C 	1
-#define IR_PROTO_ITP_C 		2
-#define IR_PROTO_PAIRING_C 	3
-#define IR_PROTO_PAIRED_C 	4
-#define IR_PROTO_HELLO_S 	5
-#define IR_PROTO_ITP_S 		6
-#define IR_PROTO_PAIRING_S 	7
-#define IR_PROTO_PAIRED_S 	8
+#define IR_PROTO_CLIENT		1
+#define IR_PROTO_SERVER		2
 
 #define IR_OP_BEACON 	 100
-#define IR_OP_HELLO 	 101
-#define IR_OP_HELLOACK 	 102
-#define IR_OP_ITP		 103
-#define IR_OP_PAIRREQ	 104
-#define IR_OP_PAIRACC	 105
-#define IR_OP_PAIRACK	 106
-#define IR_OP_KEEPALIVE	 107
-#define IR_OP_STILLALIVE 108
+#define IR_OP_KEEPALIVE	 101
+#define IR_OP_STILLALIVE 102
 
 // index 0 : OPCODE
 // index 1 : ir_seqnum
 
-uint8_t ir_proto_seqnum = 0;
 
 #define IR_PAIR_SETSTATE(STATE) { ir_proto_cycle = 0; ir_proto_tto = IR_PROTO_TTO_DEFAULT; ir_proto_state = STATE; }
 #define IR_ASSERT_PARTNER if (ir_partner != ir_rx_from) IR_PAIR_SETSTATE(IR_PROTO_LISTEN)
 
 void ir_process_one_second() {
-	if (ir_proto_state == IR_PROTO_LISTEN) {
-		// TODO: maybe beacon
+	switch(ir_proto_state) {
+	case IR_PROTO_LISTEN:
 		ir_proto_setup(0xff, IR_OP_BEACON, 0);
 		ir_write_global();
-	} else if (ir_proto_state >= IR_PROTO_HELLO_C && ir_proto_state <= IR_PROTO_PAIRED_C) {
-		if (ir_proto_cycle < ir_proto_tto) {
-			// re-send, don't time out
+		break;
+	case IR_PROTO_CLIENT:
+		if (ir_proto_tto) {
+			ir_proto_setup(ir_partner, IR_OP_KEEPALIVE, ir_proto_seqnum);
 			ir_write_global();
-			ir_proto_cycle++;
+			ir_proto_tto--;
 		} else {
-			// time out
-			IR_PAIR_SETSTATE(IR_PROTO_LISTEN);
+			ir_proto_state = IR_PROTO_LISTEN;
+			ir_proto_tto = IR_PROTO_TTO_DEFAULT;
+			ir_proto_seqnum = 0;
+			ir_partner = 0;
 		}
-	} else if (ir_proto_state >= IR_PROTO_HELLO_S && ir_proto_state <= IR_PROTO_PAIRED_S) {
-		if (ir_proto_cycle < ir_proto_tto) {
-			ir_proto_cycle++;
+		break;
+	case IR_PROTO_SERVER:
+		if (ir_proto_tto) {
+			ir_proto_tto--;
 		} else {
-			// time out
-			IR_PAIR_SETSTATE(IR_PROTO_LISTEN);
+			ir_proto_state = IR_PROTO_LISTEN;
+			ir_proto_tto = IR_PROTO_TTO_DEFAULT;
+			ir_proto_seqnum = 0;
+			ir_partner = 0;
 		}
+		break;
 	}
 }
+
+char numbers[3] = "00";
 
 // TODO: can we make sure this gets executed before any of the IR data gets
 // clobbered?
@@ -279,143 +276,52 @@ void ir_process_rx_ready() {
 		return;
 	}
 
+	if (ir_proto_state != IR_PROTO_LISTEN) {
+		led_print("lala");
+	}
+
 	uint8_t opcode = ir_rx_frame[0];
 	// TODO: assert 100 <= ir_op <= 108
 	uint8_t seqnum = ir_rx_frame[1];
-
 	switch(ir_proto_state) {
 	case IR_PROTO_LISTEN:
 		if (opcode == IR_OP_BEACON) {
-			// We'll be the client.
-			ir_partner = ir_rx_from;
-			IR_PAIR_SETSTATE(IR_PROTO_HELLO_C);
-			ir_proto_setup(ir_partner, IR_OP_HELLO, 0);
-			ir_write_global();
-		} else if (opcode == IR_OP_HELLO) {
-			// We'll be the server.
 			ir_partner = ir_rx_from;
 			ir_proto_seqnum = 0;
-			IR_PAIR_SETSTATE(IR_PROTO_HELLO_S);
-			ir_proto_setup(ir_partner, IR_OP_HELLOACK, 0);
-			ir_write_global();
-		} else {
-			// do nothing; we don't care about this message.
-		}
-		break;
-	case IR_PROTO_HELLO_C:
-		IR_ASSERT_PARTNER
-		if (opcode == IR_OP_HELLOACK) { // as expected
-			ir_proto_state = IR_PROTO_ITP_C; // Intent to pair
-			ir_proto_seqnum = 0;
-			ir_proto_setup(ir_partner, IR_OP_ITP, 0);
-			ir_write_global();
-		} else {
-			IR_PAIR_SETSTATE(IR_PROTO_LISTEN);
-		}
-		break;
-	case IR_PROTO_ITP_C:
-		IR_ASSERT_PARTNER
-		if (ir_proto_seqnum == 16 && opcode == IR_OP_PAIRREQ) {
-			IR_PAIR_SETSTATE(IR_PROTO_PAIRING_C);
-			// TODO: send PAIRACC, with our message, etc. Check if new pair.
-			ir_proto_setup(ir_partner, IR_OP_PAIRACC, 0);
-			ir_write_global();
-		} else if (opcode == IR_OP_ITP && seqnum == ir_proto_seqnum+1) {
-			ir_proto_seqnum += 2;
-			// Specifically DON'T send anything at this point.
-			ir_proto_setup(ir_partner, IR_OP_ITP, ir_proto_seqnum);
-			IR_PAIR_SETSTATE(IR_PROTO_ITP_C);
-		} else {
-			IR_PAIR_SETSTATE(IR_PROTO_LISTEN);
-		}
-		break;
-	case IR_PROTO_PAIRING_C:
-		IR_ASSERT_PARTNER
-		if (opcode == IR_OP_PAIRACK) {
-			// decide we're paired; set flag.
-			IR_PAIR_SETSTATE(IR_PROTO_PAIRED_C);
-			ir_proto_setup(ir_partner, IR_OP_KEEPALIVE, 0);
-		} else {
-			IR_PAIR_SETSTATE(IR_PROTO_LISTEN);
-		}
-		break;
-	case IR_PROTO_PAIRED_C:
-		if (ir_rx_from != ir_partner) {
-			break; // just ignore messages from others now that we're paired
-		}
-		if (opcode == IR_OP_STILLALIVE) {
-			IR_PAIR_SETSTATE(IR_PROTO_PAIRED_C);
-		}
-		break;
-	case IR_PROTO_HELLO_S: // can receive either HELLO (resend) or ITP
-		IR_ASSERT_PARTNER
-		if (opcode == IR_OP_HELLO) {
-			// resend HELLOACK
-			ir_proto_setup(ir_partner, IR_OP_HELLOACK, 0);
-			ir_write_global();
-		} else if (opcode == IR_OP_ITP && seqnum==0) {
-			IR_PAIR_SETSTATE(IR_PROTO_ITP_S);
-			// send ITP(1)
-			ir_proto_setup(ir_partner, IR_OP_ITP, 1);
-			ir_write_global();
-		} else {
-			IR_PAIR_SETSTATE(IR_PROTO_LISTEN);
-		}
-		break;
-	case IR_PROTO_ITP_S: // can receive either ITP(##) or ITP(16)
-		IR_ASSERT_PARTNER
-		if (opcode == IR_OP_ITP && seqnum == ir_proto_seqnum && seqnum == 16) {
-			// TODO: send PAIRREQ
-			// send our message, etc; and check if this is a new person.
-			ir_proto_setup(ir_partner, IR_OP_PAIRREQ, 0);
-			ir_write_global();
-		} else if (opcode == IR_OP_ITP) {
-			ir_proto_setup(ir_partner, IR_OP_ITP, seqnum+1);
-			ir_write_global();
-			if (seqnum == ir_proto_seqnum) {
-				// not resend:
-				ir_proto_seqnum+=2;
-				IR_PAIR_SETSTATE(IR_PROTO_ITP_S);
-			} else {
-				// resend: no resetting of anything.
-			}
-		} else {
-			IR_PAIR_SETSTATE(IR_PROTO_LISTEN)
-		}
-		break;
-	case IR_PROTO_PAIRING_S: // can receive either ITP(16) (resend) or PAIRACC
-		IR_ASSERT_PARTNER
-		if (opcode == IR_OP_PAIRACC) {
-			IR_PAIR_SETSTATE(IR_PROTO_PAIRED_S);
-			ir_proto_setup(ir_partner, IR_OP_PAIRACK, 0);
-			ir_write_global();
-		} else if (opcode == IR_OP_ITP && seqnum == 16) {
-			// resend:
-			// TODO: send PAIRREQ. Send message, etc; check if this is a new
-			// person.
-			ir_proto_setup(ir_partner, IR_OP_PAIRREQ, 0); // TODO: probably already done.
-			ir_write_global();
-		} else {
-			IR_PAIR_SETSTATE(IR_PROTO_LISTEN);
-		}
-		break;
-	case IR_PROTO_PAIRED_S: // can receive either PAIRACC (resend) or KEEPALIVE
-		if (ir_rx_from != ir_partner) {
-			break; // just ignore messages from others now that we're paired
-		}
-		if (opcode == IR_OP_PAIRACC) {
-			// resend:
-			ir_proto_setup(ir_partner, IR_OP_PAIRACK, 0);
-			ir_write_global();
+			ir_proto_state = IR_PROTO_CLIENT;
+			ir_proto_tto = IR_PROTO_TTO_DEFAULT+1;
+			ir_proto_setup(ir_partner, IR_OP_KEEPALIVE, ir_proto_seqnum);
+//			ir_write_global();
 		} else if (opcode == IR_OP_KEEPALIVE) {
-			IR_PAIR_SETSTATE(IR_PROTO_PAIRED_S);
-			ir_proto_setup(ir_partner, IR_OP_STILLALIVE, 0);
-			ir_write_global();
-		} else {
-			IR_PAIR_SETSTATE(IR_PROTO_LISTEN);
-			// TODO: flag unpaired.
+			ir_partner = ir_rx_from;
+			ir_proto_seqnum = seqnum; // TODO: assert 0
+			ir_proto_state = IR_PROTO_SERVER;
+			ir_proto_tto = IR_PROTO_TTO_DEFAULT;
+			ir_proto_setup(ir_partner, IR_OP_STILLALIVE, ir_proto_seqnum);
+//			ir_write_global();
 		}
 		break;
+	case IR_PROTO_CLIENT:
+		if (ir_rx_from == ir_partner && opcode == IR_OP_STILLALIVE) {
+			ir_proto_tto = IR_PROTO_TTO_DEFAULT;
+			ir_proto_seqnum++;
+			numbers[0] = '0' + (ir_proto_seqnum % 10);
+			numbers[1] = '0' + (ir_proto_seqnum / 10);
+			led_print_scroll(numbers,0,1,0);
+		}
+		break;
+	case IR_PROTO_SERVER:
+		if (ir_rx_from == ir_partner && opcode == IR_OP_KEEPALIVE) {
+			ir_proto_tto = IR_PROTO_TTO_DEFAULT;
+			ir_proto_seqnum = seqnum;
+			numbers[0] = '0' + (ir_proto_seqnum % 10);
+			numbers[1] = '0' + (ir_proto_seqnum / 10);
+			led_print_scroll(numbers,0,1,0);
+			ir_proto_setup(ir_partner, IR_OP_STILLALIVE, ir_proto_seqnum);
+		}
+		break;
+	default:
+		led_print_scroll("wtf", 0, 1, 0);
 	}
 }
 
