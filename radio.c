@@ -60,7 +60,7 @@ void init_radio() {
 	// P4.3 ----------- CLK ---|
 	// P4.7 ----------- NSS ---|
 	//                         |
-	//                         |
+	// P6.0 --------- RESET->>-|
 	// P2.0 --------- DIO0 <<--|
 	//
 
@@ -70,6 +70,9 @@ void init_radio() {
 	GPIO_enableInterrupt(GPIO_PORT_P2, GPIO_PIN0);
 	GPIO_interruptEdgeSelect(GPIO_PORT_P2, GPIO_PIN0, GPIO_LOW_TO_HIGH_TRANSITION);
 	GPIO_clearInterruptFlag(GPIO_PORT_P2, GPIO_PIN0);
+
+	// RESET:
+	GPIO_setAsOutputPin(GPIO_PORT_P6, GPIO_PIN0);
 
 	//P3.5,4,0 option select
 	GPIO_setAsPeripheralModuleFunctionInputPin(
@@ -104,6 +107,16 @@ void init_radio() {
 
 	//Enable SPI module
 	USCI_B_SPI_enable(USCI_B1_BASE);
+
+	// Radio reboot procedure:
+	//  hold RESET high for > 100 us
+	//  pull RESET low, wait 5 ms
+	//  module is ready
+
+	GPIO_setOutputHighOnPin(GPIO_PORT_P6, GPIO_PIN0);
+	delay(1);
+	GPIO_setOutputLowOnPin(GPIO_PORT_P6, GPIO_PIN0);
+	delay(10);
 
 	//Enable Receive interrupt
 	USCI_B_SPI_clearInterruptFlag(USCI_B1_BASE, USCI_B_SPI_RECEIVE_INTERRUPT);
