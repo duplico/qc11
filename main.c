@@ -20,6 +20,7 @@ volatile uint8_t f_ir_rx_ready = 0;
 uint8_t f_config_clobbered = 0;
 volatile uint8_t f_new_second = 0;
 uint8_t f_paired = 0;
+uint8_t f_ir_rts = 0;
 
 #if !BADGE_TARGET
 volatile uint8_t f_ser_rx = 0;
@@ -102,65 +103,41 @@ int main( void )
 
 	while (1) {
 
-#if !BADGE_TARGET
-		// New serial message?
-		if (f_ser_rx) {
-			ser_print((uint8_t *) ser_buffer_rx);
-			f_ser_rx = 0;
+		if (f_paired) {
+			f_paired = 0;
+			led_print_scroll("PAIRED", 0, 1, 0);
 		}
-#endif
 
 		// New IR message?
 		if (f_ir_rx_ready) {
 			f_ir_rx_ready = 0;
 			ir_process_rx_ready();
-#if BADGE_TARGET
-#else
-			fillFrameBufferSingleColor(&leds[1], NUMBEROFLEDS, ws_frameBuffer, ENCODING);
-			ws_set_colors_async(NUMBEROFLEDS);
-#endif
 		}
 
-		// New radio message?
-		if (f_rfm_rx_done) {
-			// do something
+		if (f_new_second) {
+			f_new_second = 0;
+			ir_process_one_second();
 		}
+
 
 		// Time to do something because of time?
 		if (f_animate) {
 			f_animate = 0;
-#if BADGE_TARGET
+			// TODO: This is rapidly becoming more than just an animation flag.
+			if (f_ir_rts) {
+				f_ir_rts = 0;
+				ir_write_global();
+			}
 			led_animate();
-#else
-			fillFrameBufferSingleColor(&leds[color], NUMBEROFLEDS, ws_frameBuffer, ENCODING);
-			ws_set_colors_async(NUMBEROFLEDS);
-			color++;
-			if (color==21) f_animation_done = 1;
-#endif
 		}
-
-		if (f_new_second) {
-			ir_process_one_second();
-		}
-
 		// Is an animation finished?
 		if (f_animation_done) {
 			f_animation_done = 0;
-
-
-			ir_write("qcxi", 0xff, 0);
-			radio_send(test_data, 64);
-
-			led_print_scroll("0xdecafbad", 1, 1, 0);
-
-#if BADGE_TARGET
-#else
-			color = 0;
-#endif
+			led_print_scroll("idling", 1, 1, 0);
 		}
 
 		// Going to sleep... mode...
-		__bis_SR_register(LPM3_bits + GIE);
+//		__bis_SR_register(LPM3_bits + GIE);
 	}
 } // end main()
 
