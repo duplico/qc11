@@ -91,9 +91,11 @@ int main( void )
 		fillFrameBufferSingleColor(&leds[6], NUMBEROFLEDS, ws_frameBuffer, ENCODING);
 		ws_set_colors_async(NUMBEROFLEDS);
 		delay(1000);
-		uint8_t color = 0;
 #endif
 	}
+#if !BADGE_TARGET
+	uint8_t color = 0;
+#endif
 
 	mode_sb_sync();
 	led_print_scroll("queercon 11", 1, 1, 0);
@@ -105,7 +107,7 @@ int main( void )
 #if !BADGE_TARGET
 		// New serial message?
 		if (f_ser_rx) {
-			ser_print((uint8_t *) ser_buffer_rx);
+//			ser_print((uint8_t *) ser_buffer_rx);
 			f_ser_rx = 0;
 		}
 #endif
@@ -151,9 +153,8 @@ int main( void )
 			ir_write("qcxi", 0xff, 0);
 			radio_send(test_data, 64);
 
-			led_print_scroll("0xdecafbad", 1, 1, 0);
-
 #if BADGE_TARGET
+			led_print_scroll("0xdecafbad", 1, 1, 0);
 #else
 			color = 0;
 #endif

@@ -261,6 +261,7 @@ void ser_print(char* text) {
 	USCI_A_UART_transmitData(USCI_A1_BASE, ser_buffer_tx[ser_index_tx]);
 }
 
+volatile uint8_t echo = 0;
 #pragma vector=USCI_A1_VECTOR
 __interrupt void ser_debug_isr(void)
 {
@@ -270,18 +271,24 @@ __interrupt void ser_debug_isr(void)
 		break;
 	case 2:	// RXIFG: RX buffer ready to read.
 		ser_buffer_rx[ser_index_rx] = USCI_A_UART_receiveData(USCI_A1_BASE);
+		echo = 1;
+		USCI_A_UART_transmitData(USCI_A1_BASE, ser_buffer_rx[ser_index_rx]);
 		if (ser_buffer_rx[ser_index_rx] == 0x0d) {
 			f_ser_rx = 1;
 			ser_index_rx = 0;
-			__bic_SR_register(LPM3_bits);
+			__bic_SR_register_on_exit(LPM3_bits);
 		} else {
 			ser_index_rx++;
 		}
 		break;
 	case 4:	// TXIFG: TX buffer is sent.
-		ser_index_tx++;
-		if (ser_buffer_tx[ser_index_tx]) {
-			USCI_A_UART_transmitData(USCI_A1_BASE, ser_buffer_tx[ser_index_tx]);
+		if (echo)
+			echo = 0;
+		else {
+			ser_index_tx++;
+			if (ser_buffer_tx[ser_index_tx]) {
+				USCI_A_UART_transmitData(USCI_A1_BASE, ser_buffer_tx[ser_index_tx]);
+			}
 		}
 		break;
 	default: break;
