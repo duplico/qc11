@@ -209,7 +209,8 @@ uint8_t post() {
 	// IR loopback
 	char test_str[] = "qcxi";
 	ir_write((uint8_t *) test_str, 0xff, 0);
-	delay(200);
+	uint16_t spin = 65535;
+	while (spin-- && !f_ir_rx_ready);
 	if (f_ir_rx_ready) {
 		f_ir_rx_ready = 0;
 		if (!ir_check_crc()) {
