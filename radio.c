@@ -67,10 +67,6 @@ void init_radio() {
 	// DIO0 (interrupt pin):
 	GPIO_setAsInputPin(GPIO_PORT_P2, GPIO_PIN0);
 
-	GPIO_enableInterrupt(GPIO_PORT_P2, GPIO_PIN0);
-	GPIO_interruptEdgeSelect(GPIO_PORT_P2, GPIO_PIN0, GPIO_LOW_TO_HIGH_TRANSITION);
-	GPIO_clearInterruptFlag(GPIO_PORT_P2, GPIO_PIN0);
-
 	// RESET:
 	GPIO_setAsOutputPin(GPIO_PORT_P6, GPIO_PIN0);
 
@@ -140,6 +136,16 @@ void init_radio() {
 	write_single_register(0x6f, 0x30);
 
 	write_single_register(0x25, 0b00000000); // GPIO map to default
+
+	// Now that we're done with this setup business, we can enable the
+	// DIO interrupts. We have to wait until now because otherwise if
+	// the is radio activity during setup it will enter our protocol
+	// state machine way too early, which can cause the system to hang
+	// indefinitely.
+
+	GPIO_enableInterrupt(GPIO_PORT_P2, GPIO_PIN0);
+	GPIO_interruptEdgeSelect(GPIO_PORT_P2, GPIO_PIN0, GPIO_LOW_TO_HIGH_TRANSITION);
+	GPIO_clearInterruptFlag(GPIO_PORT_P2, GPIO_PIN0);
 
 }
 
