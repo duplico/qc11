@@ -338,6 +338,7 @@ void RTC_A_ISR(void)
 	case 4:         //RTCEVIFG
 		//Interrupts every minute
 		f_new_minute = 1;
+		__bic_SR_register_on_exit(LPM3_bits);
 		break;
 	case 6:         //RTCAIFG
 		//Interrupts 5:00pm on 5th day of week

@@ -21,28 +21,15 @@ volatile uint8_t ir_rx_from = 0;
 
 uint8_t ir_reject_loopback = 0;
 
-// Protocol: SYNC0, SYNC1, FROM, TO, LEN, DATA, CRC_MSB, CRC_LSB, SYNC1, SYNC0
+// Protocol: SYNC0, SYNC1, FROM, TO, LEN, DATA, CRC_MSB, CRC_LSB, SYNC0, SYNC1
 //  Max length: 56 bytes
-uint8_t ir_tx_frame[64] = {SYNC0, SYNC1, 0, 0xFF, 1, 0, 0, 0, SYNC1, SYNC0, 0};
+uint8_t ir_tx_frame[64] = {SYNC0, SYNC1, 0, 0xFF, 1, 0, 0, 0, SYNC0, SYNC2, 0};
 volatile uint8_t ir_xmit = 0;
 volatile uint8_t ir_xmit_index = 0;
 volatile uint8_t ir_xmit_len = 0;
 
 
 void init_ir() {
-//	ir_frame.sync0 = SYNC0;
-//	ir_frame.sync1 = SYNC1;
-//	ir_frame.len = 1;
-//	ir_frame.data = {0};
-//	ir_frame.crc = 0;
-//	ir_frame.sync2 = SYNC1;
-//	ir_frame.sync3 = SYNC0;
-//
-//	uint8_t sync0, sync1, len, opcode;
-//	uint8_t data[56];
-//	uint16_t crc;
-//	uint8_t sync2, sync3;
-
 	// TX for IR
 	GPIO_setAsPeripheralModuleFunctionOutputPin(
 			IR_TXRX_PORT,
@@ -161,8 +148,8 @@ void ir_setup_global(uint8_t* payload, uint8_t to_addr, uint8_t len) {
 	ir_tx_frame[6+len] = (uint8_t) ((crc & 0xFF00) >> 8);
 
 	// Packet footer:
-	ir_tx_frame[7 + len] = SYNC1;
-	ir_tx_frame[8 + len] = SYNC0;
+	ir_tx_frame[7 + len] = SYNC0;
+	ir_tx_frame[8 + len] = SYNC1;
 
 	ir_xmit_len = len;
 }
@@ -202,8 +189,8 @@ void ir_proto_setup(uint8_t to_addr, uint8_t opcode, uint8_t seqnum) {
 	ir_tx_frame[6+len] = (uint8_t) ((crc & 0xFF00) >> 8);
 
 	// Packet footer:
-	ir_tx_frame[7 + len] = SYNC1;
-	ir_tx_frame[8 + len] = SYNC0;
+	ir_tx_frame[7 + len] = SYNC0;
+	ir_tx_frame[8 + len] = SYNC1;
 
 	ir_xmit_len = len;
 }
@@ -281,6 +268,9 @@ void ir_process_rx_ready() {
 
 	uint8_t opcode = ir_rx_frame[0];
 	// TODO: assert 100 <= ir_op <= 108
+	if (opcode < 100 || opcode > 108) {
+		return;
+	}
 	uint8_t seqnum = ir_rx_frame[1];
 
 	switch(ir_proto_state) {
