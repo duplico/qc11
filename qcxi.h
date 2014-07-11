@@ -16,8 +16,10 @@
 // Memory organization (same for F5529 and F5308)
 #define INFOA_START 0x001980
 
-#define SYNC0 0b11001100
-#define SYNC1 0b01010101
+#define SYNC0 0xAD
+#define SYNC1 0xFB
+#define SYNC2 0xCA
+#define SYNC3 0xDE
 
 #include <stdint.h>
 #include "driverlib.h"
