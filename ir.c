@@ -21,9 +21,9 @@ volatile uint8_t ir_rx_from = 0;
 
 uint8_t ir_reject_loopback = 0;
 
-// Protocol: SYNC0, SYNC1, FROM, TO, LEN, DATA, CRC_MSB, CRC_LSB, SYNC0, SYNC1
+// Protocol: SYNC0, SYNC1, FROM, TO, LEN, DATA, CRC_MSB, CRC_LSB, SYNC2, SYNC3
 //  Max length: 56 bytes
-uint8_t ir_tx_frame[64] = {SYNC0, SYNC1, 0, 0xFF, 1, 0, 0, 0, SYNC0, SYNC2, 0};
+uint8_t ir_tx_frame[64] = {SYNC0, SYNC1, 0, 0xFF, 1, 0, 0, 0, SYNC2, SYNC3, 0};
 volatile uint8_t ir_xmit = 0;
 volatile uint8_t ir_xmit_index = 0;
 volatile uint8_t ir_xmit_len = 0;
@@ -148,8 +148,8 @@ void ir_setup_global(uint8_t* payload, uint8_t to_addr, uint8_t len) {
 	ir_tx_frame[6+len] = (uint8_t) ((crc & 0xFF00) >> 8);
 
 	// Packet footer:
-	ir_tx_frame[7 + len] = SYNC0;
-	ir_tx_frame[8 + len] = SYNC1;
+	ir_tx_frame[7 + len] = SYNC2;
+	ir_tx_frame[8 + len] = SYNC3;
 
 	ir_xmit_len = len;
 }
@@ -189,8 +189,8 @@ void ir_proto_setup(uint8_t to_addr, uint8_t opcode, uint8_t seqnum) {
 	ir_tx_frame[6+len] = (uint8_t) ((crc & 0xFF00) >> 8);
 
 	// Packet footer:
-	ir_tx_frame[7 + len] = SYNC0;
-	ir_tx_frame[8 + len] = SYNC1;
+	ir_tx_frame[7 + len] = SYNC2;
+	ir_tx_frame[8 + len] = SYNC3;
 
 	ir_xmit_len = len;
 }
@@ -419,9 +419,9 @@ volatile uint8_t ir_rx_state = 0;
  * 4 = to received, waiting for len
  * 5 = len received, listening to payload
  * 6 = len payload received, waiting for crc
- * 7 = len payload received, waiting for sync0
- * 8 = waiting for sync1
- * return to 0 on receive of sync0
+ * 7 = len payload received, waiting for sync2
+ * 8 = waiting for sync3
+ * return to 0 on receive of sync3
  */
 
 #pragma vector=IR_USCI_VECTOR
@@ -498,14 +498,14 @@ __interrupt void ir_isr(void)
 				ir_rx_state++;
 			}
 			break;
-		case 7: // CRC received and checked, waiting for SYNC1
-			if (received_data == SYNC1)
+		case 7: // CRC received and checked, waiting for SYNC2
+			if (received_data == SYNC2)
 				ir_rx_state++;
 			else
 				ir_rx_state = 0;
 			break;
-		case 8: // SYNC1 received, waiting for SYNC0
-			if (received_data == SYNC0) {
+		case 8: // SYNC1 received, waiting for SYNC3
+			if (received_data == SYNC3) {
 				ir_rx_state = 0;
 				f_ir_rx_ready = 1; // Successful receive
 				__bic_SR_register(LPM3_bits);
