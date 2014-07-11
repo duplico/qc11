@@ -18,4 +18,6 @@ uint8_t ir_check_crc();
 void ir_process_one_second();
 void ir_write_global();
 
+extern uint8_t ir_cycle;
+
 #endif /* IR_H_ */

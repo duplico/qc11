@@ -24,7 +24,7 @@ uint8_t ir_reject_loopback = 0;
 
 // Protocol: SYNC0, SYNC1, FROM, TO, LEN, DATA, CRC_MSB, CRC_LSB, SYNC1, SYNC0
 //  Max length: 56 bytes
-uint8_t ir_tx_frame[64] = {SYNC0, SYNC1, 0, 0xFF, 1, 0, 0, 0, SYNC1, SYNC0, 0};
+uint8_t ir_tx_frame[64] = {SYNC0, SYNC1, 0, 0xFF, 1, 0, 0, 0, SYNC0, SYNC1, 0};
 volatile uint8_t ir_xmit = 0;
 volatile uint8_t ir_xmit_index = 0;
 volatile uint8_t ir_xmit_len = 0;
@@ -36,8 +36,8 @@ void init_ir() {
 //	ir_frame.len = 1;
 //	ir_frame.data = {0};
 //	ir_frame.crc = 0;
-//	ir_frame.sync2 = SYNC1;
-//	ir_frame.sync3 = SYNC0;
+//	ir_frame.sync2 = SYNC0;
+//	ir_frame.sync3 = SYNC1;
 //
 //	uint8_t sync0, sync1, len, opcode;
 //	uint8_t data[56];
@@ -127,6 +127,7 @@ uint8_t ir_check_crc() {
 
 	return ir_rx_crc == crc;
 }
+uint8_t ir_cycle = 124;
 
 void ir_setup_global(uint8_t* payload, uint8_t to_addr, uint8_t len) {
 	if (len==0) {
@@ -162,8 +163,8 @@ void ir_setup_global(uint8_t* payload, uint8_t to_addr, uint8_t len) {
 	ir_tx_frame[6+len] = (uint8_t) ((crc & 0xFF00) >> 8);
 
 	// Packet footer:
-	ir_tx_frame[7 + len] = SYNC1;
-	ir_tx_frame[8 + len] = SYNC0;
+	ir_tx_frame[7 + len] = SYNC0;
+	ir_tx_frame[8 + len] = SYNC1;
 
 	ir_xmit_len = len;
 }
@@ -203,8 +204,8 @@ void ir_proto_setup(uint8_t to_addr, uint8_t opcode, uint8_t seqnum) {
 	ir_tx_frame[6+len] = (uint8_t) ((crc & 0xFF00) >> 8);
 
 	// Packet footer:
-	ir_tx_frame[7 + len] = SYNC1;
-	ir_tx_frame[8 + len] = SYNC0;
+	ir_tx_frame[7 + len] = SYNC0;
+	ir_tx_frame[8 + len] = SYNC1;
 
 	ir_xmit_len = len;
 }
@@ -236,34 +237,25 @@ uint8_t ir_proto_seqnum = 0;
 #define IR_PAIR_SETSTATE(STATE) { ir_proto_cycle = 0; ir_proto_tto = IR_PROTO_TTO_DEFAULT; ir_proto_state = STATE; }
 #define IR_ASSERT_PARTNER if (ir_partner != ir_rx_from) IR_PAIR_SETSTATE(IR_PROTO_LISTEN)
 
+uint8_t need_to_send = 1;
+uint8_t tto = 5;
+
+uint8_t msg_to_send = IR_OP_BEACON;
+
 void ir_process_one_second() {
-	switch(ir_proto_state) {
-	case IR_PROTO_LISTEN:
-		ir_proto_setup(0xff, IR_OP_BEACON, 0);
+	if (need_to_send || msg_to_send == IR_OP_BEACON) {
+		ir_proto_setup(0xff, msg_to_send, 0);
+		need_to_send = 0;
 		ir_write_global();
-		break;
-	case IR_PROTO_CLIENT:
-		if (ir_proto_tto) {
-			ir_proto_setup(ir_partner, IR_OP_KEEPALIVE, ir_proto_seqnum);
-			ir_write_global();
-			ir_proto_tto--;
-		} else {
-			ir_proto_state = IR_PROTO_LISTEN;
-			ir_proto_tto = IR_PROTO_TTO_DEFAULT;
-			ir_proto_seqnum = 0;
-			ir_partner = 0;
+		ir_cycle = 0;
+		tto = 5;
+	} else {
+		tto--;
+		ir_write_global(); // resend?
+		if (tto == 0) {
+			msg_to_send = IR_OP_BEACON;
+			tto = 5;
 		}
-		break;
-	case IR_PROTO_SERVER:
-		if (ir_proto_tto) {
-			ir_proto_tto--;
-		} else {
-			ir_proto_state = IR_PROTO_LISTEN;
-			ir_proto_tto = IR_PROTO_TTO_DEFAULT;
-			ir_proto_seqnum = 0;
-			ir_partner = 0;
-		}
-		break;
 	}
 }
 
@@ -276,53 +268,20 @@ void ir_process_rx_ready() {
 		return;
 	}
 
-	if (ir_proto_state != IR_PROTO_LISTEN) {
-		led_print("lala");
+	if (msg_to_send == IR_OP_BEACON && ir_rx_frame[0] == IR_OP_BEACON) {
+		msg_to_send = IR_OP_KEEPALIVE;
+		need_to_send = 1;
+	} else if (msg_to_send == IR_OP_BEACON && ir_rx_frame[0] == IR_OP_KEEPALIVE) {
+		msg_to_send = IR_OP_STILLALIVE;
+		need_to_send = 1;
+	} else if (msg_to_send == IR_OP_STILLALIVE && ir_rx_frame[0] == IR_OP_KEEPALIVE) {
+		need_to_send = 1;
+	} else if (msg_to_send == IR_OP_KEEPALIVE && ir_rx_frame[0] == IR_OP_STILLALIVE) {
+		need_to_send = 1;
+	} else {
+		msg_to_send = IR_OP_BEACON;
 	}
-
-	uint8_t opcode = ir_rx_frame[0];
-	// TODO: assert 100 <= ir_op <= 108
-	uint8_t seqnum = ir_rx_frame[1];
-	switch(ir_proto_state) {
-	case IR_PROTO_LISTEN:
-		if (opcode == IR_OP_BEACON) {
-			ir_partner = ir_rx_from;
-			ir_proto_seqnum = 0;
-			ir_proto_state = IR_PROTO_CLIENT;
-			ir_proto_tto = IR_PROTO_TTO_DEFAULT+1;
-			ir_proto_setup(ir_partner, IR_OP_KEEPALIVE, ir_proto_seqnum);
-//			ir_write_global();
-		} else if (opcode == IR_OP_KEEPALIVE) {
-			ir_partner = ir_rx_from;
-			ir_proto_seqnum = seqnum; // TODO: assert 0
-			ir_proto_state = IR_PROTO_SERVER;
-			ir_proto_tto = IR_PROTO_TTO_DEFAULT;
-			ir_proto_setup(ir_partner, IR_OP_STILLALIVE, ir_proto_seqnum);
-//			ir_write_global();
-		}
-		break;
-	case IR_PROTO_CLIENT:
-		if (ir_rx_from == ir_partner && opcode == IR_OP_STILLALIVE) {
-			ir_proto_tto = IR_PROTO_TTO_DEFAULT;
-			ir_proto_seqnum++;
-			numbers[0] = '0' + (ir_proto_seqnum % 10);
-			numbers[1] = '0' + (ir_proto_seqnum / 10);
-			led_print_scroll(numbers,0,1,0);
-		}
-		break;
-	case IR_PROTO_SERVER:
-		if (ir_rx_from == ir_partner && opcode == IR_OP_KEEPALIVE) {
-			ir_proto_tto = IR_PROTO_TTO_DEFAULT;
-			ir_proto_seqnum = seqnum;
-			numbers[0] = '0' + (ir_proto_seqnum % 10);
-			numbers[1] = '0' + (ir_proto_seqnum / 10);
-			led_print_scroll(numbers,0,1,0);
-			ir_proto_setup(ir_partner, IR_OP_STILLALIVE, ir_proto_seqnum);
-		}
-		break;
-	default:
-		led_print_scroll("wtf", 0, 1, 0);
-	}
+	ir_cycle = 1;
 }
 
 volatile uint8_t ir_rx_state = 0;
@@ -397,6 +356,7 @@ __interrupt void ir_isr(void)
 			break;
 		case 5: // LISTEN, this should be part of the payload
 			ir_rx_frame[ir_rx_index] = received_data;
+
 			ir_rx_index++;
 			if (ir_rx_index == ir_rx_len) { // Received len bytes (ir frames):
 				ir_rx_state++;
@@ -415,16 +375,16 @@ __interrupt void ir_isr(void)
 			}
 			break;
 		case 7: // CRC received and checked, waiting for SYNC1
-			if (received_data == SYNC1)
+			if (received_data == SYNC0)
 				ir_rx_state++;
 			else
 				ir_rx_state = 0;
 			break;
 		case 8: // SYNC1 received, waiting for SYNC0
-			if (received_data == SYNC0) {
+			if (received_data == SYNC1) {
 				ir_rx_state = 0;
 				f_ir_rx_ready = 1; // Successful receive
-				__bic_SR_register(LPM3_bits);
+				__bic_SR_register_on_exit(LPM3_bits);
 			} else {
 				ir_rx_state = 0;
 			}
@@ -435,11 +395,13 @@ __interrupt void ir_isr(void)
 		ir_xmit_index++;
 		if (ir_xmit_index >= ir_xmit_len+9) {
 			ir_xmit = 0;
+			ir_rx_state = 0;
 		}
 
 		if (ir_xmit) {
 			USCI_A_UART_transmitData(IR_USCI_BASE, ir_tx_frame[ir_xmit_index]);
 		}
+
 		break;
 	default: break;
 	}
