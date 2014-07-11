@@ -75,7 +75,9 @@ int main( void )
 	__bis_SR_register(GIE);
 	init_radio(); // requires interrupts enabled.
 
-	volatile uint8_t post_result = post();
+	volatile uint8_t post_result = 0;
+//	volatile uint8_t post_result = post();
+	ir_reject_loopback = 1;
 
 	if (post_result != 0) {
 #if BADGE_TARGET
@@ -101,44 +103,24 @@ int main( void )
 	led_anim_init();
 	led_enable(LED_PERIOD/2);
 
+	char recv[] = " o0";
+
+	uint8_t nts = 1;
 	while (1) {
-
-		if (f_paired) {
-			f_paired = 0;
-			led_print_scroll("PAIRED", 0, 1, 0);
-		}
-
-		// New IR message?
 		if (f_ir_rx_ready) {
 			f_ir_rx_ready = 0;
-			ir_process_rx_ready();
+			recv[2] = ir_rx_frame[0];
+			led_print(recv);
+			nts = 1;
 		}
-
-		if (f_new_second) {
-			f_new_second = 0;
-			ir_process_one_second();
+		if (nts) {
+			delay(1000);
+			nts = 0;
+			ir_write_single_byte(ir_rx_frame[0]+1);
+			delay(1000);
 		}
-
-
-		// Time to do something because of time?
-		if (f_animate) {
-			f_animate = 0;
-			// TODO: This is rapidly becoming more than just an animation flag.
-			if (f_ir_rts) {
-				f_ir_rts = 0;
-				ir_write_global();
-			}
-			led_animate();
-		}
-		// Is an animation finished?
-		if (f_animation_done) {
-			f_animation_done = 0;
-			led_print_scroll("idling", 1, 1, 0);
-		}
-
-		// Going to sleep... mode...
-//		__bis_SR_register(LPM3_bits + GIE);
 	}
+
 } // end main()
 
 uint8_t post() {
