@@ -447,7 +447,7 @@ __interrupt void USCI_B1_ISR(void)
 		case RFM_PROTO_RX_FIFO:
 			rfm_proto_state = RFM_PROTO_RX_IDLE;
 			f_rfm_rx_done = 1; // Just received something.
-			__bic_SR_register(LPM3_bits);
+			__bic_SR_register_on_exit(LPM3_bits);
 			break;
 		case RFM_PROTO_SB_UNSET_CMD:
 			rfm_proto_state = RFM_PROTO_SB_UNSET_DAT;

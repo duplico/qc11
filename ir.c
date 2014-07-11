@@ -508,7 +508,7 @@ __interrupt void ir_isr(void)
 			if (received_data == SYNC3) {
 				ir_rx_state = 0;
 				f_ir_rx_ready = 1; // Successful receive
-				__bic_SR_register(LPM3_bits);
+				__bic_SR_register_on_exit(LPM3_bits);
 			} else {
 				ir_rx_state = 0;
 			}
