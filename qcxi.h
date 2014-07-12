@@ -124,6 +124,8 @@ extern volatile uint8_t ir_xmit_index;
 extern volatile uint8_t ir_xmit_len;
 extern uint8_t ir_reject_loopback;
 
+extern uint8_t ir_proto_state;
+
 // Interrupt flags:
 extern volatile uint8_t f_new_minute;
 extern volatile uint8_t f_ir_tx_done;
