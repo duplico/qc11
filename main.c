@@ -20,6 +20,7 @@ volatile uint8_t f_ir_rx_ready = 0;
 uint8_t f_config_clobbered = 0;
 volatile uint8_t f_new_second = 0;
 uint8_t f_paired = 0;
+uint8_t f_unpaired = 0;
 
 #if !BADGE_TARGET
 volatile uint8_t f_ser_rx = 0;
@@ -97,7 +98,6 @@ int main( void )
 	uint8_t color = 0;
 #endif
 
-	mode_sb_sync();
 	led_print_scroll("queercon 11", 1, 1, 0);
 	led_anim_init();
 	led_enable(LED_PERIOD/2);
@@ -143,15 +143,12 @@ int main( void )
 
 		if (f_new_second) {
 			f_new_second = 0;
-			ir_process_one_second();
+			ir_process_timestep();
 		}
 
 		// Is an animation finished?
 		if (f_animation_done) {
 			f_animation_done = 0;
-
-
-			ir_write("qcxi", 0xff, 0);
 			radio_send(test_data, 64);
 
 #if BADGE_TARGET
@@ -160,6 +157,14 @@ int main( void )
 #else
 				color = 0;
 #endif
+		}
+
+		if (f_paired) {
+			f_paired = 0;
+			led_print_scroll("PAIRED!", 1, 1, 0);
+		} else if (f_unpaired) {
+			f_unpaired = 0;
+			led_print_scroll("UNPAIRED", 1, 1, 0);
 		}
 
 		// Going to sleep... mode...
