@@ -127,6 +127,7 @@ void init_radio() {
 	write_single_register(0x26, 0x07);
 	write_single_register(0x29, 0xe0);
 //	write_single_register(0x29, 0xd0);
+	mode_sb_sync();
 
 	for (uint8_t sync_addr=0x2f; sync_addr<=0x36; sync_addr++) {
 		write_single_register(sync_addr, 0x01);
