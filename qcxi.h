@@ -9,7 +9,7 @@
 #define MAIN_H_
 
 // Configuration flags (TODO: should probably be in a make file):
-#define BADGE_TARGET 0
+#define BADGE_TARGET 1
 #define DEBUG_SERIAL 0
 
 

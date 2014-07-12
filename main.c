@@ -142,6 +142,7 @@ int main( void )
 		}
 
 		if (f_new_second) {
+			f_new_second = 0;
 			ir_process_one_second();
 		}
 
