@@ -155,9 +155,10 @@ int main( void )
 			radio_send(test_data, 64);
 
 #if BADGE_TARGET
-			led_print_scroll("0xdecafbad", 1, 1, 0);
+			if (ir_proto_state == IR_PROTO_LISTEN)
+				led_print_scroll("idle...", 1, 1, 0);
 #else
-			color = 0;
+				color = 0;
 #endif
 		}
 
