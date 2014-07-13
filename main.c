@@ -56,6 +56,61 @@ void init_gpio() {
 	P6OUT = 0x00;
 }
 
+/*
+ * So here's the flow of this thing.
+ *
+ * * STARTUP (POST, message, etc)
+ * ------ block until finished ----
+ *
+ * Here are the things that can happen:
+ *
+ * Time based:
+ * * Event alert raised (interrupt flag)
+ * * It's been long enough that we can do a trick (set flag from time loop)
+ * **  (maybe the trick is a prop)
+ * * Time to beacon the radio (set flag from time loop)
+ * * Time to beacon the IR (set flag from time loop)
+ *
+ * From the radio:
+ * * Receive a beacon (at some point, we need to decide if it means we:)
+ * ** adjust neighbor count
+ * ** are near a base station (arrive event)
+ * ** should schedule a prop
+ * ** get the puppy
+ * ** set our clock
+ * ** confirms we should give up the puppy
+ *
+ * From the IR
+ * * Docking with base station
+ * * Pairing
+ * ** possibly new person
+ * *** possibly new person with a new trick
+ *
+ * So for the setup in the loop, we should do the following:
+ *
+ * * First process interrupts
+ * * Then process second-order flags
+ *
+ * Looping - here are the priorities:
+ *
+ * * Set clock (pre-empts)
+ * * Arrived at event (animation, don't wait for previous to finish)
+ * * Event alert (animation, wait for idle)
+ * * Pair begins (animation and behavior pre-empts, don't wait to finish)
+ * * New pairing person (wait for idle)
+ * * New trick learned (wait for idle)
+ * * Score earned (wait for idle)
+ * * Prop earned (wait for idle)
+ * * Pair expires (wait for idle)
+ * * Get/lose puppy (wait for idle)
+ * * Get propped (from radio beacon)
+ * * Do a trick or prop (idle only)
+ *
+ * * Adjust neighbor count (from radio beacon)
+ * *
+ *
+ */
+
 int main( void )
 {
 	// TODO: check to see what powerup mode we're in.
