@@ -29,7 +29,7 @@ typedef struct {
 
 extern uint16_t led_values[5];
 extern uint16_t led_zeroes[5];
-extern uint8_t led_scrolling;
+extern uint8_t led_text_scrolling;
 
 extern const spriteframe anim_wave[];
 extern const spriteframe anim_walkin[];

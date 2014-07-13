@@ -321,7 +321,6 @@ int main( void )
 		// Is an animation finished?
 		if (f_animation_done) {
 			f_animation_done = 0;
-			stickman_wave();
 #if BADGE_TARGET
 #else
 			color = 0;
