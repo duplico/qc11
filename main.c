@@ -25,6 +25,9 @@ volatile uint8_t f_new_second = 0;
 uint8_t f_paired = 0;
 uint8_t f_unpaired = 0;
 
+// Global state:
+uint8_t clock_is_set = 0;
+
 #if !BADGE_TARGET
 volatile uint8_t f_ser_rx = 0;
 #endif
@@ -86,10 +89,20 @@ void init_gpio() {
  * ** possibly new person
  * *** possibly new person with a new trick
  *
- * So for the setup in the loop, we should do the following:
+ * So for the setup in the loop, we should maybe do the following:
  *
  * * First process interrupts
+ * ** f_new_minute;
+ * ** f_ir_tx_done;
+ * ** f_ir_rx_ready;
+ * ** f_time_loop;
+ * ** f_rfm_rx_done;
+ * ** f_new_second;
  * * Then process second-order flags
+ * ** f_animation_done;
+ * ** f_paired;
+ * ** f_unpaired;
+ * * Then do the animation things.
  *
  * Looping - here are the priorities:
  *
@@ -113,7 +126,6 @@ void init_gpio() {
 
 int main( void )
 {
-	// TODO: check to see what powerup mode we're in.
 	init_watchdog();
 	init_power();
 	init_gpio();
@@ -130,8 +142,8 @@ int main( void )
 	__bis_SR_register(GIE);
 	init_radio(); // requires interrupts enabled.
 
-	volatile uint8_t post_result = post();
-
+	// Power-on self test:
+	uint8_t post_result = post();
 	if (post_result != 0) {
 #if BADGE_TARGET
 		// Display error code:
@@ -153,6 +165,7 @@ int main( void )
 	uint8_t color = 0;
 #endif
 
+	// Startup sequence:
 	led_print_scroll("queercon 11", 1, 1, 1);
 	led_anim_init();
 	led_enable(LED_PERIOD/2);
