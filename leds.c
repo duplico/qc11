@@ -147,8 +147,7 @@ void led_set_rainbow(uint16_t value) {
 
 void led_disp_bit_to_values(uint8_t left, uint8_t top) {
 
-	// TODO: This will be handled in another routine later. But for
-	//  now, we'll light the whole rainbow in this one:
+	// Clear everything but the rainbows on the end:
 	led_values[0] &= 0b1000000000000001;
 	for (int i=1; i<5; i++) {
 		if (i & 1) {
