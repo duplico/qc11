@@ -21,6 +21,7 @@ volatile uint8_t ir_rx_len = 0;
 volatile uint8_t ir_rx_from = 0;
 
 volatile uint8_t loops_to_ir_timestep = IR_LOOPS;
+uint8_t ir_timesteps_to_beacon = IR_LOOPS_PER_BEACON;
 
 uint8_t ir_reject_loopback = 0;
 
@@ -244,8 +245,13 @@ void ir_process_timestep() {
 	switch (ir_proto_state) {
 	case IR_PROTO_LISTEN:
 		// TODO: maybe beacon
-		ir_proto_setup(0xff, IR_OP_BEACON, 0);
-		ir_write_global();
+		if (!ir_timesteps_to_beacon) {
+			ir_timesteps_to_beacon = IR_LOOPS_PER_BEACON;
+			ir_proto_setup(0xff, IR_OP_BEACON, 0);
+			ir_write_global();
+		} else {
+			ir_timesteps_to_beacon--;
+		}
 		break;
 	case IR_PROTO_PAIRED_C: // TODO: Anything special here? // fall through
 	case IR_PROTO_PAIRED_S: // TODO: Anything special here? // fall through
