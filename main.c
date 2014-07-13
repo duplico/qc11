@@ -28,6 +28,8 @@ uint8_t f_unpaired = 0;
 // Global state:
 uint8_t clock_is_set = 0;
 
+uint16_t loops_to_rf_beacon = 10 * TIME_LOOP_HZ;
+
 #if !BADGE_TARGET
 volatile uint8_t f_ser_rx = 0;
 #endif
@@ -166,7 +168,9 @@ int main( void )
 #endif
 
 	// Startup sequence:
-	led_print_scroll("queercon 11", 1, 1, 1);
+//	led_print_scroll("queercon 11", 1, 1, 1);
+	stickman_wave();
+	led_clear();
 	led_anim_init();
 	led_enable(LED_PERIOD/2);
 
@@ -180,7 +184,21 @@ int main( void )
 		}
 #endif
 
-		// New IR message?
+		/*
+		 * From the IR
+		 * * Docking with base station
+		 * * Pairing
+		 * ** possibly new person
+		 * *** possibly new person with a new trick
+		 *
+		 * ir_process_rx_ready() will do all this processing for us, and
+		 *  if necessary set the flags for:
+		 *  f_paired
+		 *  f_unpaired
+		 *  f_paired_new_person
+		 *  f_paired_new_trick
+		 *
+		 */
 		if (f_ir_rx_ready) {
 			f_ir_rx_ready = 0;
 			ir_process_rx_ready();
@@ -188,8 +206,18 @@ int main( void )
 #else
 #endif
 		}
-
-		// New radio message?
+		/*
+		 * Unlike with the IR pairing mechanism, there is very little state
+		 *  in the RF system. So we just need to load up the beacon into a
+		 *  buffer, and decide if we:
+		 *   * adjust neighbor count
+		 *   * are near a base station (arrive event)
+		 *   * should schedule a prop
+		 *   * set our clock
+		 *   * get the puppy
+		 *   * got confirmation we should give up the puppy (this will have
+		 *      some state)
+		 */
 		if (f_rfm_rx_done) {
 			// do something
 		}
@@ -220,6 +248,7 @@ int main( void )
 		// Is an animation finished?
 		if (f_animation_done) {
 			f_animation_done = 0;
+			stickman_wave();
 #if BADGE_TARGET
 #else
 				color = 0;

@@ -97,6 +97,7 @@ extern volatile uint8_t loops_to_ir_timestep;
 
 #define IR_LOOPS_PER_SEC 2
 #define IR_LOOPS TIME_LOOP_HZ / IR_LOOPS_PER_SEC
+#define IR_LOOPS_PER_BEACON 3
 
 // Persistent configuration:
 typedef struct {

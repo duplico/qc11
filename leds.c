@@ -9,21 +9,67 @@
 #include "leds.h"
 #include "fonts.h"
 
+const spriteframe anim_intro[] = {{0b00000100, 0b00011010, 0b00000111, 0b00011010, 0b00000100, 0b00000000, 0b00000000, 0b00000000, 0},{0b00000100, 0b00011010, 0b00000111, 0b00011010, 0b00000010, 0b00000000, 0b00000000, 0b00000000, 1},{0b00000100, 0b00011010, 0b00000111, 0b00011010, 0b00000001, 0b00000000, 0b00000000, 0b00000000, 0},{0b00000100, 0b00011010, 0b00000111, 0b00011011, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 1},{0b00000100, 0b00011010, 0b00000111, 0b00011010, 0b00000001, 0b00000000, 0b00000000, 0b00000000, 0},{0b00000100, 0b00011010, 0b00000111, 0b00011011, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 1},{0b00000100, 0b00011010, 0b00000111, 0b00011010, 0b00000001, 0b00000000, 0b00000000, 0b00000000, 0},{0b00000100, 0b00011010, 0b00000111, 0b00011011, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 1},{0b00000100, 0b00011010, 0b00000111, 0b00011010, 0b00000001, 0b00000000, 0b00000000, 0b00000000, 0},{0b00000100, 0b00011010, 0b00000111, 0b00011010, 0b00000010, 0b00000000, 0b00000000, 0b00000000, 1},{0b00000100, 0b00011010, 0b00000111, 0b00011010, 0b00000100, 0b00000000, 0b00000000, 0b00000000, 8},};
+
+uint8_t sprite_display = 0;
+uint8_t sprite_animate = 0;
+int8_t sprite_x = 0;
+int8_t sprite_y = 0;
+spriteframe* sprite_animation;
+uint8_t sprite_current_frame;
+
 uint16_t led_values[5] = {65535, 65535, 65535, 65535, 65535};
 
 uint16_t led_zeroes[5] = {0, 0, 0, 0, 0};
 
 uint16_t disp_bit_buffer[BACK_BUFFER_WIDTH] = { 0 };
 
+uint8_t disp_left = 0;
+uint8_t disp_top = 0;
+
 volatile uint8_t f_time_loop = 0;
 uint8_t print_pixel_len = 0;
 uint8_t print_pixel_index = 0;
 
-uint8_t led_animating = 0;
+uint8_t led_scrolling = 0;
 uint8_t f_animation_done = 0;
 
 volatile uint8_t anim_skip_frame = 0;
 volatile uint8_t anim_frames_skipped = 0;
+
+void stickman_wave() {
+	sprite_display = 1;
+	sprite_animate = 1;
+	sprite_current_frame = 0;
+	sprite_x = 1;
+	sprite_y = 8;
+	sprite_animation = (spriteframe *) anim_intro;
+	anim_skip_frame = 3;
+}
+
+void disp_apply_mask(uint16_t mask) {
+	for (uint8_t i=0; i<SCREEN_WIDTH; i++) { // Clear only the sprite area:
+		disp_bit_buffer[i] &= mask;
+	}
+}
+
+void draw_sprite() {
+	disp_top = 8; // TODO
+	disp_apply_mask(0b0000000011111111);
+	for (uint8_t col = 0; col < 8; col++) {
+		if (sprite_x+col >= 0)
+			disp_bit_buffer[col + sprite_x] |= ((uint16_t) sprite_animation[sprite_current_frame].columns[col]) << (sprite_y);
+	}
+}
+
+void sprite_next_frame() {
+	sprite_current_frame++;
+	if (sprite_animation[sprite_current_frame].movement & BIT3) {
+		// last frame
+		sprite_animate = 0;
+	}
+//	sprite_x += sprite_animation[sprite_current_frame].movement & 0b111;
+}
 
 void led_init() {
 #if BADGE_TARGET
@@ -49,9 +95,10 @@ void led_print(char* text) {
 #if BADGE_TARGET
 	uint8_t character = 0;
 	uint8_t cursor = 0;
+	disp_apply_mask(0b1111111100000000); // Clear text area.
 	do {
 		for (uint16_t i = d3_5ptFontInfo.charInfo[text[character] - d3_5ptFontInfo.startChar].offset; i < d3_5ptFontInfo.charInfo[text[character] - d3_5ptFontInfo.startChar].offset + d3_5ptFontInfo.charInfo[text[character] - d3_5ptFontInfo.startChar].widthBits; i++) {
-			disp_bit_buffer[cursor++] = d3_5ptFontInfo.data[i];
+			disp_bit_buffer[cursor++] |= d3_5ptFontInfo.data[i];
 			if (cursor == BACK_BUFFER_WIDTH)
 				return;
 		}
@@ -62,25 +109,23 @@ void led_print(char* text) {
 
 	} while (text[character]);
 
-	while (cursor < BACK_BUFFER_WIDTH) { // empty everything else.
-		disp_bit_buffer[cursor++] = 0;
-	}
 	led_disp_bit_to_values(0, 0);
 	led_display_bits(led_values);
 #endif
 }
 
+void led_clear() {
+	disp_apply_mask(0b0000000000000000);
+	led_disp_bit_to_values(disp_left, disp_top);
+	led_display_bits(led_values);
+}
+
 void led_print_scroll(char* text, uint8_t scroll_on, uint8_t scroll_off, uint8_t frameskip) {
 	uint8_t character = 0;
 	uint8_t cursor = 0;
-	if (scroll_on) {
-		while (cursor < SCREEN_WIDTH) { // empty everything before the text.
-			disp_bit_buffer[cursor++] = 0;
-		}
-//		print_pixel_len = SCREEN_WIDTH;
-	} else {
-//		print_pixel_len = 0;
-	}
+	disp_apply_mask(0b1111111100000000); // Clear text area.
+
+	cursor = SCREEN_WIDTH;
 
 	do {
 		for (uint16_t i = d3_5ptFontInfo.charInfo[text[character] - d3_5ptFontInfo.startChar].offset; i < d3_5ptFontInfo.charInfo[text[character] - d3_5ptFontInfo.startChar].offset + d3_5ptFontInfo.charInfo[text[character] - d3_5ptFontInfo.startChar].widthBits; i++) {
@@ -102,10 +147,6 @@ void led_print_scroll(char* text, uint8_t scroll_on, uint8_t scroll_off, uint8_t
 		print_pixel_len -= SCREEN_WIDTH; // TODO: Bounds checking
 	}
 
-	while (cursor < BACK_BUFFER_WIDTH) { // empty everything else.
-		disp_bit_buffer[cursor++] = 0;
-	}
-
 	anim_skip_frame = frameskip;
 	// NOTE: We specifically do NOT set anim_frames_skipped here because
 	// if we do, when we're moving from one animation to another with the
@@ -113,7 +154,7 @@ void led_print_scroll(char* text, uint8_t scroll_on, uint8_t scroll_off, uint8_t
 	// We also specifically do NOT write anything to the display buffer
 	// at this time, for the same reason.
 	print_pixel_index = 0;
-	led_animating = 1;
+	led_scrolling = 1;
 }
 
 void led_set_rainbow(uint16_t value) {
@@ -298,11 +339,8 @@ void led_anim_init() {
 }
 
 void led_animate() {
-	// Don't do anything if we're not animating. Duh.
-	if (!led_animating) return;
-
 	// Check to see if we need to skip this frame.
-	if (anim_frames_skipped >= anim_skip_frame) {
+	if (anim_skip_frame && anim_frames_skipped >= anim_skip_frame) {
 		anim_frames_skipped = 0;
 		// DISPLAY this frame.
 	} else {
@@ -310,16 +348,27 @@ void led_animate() {
 		return;
 	}
 
-	// Cool. We're going to animate this frame.
-	// TODO: check what KIND of thing we're animating.
-	// 		 for now the only animation we have is scrolling text.
-	if (print_pixel_index < print_pixel_len) {
-		led_disp_bit_to_values(print_pixel_index, 0);
+	if (led_scrolling) {
+		if (print_pixel_index < print_pixel_len) {
+			led_disp_bit_to_values(disp_left, disp_top);
+			led_display_bits(led_values);
+			disp_left++;
+		} else {
+			f_animation_done = 1;
+			led_scrolling = 0;
+		}
+	}
+
+	if (sprite_animate) {
+		sprite_next_frame();
+		if (!sprite_animate) {
+			f_animation_done = 1;
+		}
+	}
+	if (sprite_display) {
+		draw_sprite();
+		led_disp_bit_to_values(disp_left, disp_top);
 		led_display_bits(led_values);
-		print_pixel_index++;
-	} else {
-		f_animation_done = 1;
-		led_animating = 0;
 	}
 }
 

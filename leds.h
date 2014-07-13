@@ -22,9 +22,14 @@
 #define SCREEN_HEIGHT 5
 #define SCREEN_WIDTH 14
 
+typedef struct {
+	uint8_t columns[8];
+	uint8_t movement; // bit4 is set if it's the last frame.
+} spriteframe;
+
 extern uint16_t led_values[5];
 extern uint16_t led_zeroes[5];
-extern uint8_t led_animating;
+extern uint8_t led_scrolling;
 
 void led_init();
 
@@ -41,5 +46,8 @@ uint8_t led_post();
 void led_anim_init();
 void led_animate();
 inline void led_toggle( void );
+
+void stickman_wave();
+void led_clear();
 
 #endif /* LEDS_H_ */
