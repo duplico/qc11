@@ -9,7 +9,10 @@
 #include "leds.h"
 #include "fonts.h"
 
-const spriteframe anim_intro[] = {{0b00000100, 0b00011010, 0b00000111, 0b00011010, 0b00000100, 0b00000000, 0b00000000, 0b00000000, 0},{0b00000100, 0b00011010, 0b00000111, 0b00011010, 0b00000010, 0b00000000, 0b00000000, 0b00000000, 1},{0b00000100, 0b00011010, 0b00000111, 0b00011010, 0b00000001, 0b00000000, 0b00000000, 0b00000000, 0},{0b00000100, 0b00011010, 0b00000111, 0b00011011, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 1},{0b00000100, 0b00011010, 0b00000111, 0b00011010, 0b00000001, 0b00000000, 0b00000000, 0b00000000, 0},{0b00000100, 0b00011010, 0b00000111, 0b00011011, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 1},{0b00000100, 0b00011010, 0b00000111, 0b00011010, 0b00000001, 0b00000000, 0b00000000, 0b00000000, 0},{0b00000100, 0b00011010, 0b00000111, 0b00011011, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 1},{0b00000100, 0b00011010, 0b00000111, 0b00011010, 0b00000001, 0b00000000, 0b00000000, 0b00000000, 0},{0b00000100, 0b00011010, 0b00000111, 0b00011010, 0b00000010, 0b00000000, 0b00000000, 0b00000000, 1},{0b00000100, 0b00011010, 0b00000111, 0b00011010, 0b00000100, 0b00000000, 0b00000000, 0b00000000, 8},};
+// Auto-generated animation wave
+const spriteframe anim_wave[] = {{0b00000100, 0b00011010, 0b00000111, 0b00011010, 0b00000100, 0b00000000, 0b00000000, 0b00000000, 0},{0b00000100, 0b00011010, 0b00000111, 0b00011010, 0b00000010, 0b00000000, 0b00000000, 0b00000000, 0},{0b00000100, 0b00011010, 0b00000111, 0b00011010, 0b00000001, 0b00000000, 0b00000000, 0b00000000, 0},{0b00000100, 0b00011010, 0b00000111, 0b00011011, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0},{0b00000100, 0b00011010, 0b00000111, 0b00011010, 0b00000001, 0b00000000, 0b00000000, 0b00000000, 0},{0b00000100, 0b00011010, 0b00000111, 0b00011011, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0},{0b00000100, 0b00011010, 0b00000111, 0b00011010, 0b00000001, 0b00000000, 0b00000000, 0b00000000, 0},{0b00000100, 0b00011010, 0b00000111, 0b00011011, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0},{0b00000100, 0b00011010, 0b00000111, 0b00011010, 0b00000001, 0b00000000, 0b00000000, 0b00000000, 0},{0b00000100, 0b00011010, 0b00000111, 0b00011010, 0b00000010, 0b00000000, 0b00000000, 0b00000000, 0},{0b00000100, 0b00011010, 0b00000111, 0b00011010, 0b00000100, 0b00000000, 0b00000000, 0b00000000, 8},};
+// Auto-generated animation walkin
+const spriteframe anim_walkin[] = {{0b00010100, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0},{0b00001010, 0b00010100, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0},{0b00011111, 0b00011000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0},{0b00011000, 0b00000111, 0b00001000, 0b00010000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0},{0b00000000, 0b00011100, 0b00000111, 0b00011100, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0},{0b00000100, 0b00011010, 0b00000111, 0b00011010, 0b00000100, 0b00000000, 0b00000000, 0b00000000, 8},};
 
 uint8_t sprite_display = 0;
 uint8_t sprite_animate = 0;
@@ -38,17 +41,23 @@ volatile uint8_t anim_skip_frame = 0;
 volatile uint8_t anim_frames_skipped = 0;
 
 void stickman_wave() {
+	begin_sprite_animation((spriteframe *) anim_wave, 3);
+}
+
+void begin_sprite_animation(spriteframe* animation, uint8_t frameskip) {
+	disp_left = 0;
+	disp_top = 0;
 	sprite_display = 1;
 	sprite_animate = 1;
 	sprite_current_frame = 0;
-	sprite_x = 1;
+	sprite_x = 0;
 	sprite_y = 8;
-	sprite_animation = (spriteframe *) anim_intro;
-	anim_skip_frame = 3;
+	sprite_animation = animation;
+	anim_skip_frame = frameskip;
 }
 
 void disp_apply_mask(uint16_t mask) {
-	for (uint8_t i=0; i<SCREEN_WIDTH; i++) { // Clear only the sprite area:
+	for (uint8_t i=0; i<BACK_BUFFER_WIDTH; i++) { // Clear only the sprite area:
 		disp_bit_buffer[i] &= mask;
 	}
 }
@@ -68,7 +77,7 @@ void sprite_next_frame() {
 		// last frame
 		sprite_animate = 0;
 	}
-//	sprite_x += sprite_animation[sprite_current_frame].movement & 0b111;
+	sprite_x += sprite_animation[sprite_current_frame].movement & 0b111;
 }
 
 void led_init() {
@@ -153,7 +162,7 @@ void led_print_scroll(char* text, uint8_t scroll_on, uint8_t scroll_off, uint8_t
 	// same frameskip count, the transition looks jerky (which makes sense)
 	// We also specifically do NOT write anything to the display buffer
 	// at this time, for the same reason.
-	print_pixel_index = 0;
+	disp_left = 0;
 	led_scrolling = 1;
 }
 
@@ -343,13 +352,13 @@ void led_animate() {
 	if (anim_skip_frame && anim_frames_skipped >= anim_skip_frame) {
 		anim_frames_skipped = 0;
 		// DISPLAY this frame.
-	} else {
+	} else if (anim_skip_frame) {
 		anim_frames_skipped++;
 		return;
 	}
 
 	if (led_scrolling) {
-		if (print_pixel_index < print_pixel_len) {
+		if (disp_left < print_pixel_len) {
 			led_disp_bit_to_values(disp_left, disp_top);
 			led_display_bits(led_values);
 			disp_left++;

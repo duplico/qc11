@@ -31,21 +31,25 @@ extern uint16_t led_values[5];
 extern uint16_t led_zeroes[5];
 extern uint8_t led_scrolling;
 
+extern const spriteframe anim_wave[];
+extern const spriteframe anim_walkin[];
+
 void led_init();
 
 void led_print(char* text);
 void led_print_scroll(char*, uint8_t, uint8_t, uint8_t);
 
 void led_set_rainbow(uint16_t value);
-void led_disp_bit_to_values(uint8_t left, uint8_t top);
-void led_display_bits(uint16_t* val);
-void led_enable(uint16_t duty_cycle);
+void led_disp_bit_to_values(uint8_t, uint8_t);
+void led_display_bits(uint16_t*);
+void led_enable(uint16_t);
 void led_on();
 void led_disable( void );
 uint8_t led_post();
 void led_anim_init();
 void led_animate();
 inline void led_toggle( void );
+void begin_sprite_animation(spriteframe*, uint8_t);
 
 void stickman_wave();
 void led_clear();

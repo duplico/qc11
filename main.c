@@ -163,17 +163,49 @@ int main( void )
 		delay(1000);
 #endif
 	}
-#if !BADGE_TARGET
-	uint8_t color = 0;
-#endif
-
-	// Startup sequence:
-//	led_print_scroll("queercon 11", 1, 1, 1);
-	stickman_wave();
+#if BADGE_TARGET
 	led_clear();
 	led_anim_init();
 	led_enable(LED_PERIOD/2);
+#else
+	uint8_t color = 0;
+#endif
 
+#if BADGE_TARGET
+	// Startup sequence:
+	uint8_t startup_seq_index = 0;
+	led_clear();
+	led_print_scroll("qcxi", 1, 1, 0);
+
+	while (startup_seq_index<1) {
+		// Time to do something because of time?
+		if (f_time_loop) {
+			f_time_loop = 0;
+			led_animate();
+		}
+
+		// Is an animation finished?
+		if (f_animation_done) {
+			f_animation_done = 0;
+			startup_seq_index++;
+			switch(startup_seq_index) {
+//			case 1:
+//				led_print_scroll("Hello NAMENAME. I am your badge.", 1, 1, 0);
+//				break;
+//			case 2:
+//				led_print_scroll("There are many like me, but I am yours.", 1, 1, 0);
+//				break;
+//			case 3:
+//				led_print_scroll("Please leave my batteries in!", 1, 1, 0);
+//				break;
+			}
+		}
+	}
+	delay(750);
+#endif
+
+	// Main sequence:
+	begin_sprite_animation((spriteframe *) anim_walkin, 4);
 	while (1) {
 
 #if !BADGE_TARGET
@@ -206,6 +238,7 @@ int main( void )
 #else
 #endif
 		}
+
 		/*
 		 * Unlike with the IR pairing mechanism, there is very little state
 		 *  in the RF system. So we just need to load up the beacon into a
@@ -222,7 +255,16 @@ int main( void )
 			// do something
 		}
 
-		// Time to do something because of time?
+		/*
+		 * We just got a time loop interrupt, which happens roughly
+		 * TIME_LOOP_HZ times per second.
+		 *
+		 *  * Time loop based activities:
+		 * * It's been long enough that we can do a trick (set flag from time loop)
+		 * **  (maybe the trick is a prop)
+		 * * Time to beacon the radio (set flag from time loop)
+		 * * Time to beacon the IR (set flag from time loop)
+		 */
 		if (f_time_loop) {
 			f_time_loop = 0;
 #if BADGE_TARGET
@@ -245,15 +287,28 @@ int main( void )
 			}
 		}
 
-		// Is an animation finished?
-		if (f_animation_done) {
-			f_animation_done = 0;
-			stickman_wave();
-#if BADGE_TARGET
-#else
-				color = 0;
-#endif
-		}
+		/*
+		 * Calendar interrupts:
+		 *
+		 * * Event alert raised (interrupt flag)
+		 */
+
+		/*
+		 * Animation related activities:
+		 *
+		 * * Set clock (pre-empts)
+		 * * Arrived at event (animation, don't wait for previous to finish)
+		 * * Event alert (animation, wait for idle)
+		 * * Pair begins (animation and behavior pre-empts, don't wait to finish)
+		 * * New pairing person (wait for idle)
+		 * * New trick learned (wait for idle)
+		 * * Score earned (wait for idle)
+		 * * Prop earned (wait for idle)
+		 * * Pair expires (wait for idle)
+		 * * Get/lose puppy (wait for idle)
+		 * * Get propped (from radio beacon)
+		 * * Do a trick or prop (idle only)
+		 */
 
 		if (f_paired) {
 			f_paired = 0;
@@ -261,6 +316,16 @@ int main( void )
 		} else if (f_unpaired) {
 			f_unpaired = 0;
 			led_print_scroll("UNPAIRED", 1, 1, 0);
+		}
+
+		// Is an animation finished?
+		if (f_animation_done) {
+			f_animation_done = 0;
+			stickman_wave();
+#if BADGE_TARGET
+#else
+			color = 0;
+#endif
 		}
 
 		// Going to sleep... mode...
