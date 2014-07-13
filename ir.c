@@ -20,6 +20,8 @@ volatile uint8_t ir_rx_index = 0;
 volatile uint8_t ir_rx_len = 0;
 volatile uint8_t ir_rx_from = 0;
 
+volatile uint8_t loops_to_ir_timestep = IR_LOOPS;
+
 uint8_t ir_reject_loopback = 0;
 
 // Protocol: SYNC0, SYNC1, FROM, TO, LEN, DATA, CRC_MSB, CRC_LSB, SYNC2, SYNC3
@@ -309,6 +311,7 @@ void ir_process_rx_ready() {
 		IR_ASSERT_PARTNER
 		// For the SERVER: ir_proto_seqnum is what we are SENDING.
 		if (opcode == IR_OP_PAIRREQ && ir_proto_seqnum == 16) {
+			led_print_scroll("itp c", 0, 1, 0);
 			IR_PAIR_SETSTATE(IR_PROTO_PAIRING_C);
 			// TODO: send PAIRACC, with our message, etc. Check if new pair.
 			ir_proto_setup(ir_partner, IR_OP_PAIRACC, 0);
@@ -370,6 +373,7 @@ void ir_process_rx_ready() {
 			ir_proto_setup(ir_partner, IR_OP_PAIRREQ, 0);
 			ir_write_global();
 		} else if (opcode == IR_OP_ITP) {
+			led_print_scroll("itp s", 0, 1, 0);
 			ir_proto_setup(ir_partner, IR_OP_ITP, seqnum+1);
 			ir_write_global();
 			if (seqnum == ir_proto_seqnum) {

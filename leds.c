@@ -15,12 +15,15 @@ uint16_t led_zeroes[5] = {0, 0, 0, 0, 0};
 
 uint16_t disp_bit_buffer[BACK_BUFFER_WIDTH] = { 0 };
 
-volatile uint8_t f_animate = 0;
+volatile uint8_t f_time_loop = 0;
 uint8_t print_pixel_len = 0;
 uint8_t print_pixel_index = 0;
 
 uint8_t led_animating = 0;
 uint8_t f_animation_done = 0;
+
+volatile uint8_t anim_skip_frame = 0;
+volatile uint8_t anim_frames_skipped = 0;
 
 void led_init() {
 #if BADGE_TARGET
@@ -67,7 +70,7 @@ void led_print(char* text) {
 #endif
 }
 
-void led_print_scroll(char* text, uint8_t scroll_on, uint8_t scroll_off, uint8_t speed) {
+void led_print_scroll(char* text, uint8_t scroll_on, uint8_t scroll_off, uint8_t frameskip) {
 	uint8_t character = 0;
 	uint8_t cursor = 0;
 	if (scroll_on) {
@@ -103,9 +106,13 @@ void led_print_scroll(char* text, uint8_t scroll_on, uint8_t scroll_off, uint8_t
 		disp_bit_buffer[cursor++] = 0;
 	}
 
+	anim_skip_frame = frameskip;
+	// NOTE: We specifically do NOT set anim_frames_skipped here because
+	// if we do, when we're moving from one animation to another with the
+	// same frameskip count, the transition looks jerky (which makes sense)
+	// We also specifically do NOT write anything to the display buffer
+	// at this time, for the same reason.
 	print_pixel_index = 0;
-	led_disp_bit_to_values(print_pixel_index, 0);
-	led_display_bits(led_values);
 	led_animating = 1;
 }
 
@@ -137,8 +144,6 @@ void led_set_rainbow(uint16_t value) {
 	led_values[2] |= (value & BIT2)? BIT0 : 0;
 	led_values[4] |= ((value & BIT1)? BIT8 : 0) | ((value & BIT0)? BIT0 : 0);
 }
-
-uint16_t rainbow_values;
 
 void led_disp_bit_to_values(uint8_t left, uint8_t top) {
 
@@ -286,8 +291,7 @@ void led_anim_init() {
 	RTC_A_definePrescaleEvent(
 		RTC_A_BASE,
 		RTC_A_PRESCALE_1,
-//		RTC_A_PSEVENTDIVIDER_8 // 128 Hz / 8 = 32 Hz.
-		RTC_A_PSEVENTDIVIDER_16 // 128 Hz / 16 = 16 Hz.
+		TIME_LOOP_SCALER
 	);
 
 	// Interrupt 8 times per second for animation purposes:
@@ -295,14 +299,26 @@ void led_anim_init() {
 }
 
 void led_animate() {
+	// Don't do anything if we're not animating. Duh.
 	if (!led_animating) return;
-	print_pixel_index++;
+
+	// Check to see if we need to skip this frame.
+	if (anim_frames_skipped >= anim_skip_frame) {
+		anim_frames_skipped = 0;
+		// DISPLAY this frame.
+	} else {
+		anim_frames_skipped++;
+		return;
+	}
+
+	// Cool. We're going to animate this frame.
+	// TODO: check what KIND of thing we're animating.
+	// 		 for now the only animation we have is scrolling text.
 	if (print_pixel_index < print_pixel_len) {
 		led_disp_bit_to_values(print_pixel_index, 0);
 		led_display_bits(led_values);
+		print_pixel_index++;
 	} else {
-		//stop animating
-//		led_toggle();
 		f_animation_done = 1;
 		led_animating = 0;
 	}
@@ -346,7 +362,9 @@ void RTC_A_ISR(void)
 		break;
 	case 8: break;  //RT0PSIFG
 	case 10:
-		f_animate = 1;
+		f_time_loop = 1; // We know what it does! It's a TIME LOOP MACHINE.
+		// ...who would build a device that loops time every 32 milliseconds?
+		// WHO KNOWS. But that's what it does.
 		__bic_SR_register_on_exit(LPM3_bits);
 		break; //RT1PSIFG
 	case 12: break; //Reserved

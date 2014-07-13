@@ -68,7 +68,6 @@ void init_clocks() {
 
 	// Use the DCO as the master clock.
 	// Divide by 8 to get a MCLK of 1 MHz
-	// TODO: Decide if this is the right frequency or not.
 #if BADGE_TARGET
 
 	// Init XT2:
@@ -140,7 +139,6 @@ void init_clocks() {
 	SFR_enableInterrupt(SFR_OSCILLATOR_FAULT_INTERRUPT);
 
 	volatile uint32_t clockValue;
-	// TODO: Verify if the clock settings are as expected:
 	clockValue = UCS_getMCLK();
 	clockValue = UCS_getACLK();
 	clockValue = UCS_getSMCLK();

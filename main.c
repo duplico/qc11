@@ -1,12 +1,15 @@
-#include <string.h>
+#pragma FUNC_ALWAYS_INLINE (UCS_clearAllOscFlagsWithTimeout);
 
 #include "qcxi.h"
+#include <string.h>
+
 #include "radio.h"
 #include "fonts.h"
 #include "clocks.h"
 #include "leds.h"
 #include "ir.h"
 #include "ws2812.h"
+#include "main.h"
 
 #pragma DATA_SECTION (my_conf, ".infoA");
 qcxiconf my_conf;
@@ -26,7 +29,6 @@ uint8_t f_unpaired = 0;
 volatile uint8_t f_ser_rx = 0;
 #endif
 
-uint8_t test_data[65] = {'q', 'c', 'x', 'i', 0};
 char time[6] = "00:00";
 
 void init_power() {
@@ -54,8 +56,6 @@ void init_gpio() {
 	P6OUT = 0x00;
 }
 
-#define ANIM_HZ 16
-
 int main( void )
 {
 	// TODO: check to see what powerup mode we're in.
@@ -80,7 +80,7 @@ int main( void )
 	if (post_result != 0) {
 #if BADGE_TARGET
 		// Display error code:
-		char hex[4] = "AA";
+		char hex[4] = {0, 0, 0, 0};
 		hex[0] = (post_result/16 < 10)? '0' + post_result/16 : 'A' - 10 + post_result/16;
 		hex[1] = (post_result%16 < 10)? '0' + post_result%16 : 'A' - 10 + post_result%16;
 		led_print(hex);
@@ -98,7 +98,7 @@ int main( void )
 	uint8_t color = 0;
 #endif
 
-	led_print_scroll("queercon 11", 1, 1, 0);
+	led_print_scroll("queercon 11", 1, 1, 1);
 	led_anim_init();
 	led_enable(LED_PERIOD/2);
 
@@ -118,8 +118,6 @@ int main( void )
 			ir_process_rx_ready();
 #if BADGE_TARGET
 #else
-			fillFrameBufferSingleColor(&leds[1], NUMBEROFLEDS, ws_frameBuffer, ENCODING);
-			ws_set_colors_async(NUMBEROFLEDS);
 #endif
 		}
 
@@ -129,8 +127,8 @@ int main( void )
 		}
 
 		// Time to do something because of time?
-		if (f_animate) {
-			f_animate = 0;
+		if (f_time_loop) {
+			f_time_loop = 0;
 #if BADGE_TARGET
 			led_animate();
 #else
@@ -139,21 +137,22 @@ int main( void )
 			color++;
 			if (color==21) f_animation_done = 1;
 #endif
-		}
+			if (loops_to_ir_timestep) {
+				loops_to_ir_timestep--;
+			} else {
+				loops_to_ir_timestep = 8;
+				ir_process_timestep();
+			}
 
-		if (f_new_second) {
-			f_new_second = 0;
-			ir_process_timestep();
+			if (0) {
+				// TODO: radio
+			}
 		}
 
 		// Is an animation finished?
 		if (f_animation_done) {
 			f_animation_done = 0;
-			radio_send(test_data, 64);
-
 #if BADGE_TARGET
-			if (ir_proto_state == IR_PROTO_LISTEN)
-				led_print_scroll("idle...", 1, 1, 0);
 #else
 				color = 0;
 #endif
@@ -185,25 +184,25 @@ uint8_t post() {
 	}
 #if BADGE_TARGET
 
-	uint16_t tp0[5] = {0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF};
-	uint16_t tp1[5] = {0xFF00, 0xFF00, 0xFF00, 0xFF00, 0xFF00};
-	uint16_t tp2[5] = {0x00FF, 0x00FF, 0x00FF, 0x00FF, 0x00FF};
+	static const uint16_t tp0[5] = {0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF};
+	static const uint16_t tp1[5] = {0xFF00, 0xFF00, 0xFF00, 0xFF00, 0xFF00};
+	static const uint16_t tp2[5] = {0x00FF, 0x00FF, 0x00FF, 0x00FF, 0x00FF};
 
 	if (led_post() == STATUS_FAIL) {
 		post_result |= POST_SHIFTF;
 	}
 	// LED test pattern
-	led_display_bits(tp0);
+	led_display_bits((uint16_t *) tp0);
 	for (uint8_t i=LED_PERIOD; i>0; i--) {
 		led_enable(i);
 		delay(8);
 	}
-	led_display_bits(tp1);
+	led_display_bits((uint16_t *) tp1);
 	for (uint8_t i=LED_PERIOD; i>0; i--) {
 		led_enable(i);
 		delay(8);
 	}
-	led_display_bits(tp2);
+	led_display_bits((uint16_t *) tp2);
 	for (uint8_t i=LED_PERIOD; i>0; i--) {
 		led_enable(i);
 		delay(8);
@@ -215,7 +214,7 @@ uint8_t post() {
 
 	ir_reject_loopback = 0;
 	// IR loopback
-	char test_str[] = "qcxi";
+	static const char test_str[] = "qcxi";
 	ir_write((uint8_t *) test_str, 0xff, 0);
 	uint16_t spin = 65535;
 	while (spin-- && !f_ir_rx_ready);
@@ -232,7 +231,6 @@ uint8_t post() {
 		post_result |= POST_IRGF; // IR general fault
 	}
 	ir_reject_loopback = 1;
-	// Radio - TODO
 
 	return post_result;
 }
@@ -262,8 +260,8 @@ void check_config() {
 		new_conf.badge_id = 100;
 		new_conf.datetime[0] = 0; // TODO: Pre-con party time.
 		new_conf.datetime[1] = 0;
-		strcpy(my_conf.handle, "person");
-		strcpy(my_conf.message, "Hi new person.");
+		strcpy((char *) my_conf.handle, "person");
+		strcpy((char *) my_conf.message, "Hi new person.");
 
 		CRC_setSeed(CRC_BASE, 0xBEEF);
 
