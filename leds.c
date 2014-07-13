@@ -34,26 +34,36 @@ volatile uint8_t f_time_loop = 0;
 uint8_t print_pixel_len = 0;
 uint8_t print_pixel_index = 0;
 
-uint8_t led_scrolling = 0;
+uint8_t led_text_scrolling = 0;
 uint8_t f_animation_done = 0;
 
-volatile uint8_t anim_skip_frame = 0;
-volatile uint8_t anim_frames_skipped = 0;
+volatile uint8_t led_skip_frame_text = 0;
+volatile uint8_t led_skip_frame_anim = 0;
+volatile uint8_t led_frames_skipped = 0;
+
+#define ANIMATION 0
+#define TEXT 1
+
+volatile uint8_t vscroll_to_text = 0;
+volatile uint8_t vscroll_to_anim = 0;
+volatile uint8_t vertical_mode = TEXT;
 
 void stickman_wave() {
 	begin_sprite_animation((spriteframe *) anim_wave, 3);
 }
 
 void begin_sprite_animation(spriteframe* animation, uint8_t frameskip) {
-	disp_left = 0;
-	disp_top = 0;
 	sprite_display = 1;
 	sprite_animate = 1;
 	sprite_current_frame = 0;
 	sprite_x = 0;
 	sprite_y = 8;
 	sprite_animation = animation;
-	anim_skip_frame = frameskip;
+	led_skip_frame_anim = frameskip;
+
+	if (vertical_mode == TEXT) {
+		vscroll_to_anim = 1;
+	}
 }
 
 void disp_apply_mask(uint16_t mask) {
@@ -63,7 +73,6 @@ void disp_apply_mask(uint16_t mask) {
 }
 
 void draw_sprite() {
-	disp_top = 8; // TODO
 	disp_apply_mask(0b0000000011111111);
 	for (uint8_t col = 0; col < 8; col++) {
 		if (sprite_x+col >= 0)
@@ -156,14 +165,19 @@ void led_print_scroll(char* text, uint8_t scroll_on, uint8_t scroll_off, uint8_t
 		print_pixel_len -= SCREEN_WIDTH; // TODO: Bounds checking
 	}
 
-	anim_skip_frame = frameskip;
+	if (vertical_mode == ANIMATION) {
+		vscroll_to_text = 1;
+	}
+
+	led_skip_frame_text = frameskip;
 	// NOTE: We specifically do NOT set anim_frames_skipped here because
 	// if we do, when we're moving from one animation to another with the
 	// same frameskip count, the transition looks jerky (which makes sense)
 	// We also specifically do NOT write anything to the display buffer
 	// at this time, for the same reason.
 	disp_left = 0;
-	led_scrolling = 1;
+	led_text_scrolling = 1;
+	f_animation_done = 0;
 }
 
 void led_set_rainbow(uint16_t value) {
@@ -348,36 +362,66 @@ void led_anim_init() {
 }
 
 void led_animate() {
-	// Check to see if we need to skip this frame.
-	if (anim_skip_frame && anim_frames_skipped >= anim_skip_frame) {
-		anim_frames_skipped = 0;
-		// DISPLAY this frame.
-	} else if (anim_skip_frame) {
-		anim_frames_skipped++;
+	static uint8_t led_skip_frame;
+
+	// Check to see if we're transitioning display modes:
+	if (vscroll_to_text && vertical_mode == ANIMATION) {
+		disp_left = 0;
+		if (disp_top > 0) {
+			disp_top--;
+		} else {
+			// done...
+			vscroll_to_text = 0;
+			disp_top = 0; // just in case
+			vertical_mode = TEXT;
+		}
+		led_disp_bit_to_values(disp_left, disp_top);
+		led_display_bits(led_values);
+		return;
+	} else if (vscroll_to_anim && vertical_mode == TEXT) {
+		disp_left = 0;
+		if (disp_top < 8) {
+			disp_top++;
+		} else {
+			// done...
+			vscroll_to_anim = 0;
+			disp_top = 8;
+			vertical_mode = ANIMATION;
+		}
+		led_disp_bit_to_values(disp_left, disp_top);
+		led_display_bits(led_values);
 		return;
 	}
 
-	if (led_scrolling) {
+	// Check to see if we need to skip this frame.
+	led_skip_frame = led_text_scrolling? led_skip_frame_text : led_skip_frame_anim;
+	if (led_skip_frame && led_frames_skipped >= led_skip_frame) {
+		led_frames_skipped = 0;
+		// DISPLAY this frame.
+	} else if (led_skip_frame) {
+		led_frames_skipped++;
+		return;
+	}
+
+	if (led_text_scrolling) {
 		if (disp_left < print_pixel_len) {
 			led_disp_bit_to_values(disp_left, disp_top);
 			led_display_bits(led_values);
 			disp_left++;
 		} else {
-			f_animation_done = 1;
-			led_scrolling = 0;
+			f_animation_done = !sprite_animate;
+			led_text_scrolling = 0;
 		}
-	}
-
-	if (sprite_animate) {
-		sprite_next_frame();
-		if (!sprite_animate) {
-			f_animation_done = 1;
-		}
-	}
-	if (sprite_display) {
+	} else if (sprite_display) {
 		draw_sprite();
 		led_disp_bit_to_values(disp_left, disp_top);
 		led_display_bits(led_values);
+		if (sprite_animate) {
+			sprite_next_frame();
+			if (!sprite_animate) {
+				f_animation_done = 1;
+			}
+		}
 	}
 }
 
