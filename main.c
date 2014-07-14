@@ -22,13 +22,18 @@ volatile uint8_t f_ir_tx_done = 0;
 volatile uint8_t f_ir_rx_ready = 0;
 uint8_t f_config_clobbered = 0;
 volatile uint8_t f_new_second = 0;
+volatile uint8_t f_alarm = 0;
 uint8_t f_paired = 0;
 uint8_t f_unpaired = 0;
+uint8_t f_paired_new_person = 0;
+uint8_t f_paired_new_trick = 0;
+uint8_t start_new_animation = 0;
 
 // Global state:
 uint8_t clock_is_set = 0;
-
 uint16_t loops_to_rf_beacon = 10 * TIME_LOOP_HZ;
+#define MTS_LEN 255
+char message_to_send[MTS_LEN] = "";
 
 #if !BADGE_TARGET
 volatile uint8_t f_ser_rx = 0;
@@ -133,10 +138,10 @@ int main( void )
 	init_gpio();
 	init_clocks();
 	check_config();
-	init_timers();
 	led_init();
 	init_rtc();
 	init_ir();
+	init_alarms();
 #if !BADGE_TARGET
 	ws2812_init();
 	ser_init();
@@ -204,6 +209,22 @@ int main( void )
 	delay(750);
 #endif
 
+	// Signals within the main thread:
+	static uint8_t s_event_arrival = 0,
+				   s_on_bus = 0,
+				   s_event_alert = 0,
+				   s_pair = 0, // f_pair
+				   s_new_pair = 0,
+				   s_new_trick = 0,
+				   s_new_score = 0,
+				   s_new_prop = 0,
+				   s_unpair = 0, // f_unpair
+				   s_propped = 0,
+				   s_trick = 0,
+				   s_prop = 0,
+				   s_get_puppy = 0,
+				   s_lose_puppy = 0;
+
 	// Main sequence:
 	begin_sprite_animation((spriteframe *) anim_walkin, 4);
 	while (1) {
@@ -230,13 +251,30 @@ int main( void )
 		 *  f_paired_new_person
 		 *  f_paired_new_trick
 		 *
+		 * Here we can set:
+		 *
+		 *	   s_pair = 0, // f_pair
+		 *	   s_new_pair = 0,
+		 *	   s_new_trick = 0,
+		 *	   s_new_score = 0,
+		 *	   s_new_prop = 0,
+		 *	   s_unpair = 0, // f_unpair
+		 *
+		 *
 		 */
 		if (f_ir_rx_ready) {
 			f_ir_rx_ready = 0;
 			ir_process_rx_ready();
-#if BADGE_TARGET
-#else
-#endif
+		}
+
+		if (f_paired) {
+			f_paired = 0;
+			s_pair = 1;
+			led_print_scroll("pair", 1, 1, 0);
+		} else if (f_unpaired) {
+			led_print_scroll("unpair", 1, 1, 0);
+			f_unpaired = 0;
+			s_unpair = 1;
 		}
 
 		/*
@@ -250,6 +288,17 @@ int main( void )
 		 *   * get the puppy
 		 *   * got confirmation we should give up the puppy (this will have
 		 *      some state)
+		 *
+		 *
+		 *  Here we can set:
+		 *   s_event_arrival = 0,
+		 *	 s_on_bus = 0;
+		 *	 s_new_score = 0,
+		 *	 s_new_prop = 0,
+		 *	 s_get_puppy;
+		 *	 s_lose_puppy;
+		 *
+		 *
 		 */
 		if (f_rfm_rx_done) {
 			// do something
@@ -264,6 +313,10 @@ int main( void )
 		 * **  (maybe the trick is a prop)
 		 * * Time to beacon the radio (set flag from time loop)
 		 * * Time to beacon the IR (set flag from time loop)
+		 *
+	     * s_trick = 0,
+		 * s_prop = 0;
+		 *
 		 */
 		if (f_time_loop) {
 			f_time_loop = 0;
@@ -287,11 +340,45 @@ int main( void )
 			}
 		}
 
+
+		static uint8_t event_id = 0;
 		/*
 		 * Calendar interrupts:
 		 *
 		 * * Event alert raised (interrupt flag)
+		 * * Time to do a prop.
+		 *
+		 * s_event_alert = 0,
+		 * s_propped = 0,
+		 *
 		 */
+		if (f_alarm & BIT7) {
+			// TODO: prop
+		} else if (f_alarm) {
+			event_id = f_alarm & 0b0111;
+			if (f_alarm & ALARM_START_LIGHT) {
+				// TODO: setup a light blink for light number event_id.
+			}
+			if (f_alarm & ALARM_STOP_LIGHT) {
+				// TODO: stop the blinking if applicable.
+			}
+			if (f_alarm & ALARM_DISP_MSG) {
+				memset(message_to_send, 0, MTS_LEN);
+				if (f_alarm & ALARM_NOW_MSG)
+					strcat(message_to_send, "!!! ");
+				strcat(message_to_send, event_messages[event_id]);
+				if (f_alarm & ALARM_NOW_MSG)
+					strcat(message_to_send, "NOW!");
+				else {
+					strcat(message_to_send, event_times[event_id]);
+				}
+				led_print_scroll(message_to_send, 1, 1, 1);
+			}
+		}
+		if (f_alarm) {
+			f_alarm = 0;
+			init_alarms();
+		}
 
 		/*
 		 * Animation related activities:
@@ -310,16 +397,10 @@ int main( void )
 		 * * Do a trick or prop (idle only)
 		 */
 
-		if (f_paired) {
-			f_paired = 0;
-			led_print_scroll("PAIRED!", 1, 1, 0);
-		} else if (f_unpaired) {
-			f_unpaired = 0;
-			led_print_scroll("UNPAIRED", 1, 1, 0);
-		}
+		// Time to handle signals.
 
 		// Is an animation finished?
-		if (f_animation_done) {
+		if (f_animation_done || start_new_animation) {
 			f_animation_done = 0;
 #if BADGE_TARGET
 #else
@@ -442,6 +523,8 @@ void check_config() {
 		FLASH_write8(new_config_bytes, (uint8_t *)INFOA_START, sizeof(qcxiconf));
 		FLASH_lockInfoA();
 	}
+	strcpy(ir_pair_payload+2, my_conf.handle);
+	strcpy(ir_pair_payload+2+11, my_conf.message);
 	// TODO: the opposite of WDT_A_hold(WDT_A_BASE);
 }
 

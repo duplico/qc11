@@ -33,6 +33,10 @@ volatile uint8_t ir_xmit = 0;
 volatile uint8_t ir_xmit_index = 0;
 volatile uint8_t ir_xmit_len = 0;
 
+uint8_t ir_pair_payload[30] = {IR_OP_PAIRACC, 0, 0};
+
+char ir_rx_handle[11] = "";
+char ir_rx_message[17] = "";
 
 void init_ir() {
 	// TX for IR
@@ -179,6 +183,11 @@ void ir_proto_setup(uint8_t to_addr, uint8_t opcode, uint8_t seqnum) {
 	uint16_t crc = 0;
 	uint8_t len = 2;
 
+//	if (opcode == IR_OP_PAIRACC || opcode == IR_OP_PAIRACK) {
+//		// this is the one where we send our message...
+//		len = 30;
+//	}
+
 	// Packet header:
 	ir_tx_frame[0] = SYNC0;
 	ir_tx_frame[1] = SYNC1;
@@ -188,11 +197,18 @@ void ir_proto_setup(uint8_t to_addr, uint8_t opcode, uint8_t seqnum) {
 	ir_tx_frame[5] = opcode;
 	ir_tx_frame[6] = seqnum;
 
+//	if (len>2) {
+//		memcpy(&(ir_tx_frame[7]), ir_pair_payload, 30);
+//	}
+
 	CRC_setSeed(CRC_BASE, 0xBEEF);
 	CRC_set8BitData(CRC_BASE, my_conf.badge_id);
 	CRC_set8BitData(CRC_BASE, len);
 	CRC_set8BitData(CRC_BASE, opcode);
 	CRC_set8BitData(CRC_BASE, seqnum);
+//	for (uint8_t i=0; i<len; i++) {
+//		CRC_set8BitData(CRC_BASE, ir_tx_frame[5+i]);
+//	}
 
 	crc = CRC_getResult(CRC_BASE);
 
@@ -211,21 +227,10 @@ void ir_write(uint8_t* payload, uint8_t to_addr, uint8_t len) {
 	ir_write_global();
 }
 
-#define IR_PROTO_TTO_DEFAULT 6
-
 uint8_t ir_proto_state = IR_PROTO_LISTEN;
 uint8_t ir_proto_tto = IR_PROTO_TTO_DEFAULT; // tries to timeout
 uint8_t ir_partner = 0;
 
-#define IR_OP_BEACON 	 100
-#define IR_OP_HELLO 	 101
-#define IR_OP_HELLOACK 	 102
-#define IR_OP_ITP		 103
-#define IR_OP_PAIRREQ	 104
-#define IR_OP_PAIRACC	 105
-#define IR_OP_PAIRACK	 106
-#define IR_OP_KEEPALIVE	 107
-#define IR_OP_STILLALIVE 108
 
 // index 0 : OPCODE
 // index 1 : ir_seqnum
@@ -244,7 +249,6 @@ void ir_process_timestep() {
 		return;
 	switch (ir_proto_state) {
 	case IR_PROTO_LISTEN:
-		// TODO: maybe beacon
 		if (!ir_timesteps_to_beacon) {
 			ir_timesteps_to_beacon = IR_LOOPS_PER_BEACON;
 			ir_proto_setup(0xff, IR_OP_BEACON, 0);
@@ -317,9 +321,8 @@ void ir_process_rx_ready() {
 		IR_ASSERT_PARTNER
 		// For the SERVER: ir_proto_seqnum is what we are SENDING.
 		if (opcode == IR_OP_PAIRREQ && ir_proto_seqnum == 16) {
-			led_print_scroll("itp c", 0, 1, 0);
 			IR_PAIR_SETSTATE(IR_PROTO_PAIRING_C);
-			// TODO: send PAIRACC, with our message, etc. Check if new pair.
+			// TODO: send PAIRACC, with our message, etc.
 			ir_proto_setup(ir_partner, IR_OP_PAIRACC, 0);
 			ir_write_global();
 		} else if (opcode == IR_OP_ITP && seqnum == ir_proto_seqnum+1) {
@@ -334,7 +337,17 @@ void ir_process_rx_ready() {
 	case IR_PROTO_PAIRING_C:
 		IR_ASSERT_PARTNER
 		if (opcode == IR_OP_PAIRACK) {
-			// decide we're paired; set flag.
+			// decide we're paired.
+
+//			strcpy(ir_rx_handle, &(ir_rx_frame[2]));
+//			strcpy(ir_rx_message, &(ir_rx_frame[2+11]));
+
+			// See if this is a new pair.
+			if (my_conf.met_ids[ir_partner/16] & (1 << ir_partner % 16)) {
+				// new person
+				f_paired_new_person = 1;
+				// TODO: see if it's a new trick.
+			}
 			f_paired = 1;
 			IR_PAIR_SETSTATE(IR_PROTO_PAIRED_C);
 			ir_proto_setup(ir_partner, IR_OP_KEEPALIVE, 0);
@@ -374,12 +387,11 @@ void ir_process_rx_ready() {
 		// For the SERVER: ir_proto_seqnum is what we are EXPECTING.
 		if (opcode == IR_OP_ITP && seqnum == ir_proto_seqnum && seqnum == 16) {
 			// TODO: send PAIRREQ
-			// send our message, etc; and check if this is a new person.
+			// send our message, etc
 			IR_PAIR_SETSTATE(IR_PROTO_PAIRING_S);
 			ir_proto_setup(ir_partner, IR_OP_PAIRREQ, 0);
 			ir_write_global();
 		} else if (opcode == IR_OP_ITP) {
-			led_print_scroll("itp s", 0, 1, 0);
 			ir_proto_setup(ir_partner, IR_OP_ITP, seqnum+1);
 			ir_write_global();
 			if (seqnum == ir_proto_seqnum) {
@@ -398,6 +410,14 @@ void ir_process_rx_ready() {
 		if (opcode == IR_OP_PAIRACC) {
 			IR_PAIR_SETSTATE(IR_PROTO_PAIRED_S);
 			f_paired = 1;
+//			strcpy(ir_rx_handle, &(ir_rx_frame[2]));
+//			strcpy(ir_rx_message, &(ir_rx_frame[2+11]));
+
+			if (my_conf.met_ids[ir_partner/16] & (1 << ir_partner % 16)) {
+				// new person
+				f_paired_new_person = 1;
+				// TODO: see if it's a new trick.
+			}
 			ir_proto_setup(ir_partner, IR_OP_PAIRACK, 0);
 			ir_write_global();
 		} else if (opcode == IR_OP_ITP && seqnum == 16) {

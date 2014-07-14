@@ -438,39 +438,3 @@ void led_disable( void )
 inline void led_toggle( void ) {
 	GPIO_toggleOutputOnPin(LED_PORT, LED_BLANK);
 }
-
-
-
-#pragma vector=RTC_VECTOR
-__interrupt
-void RTC_A_ISR(void)
-{
-	switch (__even_in_range(RTCIV, 16)) {
-	case 0: break;  //No interrupts
-	case 2:         //RTCRDYIFG
-		// TODO: Only for now-ow-ow
-		f_new_second = 1;
-		__bic_SR_register_on_exit(LPM3_bits);
-		break;
-	case 4:         //RTCEVIFG
-		//Interrupts every minute
-		f_new_minute = 1;
-		__bic_SR_register_on_exit(LPM3_bits);
-		break;
-	case 6:         //RTCAIFG
-		//Interrupts 5:00pm on 5th day of week
-		__no_operation();
-		break;
-	case 8: break;  //RT0PSIFG
-	case 10:
-		f_time_loop = 1; // We know what it does! It's a TIME LOOP MACHINE.
-		// ...who would build a device that loops time every 32 milliseconds?
-		// WHO KNOWS. But that's what it does.
-		__bic_SR_register_on_exit(LPM3_bits);
-		break; //RT1PSIFG
-	case 12: break; //Reserved
-	case 14: break; //Reserved
-	case 16: break; //Reserved
-	default: break;
-	}
-}

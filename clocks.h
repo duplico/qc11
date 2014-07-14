@@ -39,10 +39,26 @@
 uint8_t xt2_status;
 uint8_t xt1_status; // 1 = working, 0 = fault condition
 
+#define ALARM_STOP_LIGHT 	BIT6
+#define ALARM_START_LIGHT 	BIT5
+#define ALARM_NOW_MSG 		BIT4
+#define ALARM_DISP_MSG 		BIT3
+
 void init_clocks();
-void init_timers();
+void init_alarms();
 void init_rtc();
 void init_watchdog();
+
+
+typedef struct {
+	uint8_t day;
+	uint8_t hour;
+	uint8_t min;
+	uint8_t flag;
+} alarm_time;
+
+extern char *event_times[8];
+extern char *event_messages[8];
 
 extern volatile Calendar currentTime;
 
