@@ -183,10 +183,10 @@ void ir_proto_setup(uint8_t to_addr, uint8_t opcode, uint8_t seqnum) {
 	uint16_t crc = 0;
 	uint8_t len = 2;
 
-//	if (opcode == IR_OP_PAIRACC || opcode == IR_OP_PAIRACK) {
-//		// this is the one where we send our message...
-//		len = 30;
-//	}
+	if (opcode == IR_OP_PAIRACC || opcode == IR_OP_PAIRACK) {
+		// this is the one where we send our message...
+		len = 30;
+	}
 
 	// Packet header:
 	ir_tx_frame[0] = SYNC0;
@@ -197,18 +197,16 @@ void ir_proto_setup(uint8_t to_addr, uint8_t opcode, uint8_t seqnum) {
 	ir_tx_frame[5] = opcode;
 	ir_tx_frame[6] = seqnum;
 
-//	if (len>2) {
-//		memcpy(&(ir_tx_frame[7]), ir_pair_payload, 30);
-//	}
+	if (len>2) {
+		memcpy(&(ir_tx_frame[7]), ir_pair_payload, 30);
+	}
 
 	CRC_setSeed(CRC_BASE, 0xBEEF);
 	CRC_set8BitData(CRC_BASE, my_conf.badge_id);
 	CRC_set8BitData(CRC_BASE, len);
-	CRC_set8BitData(CRC_BASE, opcode);
-	CRC_set8BitData(CRC_BASE, seqnum);
-//	for (uint8_t i=0; i<len; i++) {
-//		CRC_set8BitData(CRC_BASE, ir_tx_frame[5+i]);
-//	}
+	for (uint8_t i=0; i<len; i++) {
+		CRC_set8BitData(CRC_BASE, ir_tx_frame[5+i]);
+	}
 
 	crc = CRC_getResult(CRC_BASE);
 
@@ -339,8 +337,8 @@ void ir_process_rx_ready() {
 		if (opcode == IR_OP_PAIRACK) {
 			// decide we're paired.
 
-//			strcpy(ir_rx_handle, &(ir_rx_frame[2]));
-//			strcpy(ir_rx_message, &(ir_rx_frame[2+11]));
+			strcpy(ir_rx_handle, &(ir_rx_frame[2]));
+			strcpy(ir_rx_message, &(ir_rx_frame[2+11]));
 
 			// See if this is a new pair.
 			if (my_conf.met_ids[ir_partner/16] & (1 << ir_partner % 16)) {
@@ -410,8 +408,8 @@ void ir_process_rx_ready() {
 		if (opcode == IR_OP_PAIRACC) {
 			IR_PAIR_SETSTATE(IR_PROTO_PAIRED_S);
 			f_paired = 1;
-//			strcpy(ir_rx_handle, &(ir_rx_frame[2]));
-//			strcpy(ir_rx_message, &(ir_rx_frame[2+11]));
+			strcpy(ir_rx_handle, &(ir_rx_frame[2]));
+			strcpy(ir_rx_message, &(ir_rx_frame[2+11]));
 
 			if (my_conf.met_ids[ir_partner/16] & (1 << ir_partner % 16)) {
 				// new person

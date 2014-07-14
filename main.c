@@ -270,7 +270,7 @@ int main( void )
 		if (f_paired) {
 			f_paired = 0;
 			s_pair = 1;
-			led_print_scroll("pair", 1, 1, 0);
+			led_print_scroll(ir_rx_message, 1, 1, 0);
 		} else if (f_unpaired) {
 			led_print_scroll("unpair", 1, 1, 0);
 			f_unpaired = 0;
@@ -491,10 +491,10 @@ void check_config() {
 
 	crc = CRC_getResult(CRC_BASE);
 
-	if (crc != my_conf.crc) {
+	if (crc != my_conf.crc || 1) { // TODO!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		qcxiconf new_conf;
 		uint8_t* new_config_bytes = (uint8_t *) &new_conf;
-		for (uint8_t i=0; i<25; i++) {
+		for (uint8_t i=0; i<42; i++) {
 			new_config_bytes[i] = 0;
 			// paired_ids, seen_ids, scores, events occurred and attended.
 		}
@@ -502,8 +502,8 @@ void check_config() {
 		new_conf.badge_id = 100;
 		new_conf.datetime[0] = 0; // TODO: Pre-con party time.
 		new_conf.datetime[1] = 0;
-		strcpy((char *) my_conf.handle, "person");
-		strcpy((char *) my_conf.message, "Hi new person.");
+		strcpy((char *) new_conf.handle, "person");
+		strcpy((char *) new_conf.message, "Hi new person.");
 
 		CRC_setSeed(CRC_BASE, 0xBEEF);
 
@@ -523,8 +523,8 @@ void check_config() {
 		FLASH_write8(new_config_bytes, (uint8_t *)INFOA_START, sizeof(qcxiconf));
 		FLASH_lockInfoA();
 	}
-	strcpy(ir_pair_payload+2, my_conf.handle);
-	strcpy(ir_pair_payload+2+11, my_conf.message);
+	strcpy(&(ir_pair_payload[0]), my_conf.handle);
+	strcpy(&(ir_pair_payload[11]), my_conf.message);
 	// TODO: the opposite of WDT_A_hold(WDT_A_BASE);
 }
 
