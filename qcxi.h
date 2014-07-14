@@ -74,6 +74,9 @@ void delay(unsigned int);
 #define TIME_LOOP_HZ 32
 #define TIME_LOOP_SCALER RTC_A_PSEVENTDIVIDER_4
 
+
+extern uint8_t clock_is_set;
+
 // Power-on self test result codes:
 #define POST_XT1F 	0b1
 #define POST_XT2F 	0b10
@@ -121,11 +124,14 @@ extern volatile uint8_t f_ir_rx_ready;
 extern volatile uint8_t f_time_loop;
 extern volatile uint8_t f_rfm_rx_done;
 extern volatile uint8_t f_new_second;
+extern volatile uint8_t f_alarm;
 
 // Additional flags for signaling the main thread, not from interrupts:
 extern uint8_t f_animation_done;
 extern uint8_t f_paired;
 extern uint8_t f_unpaired;
+extern uint8_t f_paired_new_person;
+extern uint8_t f_paired_new_trick;
 
 // Extra features for the Launchpad version - serial and LED chains:
 #if !BADGE_TARGET

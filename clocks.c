@@ -9,6 +9,30 @@
 #include "clocks.h"
 
 volatile Calendar currentTime;
+uint8_t next_event_flag = 0;
+
+char *event_times[8] = {
+		"",
+		"4pm!",
+		"4pm!",
+		"4pm!",
+		"",
+		"10pm!",
+		"9pm!",
+		"12am!"
+};
+
+char *event_messages[8] = {
+		"",
+		"Mixer @ IBar ",
+		"Mixer @ IBar ",
+		"Mixer @ IBar ",
+		"",
+		"Pool party @ Palms ",
+		"Party @ Piranha ",
+		"Karaoke ",
+};
+
 
 void init_clocks() {
 
@@ -145,12 +169,122 @@ void init_clocks() {
 
 }
 
-void init_timers() {
+// We should get the following data in a flag to main from the alarm:
+// LSB
+//	3 bits: next event ID (starts with 1 because the opening party is 0)
+//	1 bit: display a message (0 for no, 1 for yes)
+//  1 bit: which message (0 for reminder, 1 for now)
+//	1 bit: start blinking light (0 for no, 1 for yes)
+//  1 bit: stop blinking light (0 for no, 1 for yes)
+//  1 bit: Prop
+// MSB
 
+/*
+ * NB:
+ *    The order of these items in this array MUST be chronological.
+ *    This is because looping through this array is how we determine which
+ *    event happens next. HOWEVER, note that the ID numbers of the events
+ *    are NOT chronological. This is so I can play a little trick to make
+ *    the ID of an event correspond with the ID of its respective light (if
+ *    it gets one).
+ */
+const alarm_time alarms[49] = {
+		{0x08, 0x15, 0x30, 1 + ALARM_DISP_MSG + ALARM_START_LIGHT}, // Reminder: Friday mixer at iBar
+		{0x08, 0x15, 0x45, 1 + ALARM_DISP_MSG}, // Reminder: Friday mixer at iBar
+		{0x08, 0x15, 0x50, 1 + ALARM_DISP_MSG}, // Reminder: Friday mixer at iBar
+		{0x08, 0x15, 0x55, 1 + ALARM_DISP_MSG}, // Reminder: Friday mixer at iBar
+		{0x08, 0x16, 0x00, 1 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Friday mixer at iBar
+		{0x08, 0x16, 0x15, 1 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Friday mixer at iBar
+		{0x08, 0x16, 0x30, 1 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Friday mixer at iBar
+		{0x08, 0x17, 0x00, 1 + ALARM_STOP_LIGHT}, // End: Friday mixer at iBar
+
+		{0x08, 0x21, 0x30, 5 + ALARM_DISP_MSG + ALARM_START_LIGHT}, // Reminder: Friday pool party at Palms
+		{0x08, 0x21, 0x45, 5 + ALARM_DISP_MSG}, // Reminder: Friday pool party at Palms
+		{0x08, 0x21, 0x50, 5 + ALARM_DISP_MSG}, // Reminder: Friday pool party at Palms
+		{0x08, 0x21, 0x55, 5 + ALARM_DISP_MSG}, // Reminder: Friday pool party at Palms
+		{0x08, 0x22, 0x00, 5 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Friday pool party at Palms
+		{0x08, 0x22, 0x15, 5 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Friday pool party at Palms
+		{0x08, 0x22, 0x30, 5 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Friday pool party at Palms
+		{0x09, 0x03, 0x00, 5 + ALARM_STOP_LIGHT}, // End: Friday pool party at Palms
+
+		{0x09, 0x15, 0x30, 2 + ALARM_DISP_MSG + ALARM_START_LIGHT}, // Reminder: Saturday mixer at iBar
+		{0x09, 0x15, 0x45, 2 + ALARM_DISP_MSG}, // Reminder: Saturday mixer at iBar
+		{0x09, 0x15, 0x50, 2 + ALARM_DISP_MSG}, // Reminder: Saturday mixer at iBar
+		{0x09, 0x15, 0x55, 2 + ALARM_DISP_MSG}, // Reminder: Saturday mixer at iBar
+		{0x09, 0x16, 0x00, 2 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Saturday mixer at iBar
+		{0x09, 0x16, 0x15, 2 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Saturday mixer at iBar
+		{0x09, 0x16, 0x30, 2 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Saturday mixer at iBar
+		{0x09, 0x17, 0x00, 2 + ALARM_STOP_LIGHT}, // End: Saturday mixer at iBar
+
+		{0x09, 0x20, 0x30, 6 + ALARM_DISP_MSG}, // Reminder: Saturday party at Piranha
+		{0x09, 0x20, 0x45, 6 + ALARM_DISP_MSG}, // Reminder: Saturday party at Piranha
+		{0x09, 0x20, 0x50, 6 + ALARM_DISP_MSG}, // Reminder: Saturday party at Piranha
+		{0x09, 0x20, 0x55, 6 + ALARM_DISP_MSG}, // Reminder: Saturday party at Piranha
+		{0x09, 0x21, 0x00, 6 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Saturday party at Piranha
+		{0x09, 0x21, 0x15, 6 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Saturday party at Piranha
+		{0x09, 0x21, 0x30, 6 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Saturday party at Piranha
+
+		{0x09, 0x23, 0x30, 7 + ALARM_DISP_MSG}, // Reminder: Saturday karaoke
+		{0x09, 0x23, 0x45, 7 + ALARM_DISP_MSG}, // Reminder: Saturday karaoke
+		{0x09, 0x23, 0x50, 7 + ALARM_DISP_MSG}, // Reminder: Saturday karaoke
+		{0x09, 0x23, 0x55, 7 + ALARM_DISP_MSG}, // Reminder: Saturday karaoke
+		{0x10, 0x00, 0x00, 7 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Saturday karaoke
+		{0x10, 0x00, 0x15, 7 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Saturday karaoke
+		{0x10, 0x00, 0x30, 7 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Saturday karaoke
+
+		{0x10, 0x15, 0x30, 3 + ALARM_DISP_MSG + ALARM_START_LIGHT}, // Reminder: Sunday mixer at iBar
+		{0x10, 0x15, 0x45, 3 + ALARM_DISP_MSG}, // Reminder: Sunday mixer at iBar
+		{0x10, 0x15, 0x50, 3 + ALARM_DISP_MSG}, // Reminder: Sunday mixer at iBar
+		{0x10, 0x15, 0x55, 3 + ALARM_DISP_MSG}, // Reminder: Sunday mixer at iBar
+		{0x10, 0x16, 0x00, 3 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Sunday mixer at iBar
+		{0x10, 0x16, 0x15, 3 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Sunday mixer at iBar
+		{0x10, 0x16, 0x30, 3 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Sunday mixer at iBar
+		{0x10, 0x17, 0x00, 3 + ALARM_STOP_LIGHT}, // End: Sunday mixer at iBar
+
+		{0x10, 0x09, 0x30, 4 + ALARM_START_LIGHT}, // Reminder: Sunday after-party
+		{0x10, 0x09, 0x00, 4}, // Now: Sunday after-party
+		{0x11, 0x03, 0x00, 4 + ALARM_STOP_LIGHT}, // End: Sunday after-party
+};
+
+void init_alarms() {
+	if (!clock_is_set)
+		return;
+
+	currentTime = RTC_A_getCalendarTime(RTC_A_BASE);
+
+	// Find the next alarm:
+	uint8_t next_alarm = 0;
+	while (next_alarm < 49) {
+		// If current alarm is in the past or less than a minute away, go to next.
+		if (alarms[next_alarm].day < currentTime.DayOfMonth &&
+				alarms[next_alarm].hour < currentTime.Hours &&
+				alarms[next_alarm].min < currentTime.Minutes + 1) {
+			next_alarm++;
+		} else {
+			next_event_flag = alarms[next_alarm].flag;
+			break;
+		}
+		// TODO: If we're in between a start light and a stop light, go ahead
+		//  and take it upon ourselves to issue an f_alarm now.
+	}
+	if (next_alarm == 49) {
+		// queercon is over.
+		// TODO.
+		return;
+	}
+
+	// Set the next alarm!
+	RTC_A_setCalendarAlarm(
+			RTC_A_BASE,
+			alarms[next_alarm].min,
+			alarms[next_alarm].hour,
+			RTC_A_ALARMCONDITION_OFF,
+			alarms[next_alarm].day
+	);
 }
 
-void init_rtc() {
 
+void init_rtc() {
 	//Starting Time for Calendar:
 	currentTime.Seconds    = 0x00;
 	currentTime.Minutes    = 0x19;
@@ -183,4 +317,37 @@ void init_rtc() {
 
 void init_watchdog() {
 	WDT_A_hold(WDT_A_BASE);
+}
+
+#pragma vector=RTC_VECTOR
+__interrupt
+void RTC_A_ISR(void)
+{
+	switch (__even_in_range(RTCIV, 16)) {
+	case 0: break;  //No interrupts
+	case 2:         //RTCRDYIFG
+		// TODO: Only for now-ow-ow
+		f_new_second = 1;
+		__bic_SR_register_on_exit(LPM3_bits);
+		break;
+	case 4:         //RTCEVIFG
+		//Interrupts every minute
+		f_new_minute = 1;
+		__bic_SR_register_on_exit(LPM3_bits);
+		break;
+	case 6:         //RTCAIFG
+		f_alarm = next_event_flag;
+		break;
+	case 8: break;  //RT0PSIFG
+	case 10:
+		f_time_loop = 1; // We know what it does! It's a TIME LOOP MACHINE.
+		// ...who would build a device that loops time every 32 milliseconds?
+		// WHO KNOWS. But that's what it does.
+		__bic_SR_register_on_exit(LPM3_bits);
+		break; //RT1PSIFG
+	case 12: break; //Reserved
+	case 14: break; //Reserved
+	case 16: break; //Reserved
+	default: break;
+	}
 }
