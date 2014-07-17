@@ -339,7 +339,7 @@ void RTC_A_ISR(void)
 		f_alarm = next_event_flag;
 		break;
 	case 8: break;  //RT0PSIFG
-	case 10:
+	case 10:		// Rollover of prescale counter
 		f_time_loop = 1; // We know what it does! It's a TIME LOOP MACHINE.
 		// ...who would build a device that loops time every 32 milliseconds?
 		// WHO KNOWS. But that's what it does.
