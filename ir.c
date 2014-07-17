@@ -226,7 +226,7 @@ void ir_write(uint8_t* payload, uint8_t to_addr, uint8_t len) {
 }
 
 uint8_t ir_proto_state = IR_PROTO_LISTEN;
-uint8_t ir_proto_tto = IR_PROTO_TTO_DEFAULT; // tries to timeout
+uint8_t ir_proto_tto = IR_PROTO_TTO; // tries to timeout
 uint8_t ir_partner = 0;
 
 
@@ -239,7 +239,7 @@ inline uint8_t ir_paired() {
 	return (ir_proto_state & 0b1111) == 4;
 }
 
-#define IR_PAIR_SETSTATE(STATE) { ir_proto_tto = IR_PROTO_TTO_DEFAULT; ir_proto_state = STATE; }
+#define IR_PAIR_SETSTATE(STATE) { ir_proto_tto = IR_PROTO_TTO; ir_proto_state = STATE; }
 #define IR_ASSERT_PARTNER if (ir_partner != ir_rx_from) IR_PAIR_SETSTATE(IR_PROTO_LISTEN)
 
 void ir_process_timestep() {
@@ -318,18 +318,22 @@ void ir_process_rx_ready() {
 	case IR_PROTO_ITP_C:
 		IR_ASSERT_PARTNER
 		// For the SERVER: ir_proto_seqnum is what we are SENDING.
-		if (opcode == IR_OP_PAIRREQ && ir_proto_seqnum == 16) {
+		if (opcode == IR_OP_PAIRREQ && ir_proto_seqnum == ITPS_TO_PAIR) {
 			IR_PAIR_SETSTATE(IR_PROTO_PAIRING_C);
 			// TODO: send PAIRACC, with our message, etc.
 			ir_proto_setup(ir_partner, IR_OP_PAIRACC, 0);
 			ir_write_global();
+			f_ir_itp_step = 1;
 		} else if (opcode == IR_OP_ITP && seqnum == ir_proto_seqnum+1) {
 			ir_proto_seqnum += 2;
+			if (ir_proto_seqnum > ITPS_TO_SHOW_PAIRING)
+				f_ir_itp_step = 1;
 			// Specifically DON'T send anything at this point.
 			ir_proto_setup(ir_partner, IR_OP_ITP, ir_proto_seqnum);
 			IR_PAIR_SETSTATE(IR_PROTO_ITP_C);
 		} else {
 			IR_PAIR_SETSTATE(IR_PROTO_LISTEN);
+			f_ir_pair_abort = 1;
 		}
 		break;
 	case IR_PROTO_PAIRING_C:
@@ -351,6 +355,7 @@ void ir_process_rx_ready() {
 			ir_proto_setup(ir_partner, IR_OP_KEEPALIVE, 0);
 		} else {
 			IR_PAIR_SETSTATE(IR_PROTO_LISTEN);
+			f_ir_pair_abort = 1;
 		}
 		break;
 	case IR_PROTO_PAIRED_C:
@@ -383,13 +388,16 @@ void ir_process_rx_ready() {
 	case IR_PROTO_ITP_S: // can receive either ITP(##) or ITP(16)
 		IR_ASSERT_PARTNER
 		// For the SERVER: ir_proto_seqnum is what we are EXPECTING.
-		if (opcode == IR_OP_ITP && seqnum == ir_proto_seqnum && seqnum == 16) {
+		if (opcode == IR_OP_ITP && seqnum == ir_proto_seqnum && seqnum == ITPS_TO_PAIR) {
 			// TODO: send PAIRREQ
 			// send our message, etc
 			IR_PAIR_SETSTATE(IR_PROTO_PAIRING_S);
 			ir_proto_setup(ir_partner, IR_OP_PAIRREQ, 0);
+			f_ir_itp_step = 1;
 			ir_write_global();
 		} else if (opcode == IR_OP_ITP) {
+			if (ir_proto_seqnum > ITPS_TO_SHOW_PAIRING)
+				f_ir_itp_step = 1;
 			ir_proto_setup(ir_partner, IR_OP_ITP, seqnum+1);
 			ir_write_global();
 			if (seqnum == ir_proto_seqnum) {
@@ -400,6 +408,7 @@ void ir_process_rx_ready() {
 				// resend: no resetting of anything.
 			}
 		} else {
+			f_ir_pair_abort = 1;
 			IR_PAIR_SETSTATE(IR_PROTO_LISTEN)
 		}
 		break;
@@ -418,13 +427,14 @@ void ir_process_rx_ready() {
 			}
 			ir_proto_setup(ir_partner, IR_OP_PAIRACK, 0);
 			ir_write_global();
-		} else if (opcode == IR_OP_ITP && seqnum == 16) {
+		} else if (opcode == IR_OP_ITP && seqnum == ITPS_TO_PAIR) {
 			// resend:
 			// TODO: send PAIRREQ. Send message, etc; check if this is a new
 			// person.
 			ir_proto_setup(ir_partner, IR_OP_PAIRREQ, 0); // TODO: probably already done.
 			ir_write_global();
 		} else {
+			f_ir_pair_abort = 1;
 			IR_PAIR_SETSTATE(IR_PROTO_LISTEN);
 		}
 		break;

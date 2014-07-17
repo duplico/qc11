@@ -28,6 +28,8 @@ uint8_t f_unpaired = 0;
 uint8_t f_paired_new_person = 0;
 uint8_t f_paired_new_trick = 0;
 uint8_t start_new_animation = 0;
+uint8_t f_ir_itp_step = 0;
+uint8_t f_ir_pair_abort = 0;
 
 // Global state:
 uint8_t clock_is_set = 0;
@@ -170,11 +172,11 @@ int main( void )
 	}
 #if BADGE_TARGET
 	led_clear();
-	led_anim_init();
 	led_enable(LED_PERIOD/2);
 #else
 	uint8_t color = 0;
 #endif
+	led_anim_init();
 
 #if BADGE_TARGET
 	// Startup sequence:
@@ -207,6 +209,7 @@ int main( void )
 		}
 	}
 	delay(750);
+	uint8_t trick = 0;
 #endif
 
 	// Signals within the main thread:
@@ -224,6 +227,9 @@ int main( void )
 				   s_prop = 0,
 				   s_get_puppy = 0,
 				   s_lose_puppy = 0;
+
+	uint8_t itps = 0;
+	uint8_t itps_pattern = 0;
 
 	// Main sequence:
 	begin_sprite_animation((spriteframe *) anim_walkin, 4);
@@ -270,10 +276,11 @@ int main( void )
 		if (f_paired) {
 			f_paired = 0;
 			s_pair = 1;
-			led_print_scroll(ir_rx_message, 1, 1, 0);
+			itps_pattern = 0;
 		} else if (f_unpaired) {
-			led_print_scroll("unpair", 1, 1, 0);
 			f_unpaired = 0;
+			itps = 0;
+			itps_pattern = 0;
 			s_unpair = 1;
 		}
 
@@ -331,15 +338,26 @@ int main( void )
 			if (loops_to_ir_timestep) {
 				loops_to_ir_timestep--;
 			} else {
-				loops_to_ir_timestep = 8;
+				loops_to_ir_timestep = IR_LOOPS;
 				ir_process_timestep();
+			}
+
+			// number of ITPs to display data for: (ITPS_TO_PAIR-ITPS_TO_SHOW_PAIRING)
+			// (ITPS_TO_PAIR-ITPS_TO_SHOW_PAIRING) / 5: ITPS per light
+			// i < (ir_proto_seqnum-ITPS_TO_SHOW_PAIRING) / ((ITPS_TO_PAIR-ITPS_TO_SHOW_PAIRING) / 5)
+
+			if (ir_proto_state == IR_PROTO_ITP_C || ir_proto_state == IR_PROTO_ITP_S) {
+				itps_pattern = 0;
+				for (uint8_t i=0; i< (ir_proto_seqnum-ITPS_TO_SHOW_PAIRING) / ((ITPS_TO_PAIR - ITPS_TO_SHOW_PAIRING) / 5); i++) {
+					itps_pattern |= (1 << i);
+				}
+				led_set_rainbow(itps_pattern);
 			}
 
 			if (0) {
 				// TODO: radio
 			}
 		}
-
 
 		static uint8_t event_id = 0;
 		/*
@@ -398,11 +416,22 @@ int main( void )
 		 */
 
 		// Time to handle signals.
-
+#if BADGE_TARGET
+		if (s_pair) {
+			s_pair = 0;
+			led_print_scroll(ir_rx_message, 1, 1, 0);
+		}
+		if (s_unpair) {
+			s_unpair = 0;
+			led_print_scroll("unpair", 1, 1, 0);
+		}
+#endif
 		// Is an animation finished?
 		if (f_animation_done || start_new_animation) {
 			f_animation_done = 0;
 #if BADGE_TARGET
+			trick = (trick + 1) % 10;
+			begin_sprite_animation(tricks[trick], 4);
 #else
 			color = 0;
 #endif
@@ -415,6 +444,7 @@ int main( void )
 
 uint8_t post() {
 	__bic_SR_register(GIE);
+	delay(1000);
 	uint8_t post_result = 0;
 
 	// Clocks
@@ -458,7 +488,11 @@ uint8_t post() {
 	// IR loopback
 	static const char test_str[] = "qcxi";
 	ir_write((uint8_t *) test_str, 0xff, 0);
+#if BADGE_TARGET
 	uint16_t spin = 65535;
+#else
+	uint32_t spin = 1572840;
+#endif
 	while (spin-- && !f_ir_rx_ready);
 	if (f_ir_rx_ready) {
 		f_ir_rx_ready = 0;
