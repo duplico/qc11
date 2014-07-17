@@ -96,11 +96,21 @@ extern uint8_t clock_is_set;
 extern volatile uint8_t ir_rx_frame[]; // Used in POST
 extern uint8_t ir_reject_loopback;
 extern uint8_t ir_proto_state;
+extern uint8_t ir_proto_seqnum;
 extern volatile uint8_t loops_to_ir_timestep;
 
-#define IR_LOOPS_PER_SEC 2
+#define IR_LOOPS_PER_SEC 8
 #define IR_LOOPS TIME_LOOP_HZ / IR_LOOPS_PER_SEC
-#define IR_LOOPS_PER_BEACON 3
+
+#define IR_SECONDS_PER_BEACON 2
+#define IR_LOOPS_PER_BEACON IR_LOOPS * IR_SECONDS_PER_BEACON
+
+#define IR_SECONDS_TO_TIMEOUT 3
+#define IR_PROTO_TTO IR_LOOPS * IR_SECONDS_TO_TIMEOUT
+
+#define SECONDS_TO_PAIR 5
+#define ITPS_TO_PAIR IR_LOOPS_PER_SEC * SECONDS_TO_PAIR
+#define ITPS_TO_SHOW_PAIRING ITPS_TO_PAIR / 2
 
 // Persistent configuration:
 typedef struct {
@@ -132,6 +142,8 @@ extern uint8_t f_paired;
 extern uint8_t f_unpaired;
 extern uint8_t f_paired_new_person;
 extern uint8_t f_paired_new_trick;
+extern uint8_t f_ir_itp_step;
+extern uint8_t f_ir_pair_abort;
 
 // Extra features for the Launchpad version - serial and LED chains:
 #if !BADGE_TARGET
