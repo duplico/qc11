@@ -33,6 +33,7 @@ extern uint8_t led_text_scrolling;
 
 extern const spriteframe anim_wave[];
 extern const spriteframe anim_walkin[];
+extern spriteframe * tricks[];
 
 void led_init();
 

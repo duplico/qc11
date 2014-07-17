@@ -15,17 +15,21 @@ for f in infiles:
         outcode = "// Auto-generated animation %s\n" % animname
         outcode += "spriteframe anim_%s[] = {" % animname
         for frame in animation:
-            assert len(frame) == 6
+            assert len(frame) in [5, 6]
             outcode += "{"
             for i in range(8):
                 outcode+= "0b000"
-                for row in frame[-2::-1]:
+                for row in frame[4::-1]:
                     outcode += str(row[i])
                 outcode += ', '
-            frame_flag = frame[-1]
+            if len(frame) == 6:
+                frame_flag = frame[-1]
+            else:
+                frame_flag = 0
             if frame is animation[-1]:
                 frame_flag += 8
             outcode += "%d}," % frame_flag
         outcode += "};\n"
         with open('%s.qsprite' % animname, 'w') as wfile:
             wfile.write(outcode)
+        print outcode
