@@ -37,6 +37,8 @@ uint16_t loops_to_rf_beacon = 10 * TIME_LOOP_HZ;
 #define MTS_LEN 255
 char message_to_send[MTS_LEN] = "";
 
+qcxipayload in_payload, out_payload;
+
 #if !BADGE_TARGET
 volatile uint8_t f_ser_rx = 0;
 #endif
@@ -308,6 +310,9 @@ int main( void )
 		 *
 		 */
 		if (f_rfm_rx_done) {
+			f_rfm_rx_done = 0;
+			in_payload;
+			led_print_scroll("rx", 0, 1, 1);
 			// do something
 		}
 
@@ -429,6 +434,7 @@ int main( void )
 		// Is an animation finished?
 		if (f_animation_done || start_new_animation) {
 			f_animation_done = 0;
+			radio_send_sync();
 #if BADGE_TARGET
 			trick = (trick + 1) % 10;
 			begin_sprite_animation(tricks[trick], 4);
@@ -444,7 +450,6 @@ int main( void )
 
 uint8_t post() {
 	__bic_SR_register(GIE);
-	delay(1000);
 	uint8_t post_result = 0;
 
 	// Clocks
@@ -559,7 +564,31 @@ void check_config() {
 	}
 	strcpy(&(ir_pair_payload[0]), my_conf.handle);
 	strcpy(&(ir_pair_payload[11]), my_conf.message);
+
+
+//	uint8_t to_addr, from_addr, base_id, puppy_flags, clock_authority,
+//			seconds, minutes, hours, day, month;
+//	uint16_t year, clock_age_seconds;
+//	uint8_t prop_id, prop_time_loops_before_start, prop_from;
+
+	out_payload.to_addr = RFM_BROADCAST;
+	out_payload.from_addr = my_conf.badge_id;
+	out_payload.base_id = 0; // TODO: unless I'm a base
+	out_payload.puppy_flags = 0;
+	out_payload.clock_authority = 255; // UNSET
+	out_payload.seconds = 0;
+	out_payload.minutes = 0;
+	out_payload.hours = 0;
+	out_payload.day = 0;
+	out_payload.month = 0;
+	out_payload.year = 0;
+	out_payload.clock_age_seconds = 0;
+	out_payload.prop_id = 0;
+	out_payload.prop_time_loops_before_start = 0;
+	out_payload.prop_from = RFM_BROADCAST;
+
 	// TODO: the opposite of WDT_A_hold(WDT_A_BASE);
+	// probably.
 }
 
 void delay(uint16_t ms)

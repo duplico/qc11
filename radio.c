@@ -19,12 +19,11 @@ uint8_t returnValue = 0;
 // The register-reading machine:
 volatile uint8_t rfm_reg_tx_index = 0;
 volatile uint8_t rfm_reg_rx_index = 0;
-volatile uint8_t rfm_reg_len = 64;
 volatile uint8_t rfm_begin = 0;
 volatile uint8_t rfm_rw_reading  = 0; // 0- read, 1- write
 volatile uint8_t rfm_rw_single = 0; // 0- single, 1- fifo
 volatile uint8_t rfm_single_msg = 0;
-volatile uint8_t rfm_fifo[64] = {0};
+volatile uint8_t rfm_fifo[sizeof(qcxipayload)] = {0};
 
 #define RFM_REG_IDLE			0
 #define RFM_REG_RX_SINGLE_CMD	1
@@ -127,6 +126,17 @@ void init_radio() {
 	write_single_register(0x26, 0x07);
 	write_single_register(0x29, 0xe0);
 //	write_single_register(0x29, 0xd0);
+
+	// Setup addresses and length:
+	//  Fixed-length, Manchester encoding, CRC on, clear FIFO on bad CRC,
+	//  filter on address and broadcast:
+	write_single_register(0x37, 0b00011010); // TODO: turn filter back on.
+	write_single_register(0x38, sizeof(qcxipayload)); // PayloadLength
+	write_single_register(0x39, my_conf.badge_id); // NodeAddress
+	write_single_register(0x40, RFM_BROADCAST); // BroadcastAddress
+	// Set my address
+	// Set broadcast address
+
 	mode_sb_sync(); // Need to do this before we enable the interrupt for DIO0.
 
 	for (uint8_t sync_addr=0x2f; sync_addr<=0x36; sync_addr++) {
@@ -238,10 +248,8 @@ inline void radio_send_dispatch(uint8_t len) {
 }
 
 // TODO: This currently blocks.
-void radio_send(uint8_t *data, uint8_t len) {
-	memcpy((void *)rfm_fifo, (void *)data, len);
+void radio_send_sync() {
 	while (rfm_reg_state != RFM_REG_IDLE || rfm_proto_state != RFM_PROTO_RX_IDLE); // Block until ready to write.
-//	radio_send_dispatch(len);
 	rfm_proto_state = RFM_PROTO_SB_UNSET_CMD;
 	mode_sb_async();
 	while (rfm_reg_state != RFM_REG_IDLE || rfm_proto_state != RFM_PROTO_RX_IDLE); // Block until written.
@@ -312,9 +320,9 @@ __interrupt void USCI_B1_ISR(void)
 			break;
 		case RFM_REG_RX_FIFO_DAT:
 			// Got a data byte from the FIFO. Put it into its proper place.
-			rfm_fifo[rfm_reg_rx_index] = USCI_B_SPI_receiveData(USCI_B1_BASE);
+			((uint8_t *) &in_payload)[rfm_reg_rx_index] = USCI_B_SPI_receiveData(USCI_B1_BASE);
 			rfm_reg_rx_index++;
-			if (rfm_reg_rx_index == rfm_reg_len) {
+			if (rfm_reg_rx_index == sizeof(qcxipayload)) {
 				// That was the last one we were expecting.
 				rfm_reg_ifgs++; // RX thread is ready to go IDLE.
 			}
@@ -323,7 +331,7 @@ __interrupt void USCI_B1_ISR(void)
 			// Got a data byte from the FIFO, but we're writing so it's stale garbage.
 			USCI_B_SPI_receiveData(USCI_B1_BASE); // Throw it away.
 			rfm_reg_rx_index++;
-			if (rfm_reg_rx_index == rfm_reg_len) {
+			if (rfm_reg_rx_index == sizeof(qcxipayload)) {
 				// That was the last one we were expecting.
 				rfm_reg_ifgs++; // RX thread is ready to go IDLE.
 			}
@@ -369,7 +377,7 @@ __interrupt void USCI_B1_ISR(void)
 			// Fall through and send the first data byte's corresponsing 0 as below:
 		case RFM_REG_RX_FIFO_DAT:
 			// We just finished sending the blank message of index rfm_reg_tx_index-1.
-			if (rfm_reg_tx_index == rfm_reg_len) {
+			if (rfm_reg_tx_index == sizeof(qcxipayload)) {
 				// We just finished sending the last one.
 				rfm_reg_ifgs++; // TX thread is ready to go IDLE.
 			} else {
@@ -385,12 +393,12 @@ __interrupt void USCI_B1_ISR(void)
 			// Fall through and send the first data byte as below:
 		case RFM_REG_TX_FIFO_DAT:
 			// We just finished sending the message of index rfm_reg_tx_index-1.
-			if (rfm_reg_tx_index == rfm_reg_len) {
+			if (rfm_reg_tx_index == sizeof(qcxipayload)) {
 				// We just finished sending the last one.
 				rfm_reg_ifgs++; // TX thread is ready to go IDLE.
 			} else {
 				// We have more to send.
-				USCI_B_SPI_transmitData(USCI_B1_BASE, rfm_fifo[rfm_reg_tx_index]);
+				USCI_B_SPI_transmitData(USCI_B1_BASE, ((uint8_t *) &out_payload)[rfm_reg_tx_index]);
 				rfm_reg_tx_index++;
 			}
 			break;
@@ -460,7 +468,7 @@ __interrupt void USCI_B1_ISR(void)
 				// mode change went well
 				rfm_proto_state = RFM_PROTO_SB_FIFO;
 				// time to start filling the FIFO:
-				radio_send_dispatch(64);
+				radio_send_dispatch(sizeof(qcxipayload));
 			} else {
 				read_single_register_async(RFM_IRQ1);
 			}
