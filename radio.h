@@ -16,6 +16,8 @@
 #define RFM_IRQ1 0x27
 #define RFM_IRQ2 0x28
 
+#define RFM_BROADCAST 0xff
+
 void init_radio();
 
 void write_single_register(uint8_t, uint8_t);
@@ -25,7 +27,7 @@ void mode_sb_sync();
 void mode_tx_sync();
 void mode_tx_async();
 
-void radio_send(uint8_t*, uint8_t);
+void radio_send_sync();
 
 uint8_t rfm_crcok();
 
