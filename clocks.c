@@ -258,7 +258,7 @@ void init_alarms() {
 		// If current alarm is in the past or less than a minute away, go to next.
 		if (alarms[next_alarm].day < currentTime.DayOfMonth &&
 				alarms[next_alarm].hour < currentTime.Hours &&
-				alarms[next_alarm].min < currentTime.Minutes + 1) {
+				alarms[next_alarm].min < currentTime.Minutes + 1) { // TODO: I think there's some wrong math here...
 			next_alarm++;
 		} else {
 			next_event_flag = alarms[next_alarm].flag;
@@ -269,7 +269,7 @@ void init_alarms() {
 	}
 	if (next_alarm == 49) {
 		// queercon is over.
-		// TODO.
+		// TODO
 		return;
 	}
 
@@ -285,19 +285,19 @@ void init_alarms() {
 
 
 void init_rtc() {
-	//Starting Time for Calendar:
-	currentTime.Seconds    = 0x00;
-	currentTime.Minutes    = 0x19;
-	currentTime.Hours      = 0x18;
-	currentTime.DayOfWeek  = 0x03;
-	currentTime.DayOfMonth = 0x20;
-	currentTime.Month      = 0x07;
-	currentTime.Year       = 0x2011;
+	//Starting Time for Calendar: // TODO:
+	currentTime.Seconds    = 00;
+	currentTime.Minutes    = 19;
+	currentTime.Hours      = 18;
+	currentTime.DayOfWeek  = 03;
+	currentTime.DayOfMonth = 20;
+	currentTime.Month      = 07;
+	currentTime.Year       = 2011;
 
 	//Initialize Calendar Mode of RTC
 	RTC_A_calendarInit(RTC_A_BASE,
 			currentTime,
-			RTC_A_FORMAT_BCD);
+			RTC_A_FORMAT_BINARY);
 
 	//Interrupt to every minute with a CalendarEvent
 	RTC_A_setCalendarEvent(RTC_A_BASE,
@@ -325,13 +325,12 @@ void RTC_A_ISR(void)
 {
 	switch (__even_in_range(RTCIV, 16)) {
 	case 0: break;  //No interrupts
-	case 2:         //RTCRDYIFG
-		// TODO: Only for now-ow-ow
+	case 2:         //RTCRDYIFG // TODO: make sure this is on
 		f_new_second = 1;
 		__bic_SR_register_on_exit(LPM3_bits);
 		break;
 	case 4:         //RTCEVIFG
-		//Interrupts every minute
+		//Interrupts every minute // TODO: make sure this is on if we need it
 		f_new_minute = 1;
 		__bic_SR_register_on_exit(LPM3_bits);
 		break;
