@@ -127,15 +127,15 @@ void init_radio() {
 	write_single_register(0x29, 0xe0);
 //	write_single_register(0x29, 0xd0);
 
+	write_single_register(0x11, 0b10010010); // Output power to 0 dBm
+
 	// Setup addresses and length:
 	//  Fixed-length, Manchester encoding, CRC on, clear FIFO on bad CRC,
 	//  filter on address and broadcast:
-	write_single_register(0x37, 0b00011010); // TODO: turn filter back on.
+	write_single_register(0x37, 0b00010100);
 	write_single_register(0x38, sizeof(qcxipayload)); // PayloadLength
 	write_single_register(0x39, my_conf.badge_id); // NodeAddress
-	write_single_register(0x40, RFM_BROADCAST); // BroadcastAddress
-	// Set my address
-	// Set broadcast address
+	write_single_register(0x3A, RFM_BROADCAST); // BroadcastAddress
 
 	mode_sb_sync(); // Need to do this before we enable the interrupt for DIO0.
 
