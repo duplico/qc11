@@ -14,6 +14,8 @@
 // Configuration flags
 #define BADGE_TARGET 1
 #define DEBUG_SERIAL 0
+#define BADGES_IN_SYSTEM 160
+#define RECEIVE_WINDOW 5
 
 // Memory organization (same for F5529 and F5308)
 #define INFOA_START 0x001980
@@ -126,6 +128,8 @@ typedef struct {
 	uint16_t crc;
 } qcxiconf;
 extern qcxiconf my_conf;
+
+extern volatile Calendar currentTime;
 
 // Flags for interrupt service routines to signal the main thread:
 extern volatile uint8_t f_new_minute;

@@ -33,11 +33,24 @@ uint8_t f_ir_pair_abort = 0;
 
 // Global state:
 uint8_t clock_is_set = 0;
+uint8_t my_clock_authority = 0;
+uint16_t clock_setting_age = 0;
 uint16_t loops_to_rf_beacon = 10 * TIME_LOOP_HZ;
 #define MTS_LEN 255
 char message_to_send[MTS_LEN] = "";
 
 qcxipayload in_payload, out_payload;
+
+// Gaydar - Stolen from QC10:
+uint8_t neighbor_counts[RECEIVE_WINDOW] = {0};
+uint8_t window_position = 0;
+uint8_t badges_seen[BADGES_IN_SYSTEM];
+uint8_t total_badges_seen = 0;
+uint8_t uber_badges_seen = 0;
+uint8_t last_neighbor_count = 0;
+uint8_t neighbor_count = 0;
+
+
 
 #if !BADGE_TARGET
 volatile uint8_t f_ser_rx = 0;
@@ -245,6 +258,10 @@ int main( void )
 		}
 #endif
 
+		if (f_new_second) {
+			currentTime = RTC_A_getCalendarTime(RTC_A_BASE);
+		}
+
 		/*
 		 * From the IR
 		 * * Docking with base station
@@ -311,9 +328,67 @@ int main( void )
 		 */
 		if (f_rfm_rx_done) {
 			f_rfm_rx_done = 0;
-			in_payload;
-			led_print_scroll("rx", 0, 1, 1);
-			// do something
+			if (in_payload.to_addr == my_conf.badge_id) {
+				// Unicast, probably about the puppy.
+			} else if (in_payload.base_id != 0xFF) {
+				// Base station, may need to check in.
+			} else if (in_payload.prop_from != 0xFF) {
+				// It's a prop notification.
+			} else {
+				// It's a beacon.
+
+				// Increment our beacon count in the current position in our
+				// sliding window.
+				neighbor_counts[window_position]+=1;
+				// TODO: See if this is a new friend
+
+				// If this marks a new max we should show it immediately.
+				if (neighbor_counts[window_position] > neighbor_count) {
+					// set_gaydar_state(neighbor_counts[window_position]);
+					neighbor_count = neighbor_counts[window_position];
+				}
+
+				led_print_scroll("rx", 0, 1, 1);
+
+			}
+
+			if (!clock_is_set || in_payload.clock_authority < my_clock_authority) {
+				static uint8_t clock_updated = 0;
+
+				if (currentTime.Year != in_payload.year) {
+					currentTime.Year = in_payload.year;
+					clock_updated = 1;
+				}
+				if (currentTime.Month != in_payload.month) {
+					currentTime.Month = in_payload.month;
+					clock_updated = 1;
+				}
+				if (currentTime.DayOfMonth != in_payload.day) {
+					currentTime.DayOfMonth = in_payload.day;
+					clock_updated = 1;
+				}
+				if (currentTime.Hours != in_payload.hours) {
+					currentTime.Hours = in_payload.hours;
+					clock_updated = 1;
+				}
+				if (currentTime.Minutes != in_payload.minutes) {
+					currentTime.Minutes = in_payload.minutes;
+					currentTime.Seconds = in_payload.seconds;
+				} else if (in_payload.seconds < ((currentTime.Seconds-1) % 60) ||
+						   in_payload.seconds > ((currentTime.Seconds+1) % 60)) {
+					currentTime.Seconds = in_payload.seconds;
+					clock_updated = 1;
+				}
+
+				if (clock_updated) {
+					clock_is_set = 1;
+					clock_setting_age = 0;
+					my_clock_authority = in_payload.clock_authority;
+					clock_updated = 0;
+					init_alarms();
+					led_print_scroll("clock", 0, 1, 1);
+				}
+			}
 		}
 
 		/*
@@ -573,7 +648,7 @@ void check_config() {
 
 	out_payload.to_addr = RFM_BROADCAST;
 	out_payload.from_addr = my_conf.badge_id;
-	out_payload.base_id = 0; // TODO: unless I'm a base
+	out_payload.base_id = 0xFF; // TODO: unless I'm a base
 	out_payload.puppy_flags = 0;
 	out_payload.clock_authority = 255; // UNSET
 	out_payload.seconds = 0;
@@ -585,7 +660,7 @@ void check_config() {
 	out_payload.clock_age_seconds = 0;
 	out_payload.prop_id = 0;
 	out_payload.prop_time_loops_before_start = 0;
-	out_payload.prop_from = RFM_BROADCAST;
+	out_payload.prop_from = 0xFF;
 
 	// TODO: the opposite of WDT_A_hold(WDT_A_BASE);
 	// probably.
