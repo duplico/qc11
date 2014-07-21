@@ -180,6 +180,9 @@ void init_clocks() {
 
 
 // TODO: refactor alarms so that we can procedurally generate the reminders.
+// event has a time;
+// reminder: yes/no
+// light: yes/no
 
 /*
  * NB:
