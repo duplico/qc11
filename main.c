@@ -10,6 +10,7 @@
 #include "leds.h"
 #include "ir.h"
 #include "ws2812.h"
+#include "anim.h"
 #include "main.h"
 
 #pragma DATA_SECTION (my_conf, ".infoA");
