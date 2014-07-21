@@ -13,7 +13,7 @@ for f in infiles:
         animation = ast.literal_eval(value)
         animname = f.split('.')[0]
         outcode = "// Auto-generated animation %s\n" % animname
-        outcode += "spriteframe anim_%s[] = {" % animname
+        outcode += "const spriteframe anim_%s[] = {" % animname
         for frame in animation:
             assert len(frame) in [5, 6]
             outcode += "{"

@@ -1,0 +1,2 @@
+// Auto-generated animation sprite_crowd_stick_jump
+const spriteframe anim_sprite_crowd_stick_jump[] = {{0b00000001, 0b00000001, 0b00000001, 0b00000000, 0b00000000, 0},{0b00000000, 0b00000001, 0b00000001, 0b00000001, 0b00000000, 0},{0b00000001, 0b00000001, 0b00000001, 0b00000000, 0b00000000, 8},};
