@@ -2,6 +2,7 @@
 
 #include "qcxi.h"
 #include <string.h>
+#include <stdlib.h>
 
 #include "radio.h"
 #include "fonts.h"
@@ -51,6 +52,7 @@ uint8_t last_neighbor_count = 0;
 uint8_t neighbor_count = 0;
 uint8_t neighbor_count_cycle = 0;
 uint8_t window_seconds = RECEIVE_WINDOW_LENGTH_SECONDS;
+uint8_t trick_seconds = TRICK_INTERVAL_SECONDS;
 
 #if !BADGE_TARGET
 volatile uint8_t f_ser_rx = 0;
@@ -169,6 +171,8 @@ int main( void )
 	__bis_SR_register(GIE);
 	init_radio(); // requires interrupts enabled.
 
+	srand(my_conf.badge_id);
+
 	// Power-on self test:
 	uint8_t post_result = post();
 	if (post_result != 0) {
@@ -202,7 +206,7 @@ int main( void )
 	led_clear();
 	led_print_scroll("qcxi", 1, 1, 0);
 
-	while (startup_seq_index<1) {
+	while (startup_seq_index<3) {
 		// Time to do something because of time?
 		if (f_time_loop) {
 			f_time_loop = 0;
@@ -223,6 +227,13 @@ int main( void )
 //			case 3:
 //				led_print_scroll("Please leave my batteries in!", 1, 1, 0);
 //				break;
+			case 1:
+				begin_sprite_animation((spriteframe *) anim_sprite_walkin, 4);
+				break;
+			case 2:
+				begin_sprite_animation((spriteframe *) anim_sprite_wave, 4);
+				break;
+
 			}
 		}
 	}
@@ -250,7 +261,6 @@ int main( void )
 	static uint8_t itps_pattern = 0;
 
 	// Main sequence:
-	begin_sprite_animation((spriteframe *) anim_walkin, 4);
 	while (1) {
 
 #if !BADGE_TARGET
@@ -268,6 +278,16 @@ int main( void )
 			if (currentTime.Seconds >= 60) {
 				currentTime = RTC_A_getCalendarTime(RTC_A_BASE);
 			}
+
+			if (!trick_seconds) {
+				// TODO: Decide what trick or prop to do.
+				trick_seconds = TRICK_INTERVAL_SECONDS;
+				trick = (trick + 1) % 15;
+				s_trick = trick+1;
+			} else if (!sprite_animate && !led_text_scrolling) {
+				trick_seconds--;
+			}
+
 
 			if (!window_seconds) {
 				window_seconds = RECEIVE_WINDOW_LENGTH_SECONDS;
@@ -508,13 +528,15 @@ int main( void )
 			s_unpair = 0;
 			led_print_scroll("unpair", 1, 1, 0);
 		}
+		if (s_trick) {
+			s_trick = 0;
+			begin_sprite_animation((spriteframe *)tricks[trick-1], 4);
+		}
 #endif
 		// Is an animation finished?
 		if (f_animation_done || start_new_animation) {
 			f_animation_done = 0;
 #if BADGE_TARGET
-			trick = (trick + 1) % 15;
-			begin_sprite_animation(tricks[trick], 4);
 #else
 			color = 0;
 #endif
