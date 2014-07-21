@@ -23,7 +23,6 @@ volatile uint8_t rfm_begin = 0;
 volatile uint8_t rfm_rw_reading  = 0; // 0- read, 1- write
 volatile uint8_t rfm_rw_single = 0; // 0- single, 1- fifo
 volatile uint8_t rfm_single_msg = 0;
-volatile uint8_t rfm_fifo[sizeof(qcxipayload)] = {0};
 
 #define RFM_REG_IDLE			0
 #define RFM_REG_RX_SINGLE_CMD	1
@@ -41,15 +40,6 @@ volatile uint8_t rfm_reg_state = RFM_REG_IDLE;
 // The protocol machine:
 volatile uint8_t rfm_proto_state = 0;
 
-#define RFM_PROTO_RX_IDLE 0
-#define RFM_PROTO_RX_FIFO 1
-#define RFM_PROTO_SB_UNSET_CMD 2
-#define RFM_PROTO_SB_UNSET_DAT 3
-#define RFM_PROTO_SB_FIFO 4
-#define RFM_PROTO_TX 5
-#define RFM_PROTO_RX_UNSET_CMD 6
-#define RFM_PROTO_RX_UNSET_DAT 7
-
 void init_radio() {
 
 	// SPI for radio //////////////////////////////////////////////////////////
@@ -64,7 +54,8 @@ void init_radio() {
 	//
 
 	// DIO0 (interrupt pin):
-	GPIO_setAsInputPin(GPIO_PORT_P2, GPIO_PIN0);
+//	GPIO_setAsInputPin(GPIO_PORT_P2, GPIO_PIN0);
+	P2SEL &= ~BIT0;
 
 	// RESET:
 	GPIO_setAsOutputPin(GPIO_PORT_P6, GPIO_PIN0);
@@ -90,7 +81,11 @@ void init_radio() {
 	returnValue = USCI_B_SPI_masterInit(
 		USCI_B1_BASE,
 		USCI_B_SPI_CLOCKSOURCE_SMCLK, // selectClockSource
+#if BADGE_TARGET
+		8000000,
+#else
 		UCS_getSMCLK(),
+#endif
 		SPICLK,
 		USCI_B_SPI_MSB_FIRST,
 		USCI_B_SPI_PHASE_DATA_CAPTURED_ONFIRST_CHANGED_ON_NEXT,
@@ -160,7 +155,7 @@ void init_radio() {
 
 }
 
-inline void write_single_register_async(uint8_t addr, uint8_t data) {
+ void write_single_register_async(uint8_t addr, uint8_t data) {
 	if (rfm_reg_state != RFM_REG_IDLE)
 		return; // TODO: flag a fault?
 	rfm_reg_state = RFM_REG_TX_SINGLE_CMD;
@@ -170,7 +165,7 @@ inline void write_single_register_async(uint8_t addr, uint8_t data) {
 	USCI_B_SPI_transmitData(USCI_B1_BASE, addr); // Send our command.
 }
 
-inline void write_single_register(uint8_t addr, uint8_t data) {
+ void write_single_register(uint8_t addr, uint8_t data) {
 	/*
 	 * This blocks.
 	 */
@@ -179,7 +174,7 @@ inline void write_single_register(uint8_t addr, uint8_t data) {
 	while (rfm_reg_state != RFM_REG_IDLE); // Block until written.
 }
 
-inline void read_single_register_async(uint8_t addr) {
+ void read_single_register_async(uint8_t addr) {
 	if (rfm_reg_state != RFM_REG_IDLE)
 			return; // TODO: flag a fault?
 	rfm_reg_state = RFM_REG_RX_SINGLE_CMD;
@@ -188,18 +183,18 @@ inline void read_single_register_async(uint8_t addr) {
 	USCI_B_SPI_transmitData(USCI_B1_BASE, addr); // Send our command.
 }
 
-inline uint8_t read_single_register_sync(uint8_t addr) {
+ uint8_t read_single_register_sync(uint8_t addr) {
 	while (rfm_reg_state != RFM_REG_IDLE); // Block until ready to read.
 	read_single_register_async(addr);
 	while (rfm_reg_state != RFM_REG_IDLE); // Block until read finished.
 	return rfm_single_msg;
 }
 
-inline void mode_rx_async() {
+ void mode_rx_async() {
 	write_single_register_async(RFM_OPMODE, 0b00010000);
 }
 
-inline void mode_rx_sync() {
+ void mode_rx_sync() {
 	while (rfm_reg_state != RFM_REG_IDLE);
 	mode_rx_async(); // Receive mode.
 	while (rfm_reg_state != RFM_REG_IDLE);
@@ -210,11 +205,11 @@ inline void mode_rx_sync() {
 	while (!(BIT7 & reg_read) || !(BIT6 & reg_read));
 }
 
-inline void mode_sb_async() {
+ void mode_sb_async() {
 	write_single_register_async(RFM_OPMODE, 0b00000100);
 }
 
-inline void mode_sb_sync() {
+ void mode_sb_sync() {
 	while (rfm_reg_state != RFM_REG_IDLE);
 	mode_sb_async();
 	while (rfm_reg_state != RFM_REG_IDLE);
@@ -229,7 +224,7 @@ void mode_tx_async() {
 	write_single_register_async(RFM_OPMODE, 0b00001100); // TX mode.
 }
 
-inline void mode_tx_sync() {
+ void mode_tx_sync() {
 	while (rfm_reg_state != RFM_REG_IDLE);
 	mode_tx_async(); // TX mode.
 	while (rfm_reg_state != RFM_REG_IDLE);
@@ -240,14 +235,13 @@ inline void mode_tx_sync() {
 	while (!(BIT7 & reg_read) || !(BIT5 & reg_read));
 }
 
-inline void radio_send_dispatch(uint8_t len) {
+ void radio_send_dispatch(uint8_t len) {
 	if (rfm_reg_state != RFM_REG_IDLE) return; // TODO
 	rfm_reg_state = RFM_REG_TX_FIFO_CMD;
 	GPIO_setOutputLowOnPin(RFM_NSS_PORT, RFM_NSS_PIN); // Hold NSS low to begin frame.
 	USCI_B_SPI_transmitData(USCI_B1_BASE, RFM_FIFO | 0b10000000); // Send write command.
 }
 
-// TODO: This currently blocks.
 void radio_send_sync() {
 	while (rfm_reg_state != RFM_REG_IDLE || rfm_proto_state != RFM_PROTO_RX_IDLE); // Block until ready to write.
 	rfm_proto_state = RFM_PROTO_SB_UNSET_CMD;
@@ -255,7 +249,22 @@ void radio_send_sync() {
 	while (rfm_reg_state != RFM_REG_IDLE || rfm_proto_state != RFM_PROTO_RX_IDLE); // Block until written.
 }
 
-inline void radio_recv_start() {
+void radio_send_half_async() {
+	if (rfm_reg_state != RFM_REG_IDLE || rfm_proto_state != RFM_PROTO_RX_IDLE)
+		return;
+	rfm_proto_state = RFM_PROTO_SB_UNSET_CMD;
+	mode_sb_async();
+	while (rfm_reg_state != RFM_REG_IDLE || rfm_proto_state != RFM_PROTO_RX_IDLE); // Block until written.
+}
+
+void radio_send_async() {
+	if (rfm_reg_state != RFM_REG_IDLE || rfm_proto_state != RFM_PROTO_RX_IDLE)
+		return;
+	rfm_proto_state = RFM_PROTO_SB_UNSET_CMD;
+	mode_sb_async();
+}
+
+ void radio_recv_start() {
 	if (rfm_reg_state != RFM_REG_IDLE)
 			return; // TODO: flag a fault?
 	rfm_reg_state = RFM_REG_RX_FIFO_CMD;

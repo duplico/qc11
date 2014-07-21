@@ -14,7 +14,7 @@
 
 volatile uint8_t received_data = 0;
 
-volatile uint8_t ir_rx_frame[64] = {0};
+volatile uint8_t ir_rx_frame[38] = {0};
 volatile uint16_t ir_rx_crc = 0;
 volatile uint8_t ir_rx_index = 0;
 volatile uint8_t ir_rx_len = 0;
@@ -27,8 +27,8 @@ uint8_t ir_reject_loopback = 0;
 
 // Protocol: SYNC0, SYNC1, FROM, TO, LEN, DATA, CRC_MSB, CRC_LSB, SYNC2, SYNC3
 // CRC16 of:              |_____|        |.....|
-//  Max length: 56 bytes
-uint8_t ir_tx_frame[64] = {SYNC0, SYNC1, 0, 0xFF, 1, 0, 0, 0, SYNC2, SYNC3, 0};
+//  Max length: 28 bytes
+uint8_t ir_tx_frame[38] = {SYNC0, SYNC1, 0, 0xFF, 1, 0, 0, 0, SYNC2, SYNC3, 0};
 volatile uint8_t ir_xmit = 0;
 volatile uint8_t ir_xmit_index = 0;
 volatile uint8_t ir_xmit_len = 0;
@@ -239,7 +239,12 @@ inline uint8_t ir_paired() {
 	return (ir_proto_state & 0b1111) == 4;
 }
 
-#define IR_PAIR_SETSTATE(STATE) { ir_proto_tto = IR_PROTO_TTO; ir_proto_state = STATE; }
+void ir_pair_setstate(uint8_t state) {
+	ir_proto_tto = IR_PROTO_TTO;
+	ir_proto_state = state;
+}
+
+#define IR_PAIR_SETSTATE(STATE) ir_pair_setstate(STATE);
 #define IR_ASSERT_PARTNER if (ir_partner != ir_rx_from) IR_PAIR_SETSTATE(IR_PROTO_LISTEN)
 
 void ir_process_timestep() {

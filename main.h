@@ -10,6 +10,6 @@
 
 void check_config();
 uint8_t post();
-
+inline void update_clock();
 
 #endif /* MAIN_H_ */
