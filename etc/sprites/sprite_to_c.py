@@ -3,7 +3,7 @@ import json
 import re
 import ast
 
-infiles = [f for f in os.listdir('.') if os.path.isfile(f) and f.endswith('.jsprite')]
+infiles = [f for f in os.listdir('.') if os.path.isfile(f) and '.' not in f]
 
 for f in infiles:
     with open(f, 'r') as jspritefile:
@@ -17,11 +17,8 @@ for f in infiles:
         for frame in animation:
             assert len(frame) in [5, 6]
             outcode += "{"
-            for i in range(8):
-                outcode+= "0b000"
-                for row in frame[4::-1]:
-                    outcode += str(row[i])
-                outcode += ', '
+            for row in frame[4::-1]:
+                outcode += "0b" + ''.join(map(str,row)) + ', '
             if len(frame) == 6:
                 frame_flag = frame[-1]
             else:

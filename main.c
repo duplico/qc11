@@ -49,8 +49,8 @@ uint8_t total_badges_seen = 0;
 uint8_t uber_badges_seen = 0;
 uint8_t last_neighbor_count = 0;
 uint8_t neighbor_count = 0;
-
-
+uint8_t neighbor_count_cycle = 0;
+uint8_t window_seconds = RECEIVE_WINDOW_LENGTH_SECONDS;
 
 #if !BADGE_TARGET
 volatile uint8_t f_ser_rx = 0;
@@ -61,9 +61,12 @@ char time[6] = "00:00";
 void init_power() {
 #if BADGE_TARGET
 	// Set Vcore to 1.8 V - NB: allows MCLK up to 8 MHz only
-	PMM_setVCore(PMM_CORE_LEVEL_0);
+//	PMM_setVCore(PMM_CORE_LEVEL_0);
+//	PMMCTL0 &= 0b11111100;
+//	PMMCTL0 |= 0b11;
 #else
-	PMM_setVCore(PMM_CORE_LEVEL_3);
+//	PMM_setVCore(PMM_CORE_LEVEL_3);
+	PMMCTL0 |= 0b11;
 #endif
 }
 
@@ -174,7 +177,7 @@ int main( void )
 		char hex[4] = {0, 0, 0, 0};
 		hex[0] = (post_result/16 < 10)? '0' + post_result/16 : 'A' - 10 + post_result/16;
 		hex[1] = (post_result%16 < 10)? '0' + post_result%16 : 'A' - 10 + post_result%16;
-		led_print(hex);
+		led_print_scroll(hex, 0, 0, 0);
 		for (uint8_t i=LED_PERIOD; i>0; i--) {
 			led_enable(i);
 			delay(25);
@@ -231,6 +234,7 @@ int main( void )
 	static uint8_t s_event_arrival = 0,
 				   s_on_bus = 0,
 				   s_event_alert = 0,
+				   s_need_rf_beacon = 0,
 				   s_pair = 0, // f_pair
 				   s_new_pair = 0,
 				   s_new_trick = 0,
@@ -243,8 +247,7 @@ int main( void )
 				   s_get_puppy = 0,
 				   s_lose_puppy = 0;
 
-	uint8_t itps = 0;
-	uint8_t itps_pattern = 0;
+	static uint8_t itps_pattern = 0;
 
 	// Main sequence:
 	begin_sprite_animation((spriteframe *) anim_walkin, 4);
@@ -259,7 +262,29 @@ int main( void )
 #endif
 
 		if (f_new_second) {
-			currentTime = RTC_A_getCalendarTime(RTC_A_BASE);
+			f_new_second = 0;
+
+			currentTime.Seconds++;
+			if (currentTime.Seconds >= 60) {
+				currentTime = RTC_A_getCalendarTime(RTC_A_BASE);
+			}
+
+			if (!window_seconds) {
+				window_seconds = RECEIVE_WINDOW_LENGTH_SECONDS;
+				s_need_rf_beacon = 1;
+				window_position = (window_position + 1) % RECEIVE_WINDOW;
+				neighbor_counts[window_position] = 0;
+				if (neighbor_count_cycle == window_position) {
+					neighbor_count = 0;
+					for (uint8_t i=0; i<RECEIVE_WINDOW; i++) {
+						if (neighbor_counts[i] > neighbor_count) {
+							neighbor_count = neighbor_counts[i];
+						}
+					}
+				}
+			} else {
+				window_seconds--;
+			}
 		}
 
 		/*
@@ -298,7 +323,6 @@ int main( void )
 			itps_pattern = 0;
 		} else if (f_unpaired) {
 			f_unpaired = 0;
-			itps = 0;
 			itps_pattern = 0;
 			s_unpair = 1;
 		}
@@ -330,13 +354,16 @@ int main( void )
 			f_rfm_rx_done = 0;
 			if (in_payload.to_addr == my_conf.badge_id) {
 				// Unicast, probably about the puppy.
-			} else if (in_payload.base_id != 0xFF) {
+			} else if (in_payload.base_id == BUS_BASE_ID) {
+				s_on_bus = RECEIVE_WINDOW;
+				// Bus
+			}
+			else if (in_payload.base_id != 0xFF) {
 				// Base station, may need to check in.
 			} else if (in_payload.prop_from != 0xFF) {
 				// It's a prop notification.
 			} else {
 				// It's a beacon.
-
 				// Increment our beacon count in the current position in our
 				// sliding window.
 				neighbor_counts[window_position]+=1;
@@ -346,49 +373,24 @@ int main( void )
 				if (neighbor_counts[window_position] > neighbor_count) {
 					// set_gaydar_state(neighbor_counts[window_position]);
 					neighbor_count = neighbor_counts[window_position];
+					neighbor_count_cycle = window_position;
+				} else if (neighbor_counts[window_position] == neighbor_count) {
+					neighbor_count_cycle = window_position;
 				}
 
 				led_print_scroll("rx", 0, 1, 1);
 
 			}
-
-			if (!clock_is_set || in_payload.clock_authority < my_clock_authority) {
-				static uint8_t clock_updated = 0;
-
-				if (currentTime.Year != in_payload.year) {
-					currentTime.Year = in_payload.year;
-					clock_updated = 1;
-				}
-				if (currentTime.Month != in_payload.month) {
-					currentTime.Month = in_payload.month;
-					clock_updated = 1;
-				}
-				if (currentTime.DayOfMonth != in_payload.day) {
-					currentTime.DayOfMonth = in_payload.day;
-					clock_updated = 1;
-				}
-				if (currentTime.Hours != in_payload.hours) {
-					currentTime.Hours = in_payload.hours;
-					clock_updated = 1;
-				}
-				if (currentTime.Minutes != in_payload.minutes) {
-					currentTime.Minutes = in_payload.minutes;
-					currentTime.Seconds = in_payload.seconds;
-				} else if (in_payload.seconds < ((currentTime.Seconds-1) % 60) ||
-						   in_payload.seconds > ((currentTime.Seconds+1) % 60)) {
-					currentTime.Seconds = in_payload.seconds;
-					clock_updated = 1;
-				}
-
-				if (clock_updated) {
-					clock_is_set = 1;
-					clock_setting_age = 0;
-					my_clock_authority = in_payload.clock_authority;
-					clock_updated = 0;
-					init_alarms();
-					led_print_scroll("clock", 0, 1, 1);
-				}
+			if (in_payload.clock_authority != 0xff &&
+					(!clock_is_set ||
+							in_payload.clock_authority < my_clock_authority)) {
+				update_clock();
 			}
+		}
+
+		if (s_need_rf_beacon && rfm_proto_state == RFM_PROTO_RX_IDLE) {
+			radio_send_half_async();
+			s_need_rf_beacon = 0;
 		}
 
 		/*
@@ -398,8 +400,8 @@ int main( void )
 		 *  * Time loop based activities:
 		 * * It's been long enough that we can do a trick (set flag from time loop)
 		 * **  (maybe the trick is a prop)
-		 * * Time to beacon the radio (set flag from time loop)
-		 * * Time to beacon the IR (set flag from time loop)
+		 * * Draw a frame of an animation
+		 * * Time-step the IR
 		 *
 	     * s_trick = 0,
 		 * s_prop = 0;
@@ -415,6 +417,7 @@ int main( void )
 			color++;
 			if (color==21) f_animation_done = 1;
 #endif
+
 			if (loops_to_ir_timestep) {
 				loops_to_ir_timestep--;
 			} else {
@@ -431,12 +434,12 @@ int main( void )
 				for (uint8_t i=0; i< (ir_proto_seqnum-ITPS_TO_SHOW_PAIRING) / ((ITPS_TO_PAIR - ITPS_TO_SHOW_PAIRING) / 5); i++) {
 					itps_pattern |= (1 << i);
 				}
+			}
+
+			if (itps_pattern) {
 				led_set_rainbow(itps_pattern);
 			}
 
-			if (0) {
-				// TODO: radio
-			}
 		}
 
 		static uint8_t event_id = 0;
@@ -509,9 +512,8 @@ int main( void )
 		// Is an animation finished?
 		if (f_animation_done || start_new_animation) {
 			f_animation_done = 0;
-			radio_send_sync();
 #if BADGE_TARGET
-			trick = (trick + 1) % 10;
+			trick = (trick + 1) % 15;
 			begin_sprite_animation(tricks[trick], 4);
 #else
 			color = 0;
@@ -650,7 +652,7 @@ void check_config() {
 	out_payload.from_addr = my_conf.badge_id;
 	out_payload.base_id = 0xFF; // TODO: unless I'm a base
 	out_payload.puppy_flags = 0;
-	out_payload.clock_authority = 255; // UNSET
+	out_payload.clock_authority = 0xFF; // UNSET
 	out_payload.seconds = 0;
 	out_payload.minutes = 0;
 	out_payload.hours = 0;
@@ -664,6 +666,44 @@ void check_config() {
 
 	// TODO: the opposite of WDT_A_hold(WDT_A_BASE);
 	// probably.
+}
+
+inline void update_clock() {
+	uint8_t clock_updated = 0;
+
+	if (currentTime.Year != in_payload.year) {
+		currentTime.Year = in_payload.year;
+		clock_updated = 1;
+	}
+	if (currentTime.Month != in_payload.month) {
+		currentTime.Month = in_payload.month;
+		clock_updated = 1;
+	}
+	if (currentTime.DayOfMonth != in_payload.day) {
+		currentTime.DayOfMonth = in_payload.day;
+		clock_updated = 1;
+	}
+	if (currentTime.Hours != in_payload.hours) {
+		currentTime.Hours = in_payload.hours;
+		clock_updated = 1;
+	}
+	if (currentTime.Minutes != in_payload.minutes) {
+		currentTime.Minutes = in_payload.minutes;
+		currentTime.Seconds = in_payload.seconds;
+	} else if (in_payload.seconds < ((currentTime.Seconds-1) % 60) ||
+			in_payload.seconds > ((currentTime.Seconds+1) % 60)) {
+		currentTime.Seconds = in_payload.seconds;
+		clock_updated = 1;
+	}
+
+	if (clock_updated) {
+		clock_is_set = 1;
+		clock_setting_age = 0;
+		my_clock_authority = in_payload.clock_authority;
+		clock_updated = 0;
+		init_alarms();
+		led_print_scroll("clock", 0, 1, 1);
+	}
 }
 
 void delay(uint16_t ms)

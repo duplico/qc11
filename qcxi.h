@@ -16,6 +16,8 @@
 #define DEBUG_SERIAL 0
 #define BADGES_IN_SYSTEM 160
 #define RECEIVE_WINDOW 5
+#define RECEIVE_WINDOW_LENGTH_SECONDS 10
+#define BUS_BASE_ID 0xEE
 
 // Memory organization (same for F5529 and F5308)
 #define INFOA_START 0x001980

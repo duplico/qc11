@@ -23,7 +23,8 @@
 #define SCREEN_WIDTH 14
 
 typedef struct {
-	uint8_t columns[8];
+//	uint8_t columns[8];
+	uint8_t rows[5];
 	uint8_t movement; // bit4 is set if it's the last frame.
 } spriteframe;
 
@@ -33,18 +34,16 @@ extern uint8_t led_text_scrolling;
 
 extern const spriteframe anim_wave[];
 extern const spriteframe anim_walkin[];
-extern spriteframe * tricks[];
+extern const spriteframe * tricks[];
 
 void led_init();
 
-void led_print(char* text);
 void led_print_scroll(char*, uint8_t, uint8_t, uint8_t);
 
 void led_set_rainbow(uint16_t value);
 void led_disp_bit_to_values(uint8_t, uint8_t);
 void led_display_bits(uint16_t*);
 void led_enable(uint16_t);
-void led_on();
 void led_disable( void );
 uint8_t led_post();
 void led_anim_init();

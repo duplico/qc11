@@ -162,11 +162,10 @@ void init_clocks() {
 	SFR_clearInterrupt(SFR_OSCILLATOR_FAULT_INTERRUPT);
 	SFR_enableInterrupt(SFR_OSCILLATOR_FAULT_INTERRUPT);
 
-	volatile uint32_t clockValue;
-	clockValue = UCS_getMCLK();
-	clockValue = UCS_getACLK();
-	clockValue = UCS_getSMCLK();
-
+//	volatile uint32_t clockValue;
+//	clockValue = UCS_getMCLK();
+//	clockValue = UCS_getACLK();
+//	clockValue = UCS_getSMCLK();
 }
 
 // We should get the following data in a flag to main from the alarm:
@@ -179,6 +178,9 @@ void init_clocks() {
 //  1 bit: Prop
 // MSB
 
+
+// TODO: refactor alarms so that we can procedurally generate the reminders.
+
 /*
  * NB:
  *    The order of these items in this array MUST be chronological.
@@ -189,61 +191,61 @@ void init_clocks() {
  *    it gets one).
  */
 const alarm_time alarms[49] = {
-		{0x08, 0x15, 0x30, 1 + ALARM_DISP_MSG + ALARM_START_LIGHT}, // Reminder: Friday mixer at iBar
-		{0x08, 0x15, 0x45, 1 + ALARM_DISP_MSG}, // Reminder: Friday mixer at iBar
-		{0x08, 0x15, 0x50, 1 + ALARM_DISP_MSG}, // Reminder: Friday mixer at iBar
-		{0x08, 0x15, 0x55, 1 + ALARM_DISP_MSG}, // Reminder: Friday mixer at iBar
-		{0x08, 0x16, 0x00, 1 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Friday mixer at iBar
-		{0x08, 0x16, 0x15, 1 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Friday mixer at iBar
-		{0x08, 0x16, 0x30, 1 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Friday mixer at iBar
-		{0x08, 0x17, 0x00, 1 + ALARM_STOP_LIGHT}, // End: Friday mixer at iBar
+		{8, 15, 30, 1 + ALARM_DISP_MSG + ALARM_START_LIGHT}, // Reminder: Friday mixer at iBar
+		{8, 15, 45, 1 + ALARM_DISP_MSG}, // Reminder: Friday mixer at iBar
+		{8, 15, 50, 1 + ALARM_DISP_MSG}, // Reminder: Friday mixer at iBar
+		{8, 15, 55, 1 + ALARM_DISP_MSG}, // Reminder: Friday mixer at iBar
+		{8, 16, 00, 1 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Friday mixer at iBar
+		{8, 16, 15, 1 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Friday mixer at iBar
+		{8, 16, 30, 1 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Friday mixer at iBar
+		{8, 17, 00, 1 + ALARM_STOP_LIGHT}, // End: Friday mixer at iBar
 
-		{0x08, 0x21, 0x30, 5 + ALARM_DISP_MSG + ALARM_START_LIGHT}, // Reminder: Friday pool party at Palms
-		{0x08, 0x21, 0x45, 5 + ALARM_DISP_MSG}, // Reminder: Friday pool party at Palms
-		{0x08, 0x21, 0x50, 5 + ALARM_DISP_MSG}, // Reminder: Friday pool party at Palms
-		{0x08, 0x21, 0x55, 5 + ALARM_DISP_MSG}, // Reminder: Friday pool party at Palms
-		{0x08, 0x22, 0x00, 5 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Friday pool party at Palms
-		{0x08, 0x22, 0x15, 5 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Friday pool party at Palms
-		{0x08, 0x22, 0x30, 5 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Friday pool party at Palms
-		{0x09, 0x03, 0x00, 5 + ALARM_STOP_LIGHT}, // End: Friday pool party at Palms
+		{8, 21, 30, 5 + ALARM_DISP_MSG + ALARM_START_LIGHT}, // Reminder: Friday pool party at Palms
+		{8, 21, 45, 5 + ALARM_DISP_MSG}, // Reminder: Friday pool party at Palms
+		{8, 21, 50, 5 + ALARM_DISP_MSG}, // Reminder: Friday pool party at Palms
+		{8, 21, 55, 5 + ALARM_DISP_MSG}, // Reminder: Friday pool party at Palms
+		{8, 22, 00, 5 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Friday pool party at Palms
+		{8, 22, 15, 5 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Friday pool party at Palms
+		{8, 22, 30, 5 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Friday pool party at Palms
+		{9, 03, 00, 5 + ALARM_STOP_LIGHT}, // End: Friday pool party at Palms
 
-		{0x09, 0x15, 0x30, 2 + ALARM_DISP_MSG + ALARM_START_LIGHT}, // Reminder: Saturday mixer at iBar
-		{0x09, 0x15, 0x45, 2 + ALARM_DISP_MSG}, // Reminder: Saturday mixer at iBar
-		{0x09, 0x15, 0x50, 2 + ALARM_DISP_MSG}, // Reminder: Saturday mixer at iBar
-		{0x09, 0x15, 0x55, 2 + ALARM_DISP_MSG}, // Reminder: Saturday mixer at iBar
-		{0x09, 0x16, 0x00, 2 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Saturday mixer at iBar
-		{0x09, 0x16, 0x15, 2 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Saturday mixer at iBar
-		{0x09, 0x16, 0x30, 2 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Saturday mixer at iBar
-		{0x09, 0x17, 0x00, 2 + ALARM_STOP_LIGHT}, // End: Saturday mixer at iBar
+		{9, 15, 30, 2 + ALARM_DISP_MSG + ALARM_START_LIGHT}, // Reminder: Saturday mixer at iBar
+		{9, 15, 45, 2 + ALARM_DISP_MSG}, // Reminder: Saturday mixer at iBar
+		{9, 15, 50, 2 + ALARM_DISP_MSG}, // Reminder: Saturday mixer at iBar
+		{9, 15, 55, 2 + ALARM_DISP_MSG}, // Reminder: Saturday mixer at iBar
+		{9, 16, 00, 2 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Saturday mixer at iBar
+		{9, 16, 15, 2 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Saturday mixer at iBar
+		{9, 16, 30, 2 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Saturday mixer at iBar
+		{9, 17, 00, 2 + ALARM_STOP_LIGHT}, // End: Saturday mixer at iBar
 
-		{0x09, 0x20, 0x30, 6 + ALARM_DISP_MSG}, // Reminder: Saturday party at Piranha
-		{0x09, 0x20, 0x45, 6 + ALARM_DISP_MSG}, // Reminder: Saturday party at Piranha
-		{0x09, 0x20, 0x50, 6 + ALARM_DISP_MSG}, // Reminder: Saturday party at Piranha
-		{0x09, 0x20, 0x55, 6 + ALARM_DISP_MSG}, // Reminder: Saturday party at Piranha
-		{0x09, 0x21, 0x00, 6 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Saturday party at Piranha
-		{0x09, 0x21, 0x15, 6 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Saturday party at Piranha
-		{0x09, 0x21, 0x30, 6 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Saturday party at Piranha
+		{9, 20, 30, 6 + ALARM_DISP_MSG}, // Reminder: Saturday party at Piranha
+		{9, 20, 45, 6 + ALARM_DISP_MSG}, // Reminder: Saturday party at Piranha
+		{9, 20, 50, 6 + ALARM_DISP_MSG}, // Reminder: Saturday party at Piranha
+		{9, 20, 55, 6 + ALARM_DISP_MSG}, // Reminder: Saturday party at Piranha
+		{9, 21, 00, 6 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Saturday party at Piranha
+		{9, 21, 15, 6 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Saturday party at Piranha
+		{9, 21, 30, 6 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Saturday party at Piranha
 
-		{0x09, 0x23, 0x30, 7 + ALARM_DISP_MSG}, // Reminder: Saturday karaoke
-		{0x09, 0x23, 0x45, 7 + ALARM_DISP_MSG}, // Reminder: Saturday karaoke
-		{0x09, 0x23, 0x50, 7 + ALARM_DISP_MSG}, // Reminder: Saturday karaoke
-		{0x09, 0x23, 0x55, 7 + ALARM_DISP_MSG}, // Reminder: Saturday karaoke
-		{0x10, 0x00, 0x00, 7 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Saturday karaoke
-		{0x10, 0x00, 0x15, 7 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Saturday karaoke
-		{0x10, 0x00, 0x30, 7 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Saturday karaoke
+		{9, 23, 30, 7 + ALARM_DISP_MSG}, // Reminder: Saturday karaoke
+		{9, 23, 45, 7 + ALARM_DISP_MSG}, // Reminder: Saturday karaoke
+		{9, 23, 50, 7 + ALARM_DISP_MSG}, // Reminder: Saturday karaoke
+		{9, 23, 55, 7 + ALARM_DISP_MSG}, // Reminder: Saturday karaoke
+		{10, 00, 00, 7 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Saturday karaoke
+		{10, 00, 15, 7 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Saturday karaoke
+		{10, 00, 30, 7 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Saturday karaoke
 
-		{0x10, 0x15, 0x30, 3 + ALARM_DISP_MSG + ALARM_START_LIGHT}, // Reminder: Sunday mixer at iBar
-		{0x10, 0x15, 0x45, 3 + ALARM_DISP_MSG}, // Reminder: Sunday mixer at iBar
-		{0x10, 0x15, 0x50, 3 + ALARM_DISP_MSG}, // Reminder: Sunday mixer at iBar
-		{0x10, 0x15, 0x55, 3 + ALARM_DISP_MSG}, // Reminder: Sunday mixer at iBar
-		{0x10, 0x16, 0x00, 3 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Sunday mixer at iBar
-		{0x10, 0x16, 0x15, 3 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Sunday mixer at iBar
-		{0x10, 0x16, 0x30, 3 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Sunday mixer at iBar
-		{0x10, 0x17, 0x00, 3 + ALARM_STOP_LIGHT}, // End: Sunday mixer at iBar
+		{10, 15, 30, 3 + ALARM_DISP_MSG + ALARM_START_LIGHT}, // Reminder: Sunday mixer at iBar
+		{10, 15, 45, 3 + ALARM_DISP_MSG}, // Reminder: Sunday mixer at iBar
+		{10, 15, 50, 3 + ALARM_DISP_MSG}, // Reminder: Sunday mixer at iBar
+		{10, 15, 55, 3 + ALARM_DISP_MSG}, // Reminder: Sunday mixer at iBar
+		{10, 16, 00, 3 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Sunday mixer at iBar
+		{10, 16, 15, 3 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Sunday mixer at iBar
+		{10, 16, 30, 3 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Sunday mixer at iBar
+		{10, 17, 00, 3 + ALARM_STOP_LIGHT}, // End: Sunday mixer at iBar
 
-		{0x10, 0x09, 0x30, 4 + ALARM_START_LIGHT}, // Reminder: Sunday after-party
-		{0x10, 0x09, 0x00, 4}, // Now: Sunday after-party
-		{0x11, 0x03, 0x00, 4 + ALARM_STOP_LIGHT}, // End: Sunday after-party
+		{10, 9, 30, 4 + ALARM_START_LIGHT}, // Reminder: Sunday after-party
+		{10, 9, 00, 4}, // Now: Sunday after-party
+		{11, 3, 00, 4 + ALARM_STOP_LIGHT}, // End: Sunday after-party
 };
 
 void init_alarms() {
@@ -255,6 +257,10 @@ void init_alarms() {
 	// Find the next alarm:
 	uint8_t next_alarm = 0;
 	while (next_alarm < 49) {
+		// TODO: Check to see if the current alarm is "ALARM_NOW_MSG". If so,
+		//  first look 30, 15, 10, 5 minutes beforehand;
+		//  then look 15 and 30 minutes afterwards.
+
 		// If current alarm is in the past or less than a minute away, go to next.
 		if (alarms[next_alarm].day < currentTime.DayOfMonth &&
 				alarms[next_alarm].hour < currentTime.Hours &&
