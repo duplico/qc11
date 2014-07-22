@@ -40,7 +40,9 @@ uint16_t clock_setting_age = 0;
 uint16_t loops_to_rf_beacon = 10 * TIME_LOOP_HZ;
 #define MTS_LEN 255
 char message_to_send[MTS_LEN] = "";
-
+uint8_t my_trick = 0;
+uint16_t known_tricks = 0;
+uint8_t known_trick_count = 0;
 qcxipayload in_payload, out_payload;
 
 // Gaydar - Stolen from QC10:
@@ -54,6 +56,7 @@ uint8_t neighbor_count = 0;
 uint8_t neighbor_count_cycle = 0;
 uint8_t window_seconds = RECEIVE_WINDOW_LENGTH_SECONDS;
 uint8_t trick_seconds = TRICK_INTERVAL_SECONDS;
+
 
 #if !BADGE_TARGET
 volatile uint8_t f_ser_rx = 0;
@@ -87,6 +90,34 @@ void init_gpio() {
 	P5OUT = 0x00;
 	P6DIR = 0xFF;
 	P6OUT = 0x00;
+}
+
+uint8_t seen_badge(uint8_t id) {
+	uint8_t badge_frame = id / 16;
+	uint8_t badge_bit = 1 << (id % 16);
+	return (~(my_conf.met_ids[badge_frame]) & badge_bit)? 1: 0;
+}
+
+void set_badge_seen(uint8_t id) {
+	uint8_t badge_frame = id / 16;
+	uint8_t badge_bit = 1 << (id % 16);
+	if (!(~(my_conf.met_ids[badge_frame]) & badge_bit)) {
+		// haven't seen it, so we need to set its 1 to a 0.
+		uint16_t new_config_word = my_conf.met_ids[badge_frame] & ~(badge_bit);
+		FLASH_unlockInfoA();// TODO
+		FLASH_write16(&new_config_word, &(my_conf.met_ids[badge_frame]), 1);
+		FLASH_lockInfoA();
+	} // otherwise, nothing to do.
+}
+
+uint8_t paired_badge(uint8_t id) {
+	uint8_t badge_frame = id / 16;
+	uint8_t badge_bit = 1 << (id % 16);
+	return (~(my_conf.paired_ids[badge_frame]) & badge_bit)? 1: 0;
+}
+
+uint8_t have_trick(uint8_t trick_id) {
+	return known_tricks & (1 << trick_id);
 }
 
 /*
@@ -281,14 +312,36 @@ int main( void )
 			}
 
 			if (!trick_seconds) {
-				// TODO: Decide what trick or prop to do.
 				trick_seconds = TRICK_INTERVAL_SECONDS;
-				trick = (trick + 1) % 15;
-				s_trick = trick+1;
+				// TODO: Decide what trick or prop to do.
+				if (rand() % 3) {
+					// wave
+					s_trick = TRICK_COUNT+1;
+				} else if (neighbor_count && !(rand() % 4)){
+					// prop
+				} else {
+					// trick
+					static uint8_t known_trick_to_do;
+					known_trick_to_do = rand() % known_trick_count;
+					// start with the first known trick:
+
+					while (!(known_tricks & 1<<s_trick)) {
+						s_trick++;
+					}
+
+					while (known_trick_to_do) {
+						s_trick++;
+						if (known_tricks & 1<<s_trick) {
+							// if and only if we know the candidate trick, do
+							// we decrement known_trick_to_do.
+							known_trick_to_do--;
+						}
+					}
+					s_trick++; // because the s_trick flag is trick_id+1
+				}
 			} else if (!sprite_animate && !led_text_scrolling) {
 				trick_seconds--;
 			}
-
 
 			if (!window_seconds) {
 				window_seconds = RECEIVE_WINDOW_LENGTH_SECONDS;
@@ -530,8 +583,8 @@ int main( void )
 			led_print_scroll("unpair", 1, 1, 0);
 		}
 		if (s_trick) {
+			begin_sprite_animation((spriteframe *)tricks[s_trick-1], 4);
 			s_trick = 0;
-			begin_sprite_animation((spriteframe *)tricks[trick-1], 4);
 		}
 #endif
 		// Is an animation finished?
@@ -630,11 +683,11 @@ void check_config() {
 
 	crc = CRC_getResult(CRC_BASE);
 
-	if (crc != my_conf.crc || 1) { // TODO!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	if (crc != my_conf.crc || 1) { // TODO!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		qcxiconf new_conf;
 		uint8_t* new_config_bytes = (uint8_t *) &new_conf;
 		for (uint8_t i=0; i<42; i++) {
-			new_config_bytes[i] = 0;
+			new_config_bytes[i] = 0xff;
 			// paired_ids, seen_ids, scores, events occurred and attended.
 		}
 		// TODO: set self to seen/paired, I guess.
@@ -662,6 +715,24 @@ void check_config() {
 		FLASH_write8(new_config_bytes, (uint8_t *)INFOA_START, sizeof(qcxiconf));
 		FLASH_lockInfoA();
 	}
+
+	// Decide which tricks we know:
+	my_trick = my_conf.badge_id % TRICK_COUNT;
+	known_tricks = 1 << my_trick;
+	known_trick_count = 1;
+
+	for (uint8_t trick_id = 0; trick_id < TRICK_COUNT; trick_id++) {
+		if (trick_id == my_trick) continue;
+		for (uint8_t badge_id = trick_id; badge_id < BADGES_IN_SYSTEM; badge_id+=TRICK_COUNT) {
+			if (paired_badge(badge_id) && !(known_tricks & 1<<(trick_id))) {
+				known_tricks |= 1 << trick_id;
+				known_trick_count++;
+				break;
+			}
+		}
+	}
+
+	// Setup our IR pairing payload:
 	strcpy(&(ir_pair_payload[0]), my_conf.handle);
 	strcpy(&(ir_pair_payload[11]), my_conf.message);
 
