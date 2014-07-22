@@ -55,6 +55,11 @@ void begin_sprite_animation(spriteframe* animation, uint8_t frameskip) {
 	led_skip_frame_anim = frameskip;
 	f_animation_done = 0;
 
+	if (vscroll_to_text) { // interrupting text?
+		vscroll_to_text = 0;
+		vertical_mode = TEXT;
+	}
+
 	if (vertical_mode == TEXT) {
 		vscroll_to_anim = 1;
 	}
@@ -143,10 +148,8 @@ void led_clear() {
 
 void led_print_scroll(char* text, uint8_t scroll_on, uint8_t scroll_off, uint8_t frameskip) {
 	uint8_t character = 0;
-	uint8_t cursor = 0;
+	uint8_t cursor = scroll_on? SCREEN_WIDTH : 0;
 	disp_apply_mask(0b1111111100000000); // Clear text area.
-
-	cursor = SCREEN_WIDTH;
 
 	do {
 		for (uint16_t i = d3_5ptFontInfo.charInfo[text[character] - d3_5ptFontInfo.startChar].offset; i < d3_5ptFontInfo.charInfo[text[character] - d3_5ptFontInfo.startChar].offset + d3_5ptFontInfo.charInfo[text[character] - d3_5ptFontInfo.startChar].widthBits; i++) {
@@ -168,6 +171,11 @@ void led_print_scroll(char* text, uint8_t scroll_on, uint8_t scroll_off, uint8_t
 		print_pixel_len -= SCREEN_WIDTH; // TODO: Bounds checking
 	}
 
+	if (vscroll_to_anim) { // we're interrupting an animation...
+		vertical_mode = ANIMATION;
+		vscroll_to_anim = 0;
+	}
+
 	if (vertical_mode == ANIMATION) {
 		vscroll_to_text = 1;
 	}
@@ -182,7 +190,7 @@ void led_print_scroll(char* text, uint8_t scroll_on, uint8_t scroll_off, uint8_t
 	led_text_scrolling = 1;
 	f_animation_done = 0;
 	if (!scroll_on && !scroll_off) {
-		led_disp_bit_to_values(0, 0);
+		led_disp_bit_to_values(disp_left, disp_top);
 		led_display_bits(led_values);
 	}
 }

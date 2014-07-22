@@ -44,6 +44,7 @@ uint8_t my_trick = 0;
 uint16_t known_tricks = 0;
 uint8_t known_trick_count = 0;
 qcxipayload in_payload, out_payload;
+uint16_t rainbow_lights = 0;
 
 // Gaydar - Stolen from QC10:
 uint8_t neighbor_counts[RECEIVE_WINDOW] = {0};
@@ -270,7 +271,6 @@ int main( void )
 		}
 	}
 	delay(750);
-	uint8_t trick = 0;
 #endif
 
 	// Signals within the main thread:
@@ -288,7 +288,8 @@ int main( void )
 				   s_trick = 0,
 				   s_prop = 0,
 				   s_get_puppy = 0,
-				   s_lose_puppy = 0;
+				   s_lose_puppy = 0,
+				   s_update_rainbow = 0;
 
 	static uint8_t itps_pattern = 0;
 
@@ -306,6 +307,12 @@ int main( void )
 		if (f_new_second) {
 			f_new_second = 0;
 
+			if (!clock_is_set) {
+				// TODO
+				rainbow_lights ^= BIT9;
+				s_update_rainbow = 1;
+			}
+
 			currentTime.Seconds++;
 			if (currentTime.Seconds >= 60) {
 				currentTime = RTC_A_getCalendarTime(RTC_A_BASE);
@@ -313,12 +320,12 @@ int main( void )
 
 			if (!trick_seconds) {
 				trick_seconds = TRICK_INTERVAL_SECONDS;
-				// TODO: Decide what trick or prop to do.
 				if (rand() % 3) {
 					// wave
 					s_trick = TRICK_COUNT+1;
 				} else if (neighbor_count && !(rand() % 4)){
 					// prop
+					// TODO
 				} else {
 					// trick
 					static uint8_t known_trick_to_do;
@@ -441,18 +448,20 @@ int main( void )
 				// Increment our beacon count in the current position in our
 				// sliding window.
 				neighbor_counts[window_position]+=1;
-				// TODO: See if this is a new friend
 
-				// If this marks a new max we should show it immediately.
+				if (!seen_badge(in_payload.from_addr)) { // new acquaintance
+					set_badge_seen(in_payload.from_addr);
+				}
+
+				// TODO: If this marks a new max we should show it immediately.
 				if (neighbor_counts[window_position] > neighbor_count) {
-					// set_gaydar_state(neighbor_counts[window_position]);
 					neighbor_count = neighbor_counts[window_position];
 					neighbor_count_cycle = window_position;
 				} else if (neighbor_counts[window_position] == neighbor_count) {
 					neighbor_count_cycle = window_position;
 				}
 
-				led_print_scroll("rx", 0, 1, 1);
+				led_print_scroll("rx", 1, 1, 1);
 
 			}
 			if (in_payload.clock_authority != 0xff &&
@@ -511,9 +520,15 @@ int main( void )
 			}
 
 			if (itps_pattern) {
-				led_set_rainbow(itps_pattern);
+				s_update_rainbow = 1;
+				rainbow_lights &= 0b1111111100000000;
+				rainbow_lights |= itps_pattern;
 			}
+		}
 
+		if (s_update_rainbow) {
+			s_update_rainbow = 0;
+			led_set_rainbow(rainbow_lights);
 		}
 
 		static uint8_t event_id = 0;

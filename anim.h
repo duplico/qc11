@@ -9,11 +9,9 @@
 #define ANIM_H_
 #include "leds.h"
 
-#define TRICK_COUNT 14
-
-extern const spriteframe anim_sprite_wave[];
-extern const spriteframe anim_sprite_walkin[];
-extern const spriteframe * tricks[];
-extern const spriteframe stand[];
+extern spriteframe anim_sprite_wave[];
+extern spriteframe anim_sprite_walkin[];
+extern spriteframe * tricks[];
+extern spriteframe stand[];
 
 #endif /* ANIM_H_ */
