@@ -397,8 +397,8 @@ int main( void )
 		 */
 		if (f_rfm_rx_done) {
 			f_rfm_rx_done = 0;
-			if (in_payload.to_addr == my_conf.badge_id) {
-				// Unicast, probably about the puppy.
+			if (in_payload.puppy_flags) {
+				// Puppy-related
 			} else if (in_payload.base_id == BUS_BASE_ID) {
 				s_on_bus = RECEIVE_WINDOW;
 				// Bus
@@ -414,6 +414,8 @@ int main( void )
 				// If we don't currently have a prop scheduled, or if this prop is
 				// more authoritative than our currently scheduled prop, it's time
 				// to do a prop.
+				// TODO: If we're paired, and this is from the person
+				//  we're paired with, it's the most authoritative thing possible.
 				if ((!s_propped || in_payload.prop_from > s_prop_authority) && in_payload.prop_time_loops_before_start) {
 					s_propped = 1;
 					s_prop_authority = in_payload.prop_from;
