@@ -77,6 +77,7 @@
 void delay(unsigned int);
 
 uint8_t paired_badge(uint8_t);
+void set_badge_paired(uint8_t);
 uint8_t have_trick(uint8_t);
 
 // For setting up our time-based loop:
@@ -162,6 +163,7 @@ typedef struct {
 			seconds, minutes, hours, day, month;
 	uint16_t year, clock_age_seconds;
 	uint8_t prop_id, prop_time_loops_before_start, prop_from;
+	uint8_t beacon;
 } qcxipayload;
 extern qcxipayload in_payload, out_payload;
 

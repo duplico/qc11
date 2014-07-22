@@ -117,6 +117,27 @@ uint8_t paired_badge(uint8_t id) {
 	return (~(my_conf.paired_ids[badge_frame]) & badge_bit)? 1: 0;
 }
 
+void set_badge_paired(uint8_t id) {
+	uint8_t badge_frame = id / 16;
+	uint8_t badge_bit = 1 << (id % 16);
+	if (!(~(my_conf.paired_ids[badge_frame]) & badge_bit)) {
+		// haven't seen it, so we need to set its 1 to a 0.
+		uint16_t new_config_word = my_conf.paired_ids[badge_frame] & ~(badge_bit);
+		FLASH_unlockInfoA();// TODO
+		FLASH_write16(&new_config_word, &(my_conf.paired_ids[badge_frame]), 1);
+		FLASH_lockInfoA();
+
+		if (!have_trick(id % TRICK_COUNT)) {
+			// new trick
+			f_paired_new_trick = (id % TRICK_COUNT);
+			known_trick_count++;
+			known_tricks |= (1 << f_paired_new_trick);
+			f_paired_new_trick++; // because this flag is trick_id+1
+		}
+
+	} // otherwise, nothing to do.
+}
+
 uint8_t have_trick(uint8_t trick_id) {
 	return known_tricks & (1 << trick_id);
 }
@@ -127,29 +148,29 @@ uint8_t have_trick(uint8_t trick_id) {
  * * STARTUP (POST, message, etc)
  * ------ block until finished ----
  *
- * Here are the things that can happen:
+ * Here are the things that can be flagged:
  *
  * Time based:
- * * Event alert raised (interrupt flag)
- * * It's been long enough that we can do a trick (set flag from time loop)
- * **  (maybe the trick is a prop)
- * * Time to beacon the radio (set flag from time loop)
- * * Time to beacon the IR (set flag from time loop)
+ * * TODO: Event alert raised (interrupt flag)
+ * * DONE It's been long enough that we can do a trick (set flag from time loop)
+ * ** TODO  (maybe the trick is a prop)
+ * * DONE Time to beacon the radio (set flag from time loop)
+ * * DONE Time to beacon the IR (set flag from time loop)
  *
  * From the radio:
- * * Receive a beacon (at some point, we need to decide if it means we:)
- * ** adjust neighbor count
- * ** are near a base station (arrive event)
- * ** should schedule a prop
- * ** get the puppy
- * ** set our clock
- * ** confirms we should give up the puppy
+ * * DONE Receive a beacon (at some point, we need to decide if it means we:)
+ * ** TODO adjust neighbor count
+ * ** TODO are near a base station (arrive event)
+ * ** DONE should schedule a prop
+ * ** TODO get the puppy
+ * ** DONE set our clock
+ * ** TODO confirms we should give up the puppy
  *
  * From the IR
- * * Docking with base station
- * * Pairing
- * ** possibly new person
- * *** possibly new person with a new trick
+ * * TODO Docking with base station
+ * * DONE Pairing
+ * ** DONE possibly new person
+ * *** DONE possibly new person with a new trick
  *
  * So for the setup in the loop, we should maybe do the following:
  *
@@ -273,20 +294,27 @@ int main( void )
 	delay(750);
 #endif
 
+	static uint8_t s_prop_id = 0,
+				   s_prop_cycles = 0,
+				   s_prop_authority = 0,
+				   s_propped = 0;
+
 	// Signals within the main thread:
 	static uint8_t s_event_arrival = 0,
 				   s_on_bus = 0,
+				   s_off_bus = 0,
 				   s_event_alert = 0,
 				   s_need_rf_beacon = 0,
+				   s_rf_retransmit = 0,
 				   s_pair = 0, // f_pair
 				   s_new_pair = 0,
 				   s_new_trick = 0,
 				   s_new_score = 0,
 				   s_new_prop = 0,
 				   s_unpair = 0, // f_unpair
-				   s_propped = 0,
 				   s_trick = 0,
 				   s_prop = 0,
+				   s_prop_animation_length = 0,
 				   s_get_puppy = 0,
 				   s_lose_puppy = 0,
 				   s_update_rainbow = 0;
@@ -319,14 +347,20 @@ int main( void )
 				currentTime = RTC_A_getCalendarTime(RTC_A_BASE);
 			}
 
-			if (!trick_seconds) {
+			if (!trick_seconds && !s_propped) {
 				trick_seconds = TRICK_INTERVAL_SECONDS;
 				if (rand() % 3) {
 					// wave
 					s_trick = TRICK_COUNT+1;
-				} else if (neighbor_count && !(rand() % 4)){
+				} else if (!s_propped && neighbor_count && !(rand() % 4)){
 					// prop
 					// TODO
+					s_prop = 1;
+					s_prop_authority = my_conf.badge_id;
+					// TODO: s_prop_id =
+					// TODO: s_prop_animation_length =
+					// s_prop_cycles = SOME_DELAY + ANIM_LENGTH
+					// Then we're testing whether s_prop_cycles == ANIM_LENGTH
 				} else {
 					// trick
 					static uint8_t known_trick_to_do;
@@ -347,13 +381,14 @@ int main( void )
 					}
 					s_trick++; // because the s_trick flag is trick_id+1
 				}
-			} else if (!sprite_animate && !led_text_scrolling) {
+			} else if (!sprite_animate && !led_text_scrolling && !s_propped) {
 				trick_seconds--;
 			}
 
 			if (!window_seconds) {
 				window_seconds = RECEIVE_WINDOW_LENGTH_SECONDS;
 				s_need_rf_beacon = 1;
+				// TODO: mess with s_on_bus and s_off_bus here.
 				window_position = (window_position + 1) % RECEIVE_WINDOW;
 				neighbor_counts[window_position] = 0;
 				if (neighbor_count_cycle == window_position) {
@@ -439,13 +474,32 @@ int main( void )
 			} else if (in_payload.base_id == BUS_BASE_ID) {
 				s_on_bus = RECEIVE_WINDOW;
 				// Bus
+				// TODO: can set s_on_bus
 			}
 			else if (in_payload.base_id != 0xFF) {
 				// Base station, may need to check in.
-			} else if (in_payload.prop_from != 0xFF) {
+				// TODO: can set s_event_arrival
+			}
+
+			if (in_payload.prop_from != 0xFF) {
 				// It's a prop notification.
-			} else {
-				// It's a beacon.
+				// If we don't currently have a prop scheduled, or if this prop is
+				// more authoritative than our currently scheduled prop, it's time
+				// to do a prop.
+				if ((!s_propped || in_payload.prop_from > s_prop_authority) && in_payload.prop_time_loops_before_start) {
+					s_propped = 1;
+					s_prop_authority = in_payload.prop_from;
+					s_prop_cycles = in_payload.prop_time_loops_before_start;
+					s_prop_id = in_payload.prop_id;
+				} else if (s_propped) {
+					// If we're already propped, and our current prop has higher authority,
+					// retransmit it.
+					s_rf_retransmit = 1;
+				}
+			}
+
+			if (in_payload.beacon) {
+				// It's a beacon (one per cycle).
 				// Increment our beacon count in the current position in our
 				// sliding window.
 				neighbor_counts[window_position]+=1;
@@ -465,6 +519,7 @@ int main( void )
 				led_print_scroll("rx", 1, 1, 1);
 
 			}
+
 			if (in_payload.clock_authority != 0xff &&
 					(!clock_is_set ||
 							in_payload.clock_authority < my_clock_authority)) {
@@ -473,8 +528,13 @@ int main( void )
 		}
 
 		if (s_need_rf_beacon && rfm_proto_state == RFM_PROTO_RX_IDLE) {
+			out_payload.beacon = 1;
 			radio_send_half_async();
 			s_need_rf_beacon = 0;
+		} else if (s_rf_retransmit && rfm_proto_state == RFM_PROTO_RX_IDLE) {
+			out_payload.beacon = 0;
+			radio_send_half_async();
+			s_rf_retransmit = 0;
 		}
 
 		/*
@@ -524,6 +584,10 @@ int main( void )
 				s_update_rainbow = 1;
 				rainbow_lights &= 0b1111111100000000;
 				rainbow_lights |= itps_pattern;
+			}
+
+			if (s_propped) {
+				s_prop_cycles--;
 			}
 		}
 
@@ -752,7 +816,6 @@ void check_config() {
 	strcpy(&(ir_pair_payload[0]), my_conf.handle);
 	strcpy(&(ir_pair_payload[11]), my_conf.message);
 
-
 //	uint8_t to_addr, from_addr, base_id, puppy_flags, clock_authority,
 //			seconds, minutes, hours, day, month;
 //	uint16_t year, clock_age_seconds;
@@ -773,6 +836,7 @@ void check_config() {
 	out_payload.prop_id = 0;
 	out_payload.prop_time_loops_before_start = 0;
 	out_payload.prop_from = 0xFF;
+	out_payload.beacon = 0;
 
 	// TODO: the opposite of WDT_A_hold(WDT_A_BASE);
 	// probably.
