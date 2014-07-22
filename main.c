@@ -307,7 +307,8 @@ int main( void )
 		if (f_new_second) {
 			f_new_second = 0;
 
-			if (!clock_is_set) {
+			// BIT7 of events_occurred is !defcon_over:
+			if (!clock_is_set && (BIT7 & my_conf.events_occurred)) {
 				// TODO
 				rainbow_lights ^= BIT9;
 				s_update_rainbow = 1;
