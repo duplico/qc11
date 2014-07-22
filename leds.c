@@ -106,7 +106,7 @@ void sprite_next_frame() {
 		sprite_animate = 0;
 		return;
 	} else if (sprite_animation[sprite_current_frame].movement & BIT3) {
-		sprite_animation = stand;
+		sprite_animation = (spriteframe *)stand;
 		sprite_current_frame = 0;
 	} else {
 		sprite_current_frame++;

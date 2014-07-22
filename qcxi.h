@@ -18,7 +18,7 @@
 #define RECEIVE_WINDOW 5
 #define RECEIVE_WINDOW_LENGTH_SECONDS 10
 #define BUS_BASE_ID 0xEE
-#define TRICK_INTERVAL_SECONDS 4
+#define TRICK_INTERVAL_SECONDS 6
 
 
 // Memory organization (same for F5529 and F5308)
