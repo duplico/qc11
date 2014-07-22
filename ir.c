@@ -25,10 +25,11 @@ uint8_t ir_timesteps_to_beacon = IR_LOOPS_PER_BEACON;
 
 uint8_t ir_reject_loopback = 0;
 
+#define MAX_IR_LEN 31
 // Protocol: SYNC0, SYNC1, FROM, TO, LEN, DATA, CRC_MSB, CRC_LSB, SYNC2, SYNC3
 // CRC16 of:              |_____|        |.....|
-//  Max length: 28 bytes
-uint8_t ir_tx_frame[38] = {SYNC0, SYNC1, 0, 0xFF, 1, 0, 0, 0, SYNC2, SYNC3, 0};
+//  Max length: 31 bytes
+uint8_t ir_tx_frame[MAX_IR_LEN + 9] = {SYNC0, SYNC1, 0, 0xFF, 1, 0, 0, 0, SYNC2, SYNC3, 0};
 volatile uint8_t ir_xmit = 0;
 volatile uint8_t ir_xmit_index = 0;
 volatile uint8_t ir_xmit_len = 0;
@@ -325,7 +326,6 @@ void ir_process_rx_ready() {
 		// For the SERVER: ir_proto_seqnum is what we are SENDING.
 		if (opcode == IR_OP_PAIRREQ && ir_proto_seqnum == ITPS_TO_PAIR) {
 			IR_PAIR_SETSTATE(IR_PROTO_PAIRING_C);
-			// TODO: send PAIRACC, with our message, etc.
 			ir_proto_setup(ir_partner, IR_OP_PAIRACC, 0);
 			ir_write_global();
 			f_ir_itp_step = 1;
@@ -346,14 +346,16 @@ void ir_process_rx_ready() {
 		if (opcode == IR_OP_PAIRACK) {
 			// decide we're paired.
 
-			strcpy(ir_rx_handle, &(ir_rx_frame[2]));
-			strcpy(ir_rx_message, &(ir_rx_frame[2+11]));
+			strcpy(ir_rx_handle, (char *) &(ir_rx_frame[2]));
+			strcpy(ir_rx_message, (char *) &(ir_rx_frame[2+11]));
 
 			// See if this is a new pair.
-			if (my_conf.met_ids[ir_partner/16] & (1 << ir_partner % 16)) {
-				// new person
+			if (!paired_badge(ir_partner)) {
 				f_paired_new_person = 1;
-				// TODO: see if it's a new trick.
+				if (!have_trick(ir_partner % TRICK_COUNT)) {
+					// new trick
+					f_paired_new_trick = (ir_partner % TRICK_COUNT) + 1;
+				}
 			}
 			f_paired = 1;
 			IR_PAIR_SETSTATE(IR_PROTO_PAIRED_C);
@@ -532,6 +534,10 @@ __interrupt void ir_isr(void)
 			ir_rx_len = received_data;
 			ir_rx_index = 0;
 			ir_rx_state++;
+			if (ir_rx_len > MAX_IR_LEN) {
+				ir_rx_state = 0;
+				ir_rx_len = 0;
+			}
 			break;
 		case 5: // LISTEN, this should be part of the payload
 			ir_rx_frame[ir_rx_index] = received_data;
