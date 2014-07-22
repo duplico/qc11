@@ -181,6 +181,10 @@ void led_print_scroll(char* text, uint8_t scroll_on, uint8_t scroll_off, uint8_t
 	disp_left = 0;
 	led_text_scrolling = 1;
 	f_animation_done = 0;
+	if (!scroll_on && !scroll_off) {
+		led_disp_bit_to_values(0, 0);
+		led_display_bits(led_values);
+	}
 }
 
 void led_set_rainbow(uint16_t value) {
@@ -401,7 +405,7 @@ void led_animate() {
 			disp_left++;
 		} else {
 			f_animation_done = !sprite_animate;
-			if (sprite_animate) {
+			if (sprite_display) {
 				vscroll_to_anim = 1;
 			}
 			led_text_scrolling = 0;
