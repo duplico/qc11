@@ -19,6 +19,7 @@
 #define RECEIVE_WINDOW_LENGTH_SECONDS 10
 #define BUS_BASE_ID 0xEE
 #define TRICK_INTERVAL_SECONDS 6
+#define TRICK_COUNT 14
 
 
 // Memory organization (same for F5529 and F5308)
@@ -74,6 +75,9 @@
 
 // The delay function, which we don't really want to use much, please.
 void delay(unsigned int);
+
+uint8_t paired_badge(uint8_t);
+uint8_t have_trick(uint8_t);
 
 // For setting up our time-based loop:
 // 128 Hz / 4 = 32 Hz
