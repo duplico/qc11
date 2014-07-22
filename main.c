@@ -253,6 +253,7 @@ int main( void )
 	uint8_t color = 0;
 #endif
 	led_anim_init();
+	led_set_rainbow(0);
 
 #if BADGE_TARGET
 	// Startup sequence:
@@ -331,79 +332,6 @@ int main( void )
 			f_ser_rx = 0;
 		}
 #endif
-
-		if (f_new_second) {
-			f_new_second = 0;
-
-			// BIT7 of events_occurred is !defcon_over:
-			if (!clock_is_set && (BIT7 & my_conf.events_occurred)) {
-				// TODO
-				rainbow_lights ^= BIT9;
-				s_update_rainbow = 1;
-			}
-
-			currentTime.Seconds++;
-			if (currentTime.Seconds >= 60) {
-				currentTime = RTC_A_getCalendarTime(RTC_A_BASE);
-			}
-
-			if (!trick_seconds && !s_propped) {
-				trick_seconds = TRICK_INTERVAL_SECONDS;
-				if (rand() % 3) {
-					// wave
-					s_trick = TRICK_COUNT+1;
-				} else if (!s_propped && neighbor_count && !(rand() % 4)){
-					// prop
-					// TODO
-					s_prop = 1;
-					s_prop_authority = my_conf.badge_id;
-					// TODO: s_prop_id =
-					// TODO: s_prop_animation_length =
-					// s_prop_cycles = SOME_DELAY + ANIM_LENGTH
-					// Then we're testing whether s_prop_cycles == ANIM_LENGTH
-				} else {
-					// trick
-					static uint8_t known_trick_to_do;
-					known_trick_to_do = rand() % known_trick_count;
-					// start with the first known trick:
-
-					while (!(known_tricks & 1<<s_trick)) {
-						s_trick++;
-					}
-
-					while (known_trick_to_do) {
-						s_trick++;
-						if (known_tricks & 1<<s_trick) {
-							// if and only if we know the candidate trick, do
-							// we decrement known_trick_to_do.
-							known_trick_to_do--;
-						}
-					}
-					s_trick++; // because the s_trick flag is trick_id+1
-				}
-			} else if (!sprite_animate && !led_text_scrolling && !s_propped) {
-				trick_seconds--;
-			}
-
-			if (!window_seconds) {
-				window_seconds = RECEIVE_WINDOW_LENGTH_SECONDS;
-				s_need_rf_beacon = 1;
-				// TODO: mess with s_on_bus and s_off_bus here.
-				window_position = (window_position + 1) % RECEIVE_WINDOW;
-				neighbor_counts[window_position] = 0;
-				if (neighbor_count_cycle == window_position) {
-					neighbor_count = 0;
-					for (uint8_t i=0; i<RECEIVE_WINDOW; i++) {
-						if (neighbor_counts[i] > neighbor_count) {
-							neighbor_count = neighbor_counts[i];
-						}
-					}
-				}
-			} else {
-				window_seconds--;
-			}
-		}
-
 		/*
 		 * From the IR
 		 * * Docking with base station
@@ -527,14 +455,76 @@ int main( void )
 			}
 		}
 
-		if (s_need_rf_beacon && rfm_proto_state == RFM_PROTO_RX_IDLE) {
-			out_payload.beacon = 1;
-			radio_send_half_async();
-			s_need_rf_beacon = 0;
-		} else if (s_rf_retransmit && rfm_proto_state == RFM_PROTO_RX_IDLE) {
-			out_payload.beacon = 0;
-			radio_send_half_async();
-			s_rf_retransmit = 0;
+		if (f_new_second) {
+			f_new_second = 0;
+
+			// BIT7 of events_occurred is !defcon_over:
+			if (!clock_is_set && (BIT7 & my_conf.events_occurred)) {
+				// TODO
+				rainbow_lights ^= BIT9;
+				s_update_rainbow = 1;
+			}
+
+			currentTime.Seconds++;
+			if (currentTime.Seconds >= 60) {
+				currentTime = RTC_A_getCalendarTime(RTC_A_BASE);
+			}
+
+			if (!trick_seconds && !s_propped) {
+				trick_seconds = TRICK_INTERVAL_SECONDS;
+				if (rand() % 3) {
+					// wave
+					s_trick = TRICK_COUNT+1;
+				} else if (!s_propped && neighbor_count && !(rand() % 4)){
+					// prop
+					// TODO
+					s_prop = 1;
+					s_prop_authority = my_conf.badge_id;
+					// TODO: s_prop_id =
+					// TODO: s_prop_animation_length =
+					// s_prop_cycles = SOME_DELAY + ANIM_LENGTH
+					// Then we're testing whether s_prop_cycles == ANIM_LENGTH
+				} else {
+					// trick
+					static uint8_t known_trick_to_do;
+					known_trick_to_do = rand() % known_trick_count;
+					// start with the first known trick:
+
+					while (!(known_tricks & 1<<s_trick)) {
+						s_trick++;
+					}
+
+					while (known_trick_to_do) {
+						s_trick++;
+						if (known_tricks & 1<<s_trick) {
+							// if and only if we know the candidate trick, do
+							// we decrement known_trick_to_do.
+							known_trick_to_do--;
+						}
+					}
+					s_trick++; // because the s_trick flag is trick_id+1
+				}
+			} else if (!sprite_animate && !led_text_scrolling && !s_propped) {
+				trick_seconds--;
+			}
+
+			if (!window_seconds) {
+				window_seconds = RECEIVE_WINDOW_LENGTH_SECONDS;
+				s_need_rf_beacon = 1;
+				// TODO: mess with s_on_bus and s_off_bus here.
+				window_position = (window_position + 1) % RECEIVE_WINDOW;
+				neighbor_counts[window_position] = 0;
+				if (neighbor_count_cycle == window_position) {
+					neighbor_count = 0;
+					for (uint8_t i=0; i<RECEIVE_WINDOW; i++) {
+						if (neighbor_counts[i] > neighbor_count) {
+							neighbor_count = neighbor_counts[i];
+						}
+					}
+				}
+			} else {
+				window_seconds--;
+			}
 		}
 
 		/*
@@ -584,16 +574,13 @@ int main( void )
 				s_update_rainbow = 1;
 				rainbow_lights &= 0b1111111100000000;
 				rainbow_lights |= itps_pattern;
+			} else {
+				// TODO: set rainbow_lights LSByte to our score
 			}
 
 			if (s_propped) {
 				s_prop_cycles--;
 			}
-		}
-
-		if (s_update_rainbow) {
-			s_update_rainbow = 0;
-			led_set_rainbow(rainbow_lights);
 		}
 
 		static uint8_t event_id = 0;
@@ -627,7 +614,8 @@ int main( void )
 				else {
 					strcat(message_to_send, event_times[event_id]);
 				}
-				led_print_scroll(message_to_send, 1, 1, 1);
+				// TODO: move this to a signal handler later:
+				s_event_alert = 1;
 			}
 		}
 		if (f_alarm) {
@@ -653,7 +641,42 @@ int main( void )
 		 */
 
 		// Time to handle signals.
+
+//		s_prop = 0,
+//		s_propped = 0;
+//		s_event_arrival = 0,
+//		s_on_bus = 0,
+//		s_off_bus = 0,
+//		s_event_alert = 0,
+//		s_need_rf_beacon = 0,
+//		s_rf_retransmit = 0,
+//		s_pair = 0, // f_pair
+//		s_new_pair = 0,
+//		s_new_trick = 0,
+//		s_new_score = 0,
+//		s_new_prop = 0,
+//		s_unpair = 0, // f_unpair
+//		s_trick = 0,
+//		s_prop_animation_length = 0,
+//		s_get_puppy = 0,
+//		s_lose_puppy = 0,
+//		s_update_rainbow = 0;
+
+		if (s_need_rf_beacon && rfm_proto_state == RFM_PROTO_RX_IDLE) {
+			out_payload.beacon = 1;
+			radio_send_half_async();
+			s_need_rf_beacon = 0;
+		} else if (s_rf_retransmit && rfm_proto_state == RFM_PROTO_RX_IDLE) {
+			out_payload.beacon = 0;
+			radio_send_half_async();
+			s_rf_retransmit = 0;
+		}
+
 #if BADGE_TARGET
+		if (s_event_alert) {
+			s_event_alert = 0;
+			led_print_scroll(message_to_send, 1, 1, 1);
+		}
 		if (s_pair) {
 			s_pair = 0;
 			led_print_scroll(ir_rx_message, 1, 1, 0);
@@ -663,8 +686,12 @@ int main( void )
 			led_print_scroll("unpair", 1, 1, 0);
 		}
 		if (s_trick) {
-			begin_sprite_animation((spriteframe *)tricks[s_trick-1], 4);
 			s_trick = 0;
+			begin_sprite_animation((spriteframe *)tricks[s_trick-1], 4);
+		}
+		if (s_update_rainbow) {
+			s_update_rainbow = 0;
+			led_set_rainbow(rainbow_lights);
 		}
 #endif
 		// Is an animation finished?
