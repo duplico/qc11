@@ -352,10 +352,7 @@ void ir_process_rx_ready() {
 			// See if this is a new pair.
 			if (!paired_badge(ir_partner)) {
 				f_paired_new_person = 1;
-				if (!have_trick(ir_partner % TRICK_COUNT)) {
-					// new trick
-					f_paired_new_trick = (ir_partner % TRICK_COUNT) + 1;
-				}
+				set_badge_paired(ir_partner);
 			}
 			f_paired = 1;
 			IR_PAIR_SETSTATE(IR_PROTO_PAIRED_C);
