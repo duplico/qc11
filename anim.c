@@ -104,3 +104,10 @@ spriteframe * tricks[] = {
 		anim_sprite_trick_studio,
 		anim_sprite_wave
 };
+
+spriteframe * gaydar[] = {
+		anim_sprite_halfheight_intro,
+		anim_sprite_crowd_1_to_2,
+		anim_sprite_crowd_2_to_3,
+		anim_sprite_crowd_3_to_4
+};
