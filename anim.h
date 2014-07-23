@@ -13,5 +13,6 @@ extern spriteframe anim_sprite_wave[];
 extern spriteframe anim_sprite_walkin[];
 extern spriteframe * tricks[];
 extern spriteframe stand[];
+extern spriteframe * gaydar[];
 
 #endif /* ANIM_H_ */
