@@ -119,9 +119,15 @@ uint8_t paired_badge(uint8_t id) {
 }
 
 void set_badge_paired(uint8_t id) {
+	strcpy(ir_rx_handle, (char *) &(ir_rx_frame[2]));
+	strcpy(ir_rx_message, (char *) &(ir_rx_frame[2+11]));
+
 	uint8_t badge_frame = id / 16;
 	uint8_t badge_bit = 1 << (id % 16);
+
+	// See if this is a new pair.
 	if (!(~(my_conf.paired_ids[badge_frame]) & badge_bit)) {
+		f_paired_new_person = 1;
 		// haven't seen it, so we need to set its 1 to a 0.
 		uint16_t new_config_word = my_conf.paired_ids[badge_frame] & ~(badge_bit);
 		FLASH_unlockInfoA();// TODO
@@ -137,6 +143,8 @@ void set_badge_paired(uint8_t id) {
 		}
 
 	} // otherwise, nothing to do.
+	f_paired = 1;
+	ir_pair_setstate(ir_proto_state+1);
 }
 
 uint8_t have_trick(uint8_t trick_id) {
@@ -371,6 +379,9 @@ int main( void )
 			f_unpaired = 0;
 			itps_pattern = 0;
 			s_unpair = 1;
+		} else if(f_ir_pair_abort) {
+			f_ir_pair_abort = 0;
+			itps_pattern = 0;
 		}
 
 		/*
