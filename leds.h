@@ -24,13 +24,16 @@
 
 typedef struct {
 	uint8_t rows[5];
-	uint8_t movement; // bit4 is set if it's the last frame.
+	uint8_t len;
 } spriteframe;
+
+typedef struct {
+	uint16_t rows[5];
+	uint8_t len;
+} fullframe;
 
 extern uint16_t led_values[5];
 extern uint16_t led_zeroes[5];
-extern uint8_t led_text_scrolling;
-extern uint8_t sprite_animate;
 
 void led_init();
 
