@@ -305,32 +305,16 @@ uint8_t led_post()
 	//Set latch to low (should be already)
 	GPIO_setOutputLowOnPin(LED_PORT, LED_LATCH);
 
-	uint16_t i;
-	uint8_t j;
-
 	uint16_t test_pattern = 0b1111101010100001;
 	uint16_t test_response = 0;
-	for (j=0; j<5; j++) { // Fill all the registers with the test pattern.
-		for (i = 0; i < 16; i++)  {
+	for (uint8_t j=0; j<6; j++) { // Fill all the registers with the test pattern.
+		for (uint8_t i = 0; i < 16; i++)  {
+			test_response |= GPIO_getInputPinValue(GPIO_PORT_P1, GPIO_PIN6) << i;
 			WRITE_IF(LED_PORT, LED_DATA, (test_pattern & (1 << i)));
 			GPIO_pulse(LED_PORT, LED_CLOCK);
 		}
 	}
-	// Now read them:
-	for (j=0; j<5; j++) {
-		// Iterate over each bit, set data pin, and pulse the clock to send it
-		// to the shift register
-		test_response = 0;
-		for (i = 0; i < 16; i++)  {
-			test_response |= GPIO_getInputPinValue(GPIO_PORT_P1, GPIO_PIN6) << i;
-			WRITE_IF(LED_PORT, LED_DATA, 0);
-			GPIO_pulse(LED_PORT, LED_CLOCK);
-		}
-		if (test_response != test_pattern) {
-			return STATUS_FAIL;
-		}
-	}
-	return STATUS_SUCCESS;
+	return test_response == test_pattern;
 }
 
 void led_enable(uint16_t duty_cycle) {
