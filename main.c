@@ -58,6 +58,7 @@ uint8_t neighbor_count_cycle = 0;
 uint8_t window_seconds = RECEIVE_WINDOW_LENGTH_SECONDS;
 uint8_t trick_seconds = TRICK_INTERVAL_SECONDS;
 
+uint8_t my_score = 0;
 
 #if !BADGE_TARGET
 volatile uint8_t f_ser_rx = 0;
@@ -247,13 +248,13 @@ int main( void )
 #endif
 	}
 #if BADGE_TARGET
+	led_set_rainbow(0);
 	led_clear();
 	led_enable(LED_PERIOD/2);
 #else
 	uint8_t color = 0;
 #endif
 	led_anim_init();
-	led_set_rainbow(0);
 
 #if BADGE_TARGET
 	// Startup sequence:
@@ -570,14 +571,17 @@ int main( void )
 				for (uint8_t i=0; i< (ir_proto_seqnum-ITPS_TO_SHOW_PAIRING) / ((ITPS_TO_PAIR - ITPS_TO_SHOW_PAIRING) / 5); i++) {
 					itps_pattern |= (1 << i);
 				}
+			} else if (itps_pattern) {
+				itps_pattern = 0;
 			}
 
 			if (itps_pattern) {
 				s_update_rainbow = 1;
-				rainbow_lights &= 0b1111111100000000;
+				rainbow_lights &= 0b1111111111100000;
 				rainbow_lights |= itps_pattern;
 			} else {
-				// TODO: set rainbow_lights LSByte to our score
+				rainbow_lights &= 0b1111111111100000;
+				rainbow_lights |= (my_score & 0b11111); // TODO
 			}
 
 			if (s_propped) {
@@ -666,6 +670,9 @@ int main( void )
 
 		if (s_need_rf_beacon && rfm_proto_state == RFM_PROTO_RX_IDLE) {
 			out_payload.beacon = 1;
+			out_payload.clock_age_seconds = clock_setting_age;
+			memcpy(&out_payload.time, &currentTime, sizeof currentTime);
+
 			radio_send_half_async();
 			s_need_rf_beacon = 0;
 		} else if (s_rf_retransmit && rfm_proto_state == RFM_PROTO_RX_IDLE) {
@@ -688,8 +695,8 @@ int main( void )
 			led_print_scroll("unpair", 1, 1, 0);
 		}
 		if (s_trick) {
-			s_trick = 0;
 			begin_sprite_animation((spriteframe *)tricks[s_trick-1], 4);
+			s_trick = 0; // this needs to be after the above statement. Duh.
 		}
 		if (s_update_rainbow) {
 			s_update_rainbow = 0;
@@ -795,14 +802,15 @@ void check_config() {
 	if (crc != my_conf.crc || 1) { // TODO!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		qcxiconf new_conf;
 		uint8_t* new_config_bytes = (uint8_t *) &new_conf;
-		for (uint8_t i=0; i<42; i++) {
+		for (uint8_t i=0; i<50; i++) {
 			new_config_bytes[i] = 0xff;
 			// paired_ids, seen_ids, scores, events occurred and attended.
 		}
 		// TODO: set self to seen/paired, I guess.
 		new_conf.badge_id = 100;
-		new_conf.datetime[0] = 0; // TODO: Pre-con party time.
-		new_conf.datetime[1] = 0;
+		// new_conf.datetime is a DONTCARE because the clock's damn well not
+		// going to be set anyway, and we have no idea what time it is,
+		// and this section should (c) never be reached.
 		strcpy((char *) new_conf.handle, "person");
 		strcpy((char *) new_conf.message, "Hi new person.");
 
@@ -841,6 +849,9 @@ void check_config() {
 		}
 	}
 
+	// Time:
+	memcpy(&currentTime, &my_conf.datetime, sizeof currentTime);
+
 	// Setup our IR pairing payload:
 	strcpy(&(ir_pair_payload[0]), my_conf.handle);
 	strcpy(&(ir_pair_payload[11]), my_conf.message);
@@ -855,12 +866,7 @@ void check_config() {
 	out_payload.base_id = 0xFF; // TODO: unless I'm a base
 	out_payload.puppy_flags = 0;
 	out_payload.clock_authority = 0xFF; // UNSET
-	out_payload.seconds = 0;
-	out_payload.minutes = 0;
-	out_payload.hours = 0;
-	out_payload.day = 0;
-	out_payload.month = 0;
-	out_payload.year = 0;
+	memcpy(&out_payload.time, &currentTime, sizeof currentTime);
 	out_payload.clock_age_seconds = 0;
 	out_payload.prop_id = 0;
 	out_payload.prop_time_loops_before_start = 0;
@@ -872,38 +878,18 @@ void check_config() {
 }
 
 inline void update_clock() {
-	uint8_t clock_updated = 0;
 
-	if (currentTime.Year != in_payload.year) {
-		currentTime.Year = in_payload.year;
-		clock_updated = 1;
-	}
-	if (currentTime.Month != in_payload.month) {
-		currentTime.Month = in_payload.month;
-		clock_updated = 1;
-	}
-	if (currentTime.DayOfMonth != in_payload.day) {
-		currentTime.DayOfMonth = in_payload.day;
-		clock_updated = 1;
-	}
-	if (currentTime.Hours != in_payload.hours) {
-		currentTime.Hours = in_payload.hours;
-		clock_updated = 1;
-	}
-	if (currentTime.Minutes != in_payload.minutes) {
-		currentTime.Minutes = in_payload.minutes;
-		currentTime.Seconds = in_payload.seconds;
-	} else if (in_payload.seconds < ((currentTime.Seconds-1) % 60) ||
-			in_payload.seconds > ((currentTime.Seconds+1) % 60)) {
-		currentTime.Seconds = in_payload.seconds;
-		clock_updated = 1;
-	}
-
-	if (clock_updated) {
+	if (memcmp(&currentTime.Minutes,
+				&in_payload.time.Minutes,
+				sizeof currentTime - sizeof currentTime.Seconds) ||
+		in_payload.time.Seconds < ((currentTime.Seconds-1) % 60) ||
+		in_payload.time.Seconds > ((currentTime.Seconds+1) % 60))
+	{
+		memcpy(&currentTime, &in_payload.time, sizeof currentTime);
 		clock_is_set = 1;
 		clock_setting_age = 0;
 		my_clock_authority = in_payload.clock_authority;
-		clock_updated = 0;
+		out_payload.clock_authority = my_clock_authority;
 		init_alarms();
 		led_print_scroll("clock", 0, 1, 1);
 	}

@@ -131,7 +131,7 @@ typedef struct {
 	uint8_t events_occurred;
 	uint8_t events_attended;
 	uint8_t badge_id;
-	uint16_t datetime[2];
+	Calendar datetime;
 	uint8_t handle[11];
 	uint8_t message[17];
 	uint16_t crc;
@@ -159,9 +159,9 @@ extern uint8_t f_ir_itp_step;
 extern uint8_t f_ir_pair_abort;
 
 typedef struct {
-	uint8_t to_addr, from_addr, base_id, puppy_flags, clock_authority,
-			seconds, minutes, hours, day, month;
-	uint16_t year, clock_age_seconds;
+	uint8_t to_addr, from_addr, base_id, puppy_flags, clock_authority;
+	Calendar time;
+	uint16_t clock_age_seconds;
 	uint8_t prop_id, prop_time_loops_before_start, prop_from;
 	uint8_t beacon;
 } qcxipayload;
