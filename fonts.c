@@ -9,7 +9,7 @@
 #include "fonts.h"
 
 /* Character bitmaps for D3 5pt */
-const uint8_t d3_5ptBitmaps[] =
+const uint8_t font_bits[] =
 {
 	/* @0 ' ' (2 pixels wide) */
 	//
@@ -874,11 +874,11 @@ const FONT_CHAR_INFO d3_5ptDescriptors[] =
 };
 
 /* Font information for D3 5pt */
-const FONT_INFO d3_5ptFontInfo =
+const FONT_INFO font_info =
 {
 	1, /*  Character height */
 	' ', /*  Start character */
 	'~', /*  End character */
 	d3_5ptDescriptors, /*  Character descriptor array */
-	d3_5ptBitmaps, /*  Character bitmap array */
+	font_bits, /*  Character bitmap array */
 };

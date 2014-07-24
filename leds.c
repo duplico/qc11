@@ -10,188 +10,244 @@
 #include "fonts.h"
 #include "anim.h"
 
-uint8_t sprite_display = 0;
-uint8_t sprite_animate = 0;
-uint8_t sprite_animate_done = 0;
-int8_t sprite_x = 0;
-int8_t sprite_y = 0;
-spriteframe* sprite_animation;
-uint8_t sprite_current_frame;
+#define DISPLAY_OFF 	0
+#define DISPLAY_ON  	1
+#define DISPLAY_ANIMATE BIT1
+#define DISPLAY_ON_ANIMATE 3
 
-uint16_t led_values[5] = {65535, 65535, 65535, 65535, 65535};
+#define DISPLAY_MIRROR_BIT BIT3
 
-uint16_t led_zeroes[5] = {0, 0, 0, 0, 0};
+uint8_t led_display_left = 0;
+uint8_t led_display_right = 0;
+uint8_t led_display_full = 0;
+uint8_t led_display_text = 0;
 
-uint16_t disp_bit_buffer[BACK_BUFFER_WIDTH] = { 0 };
+uint8_t led_display_left_frame = 0;
+uint8_t led_display_right_frame = 0;
+uint8_t led_display_full_frame = 0;
 
-uint8_t disp_left = 0;
-uint8_t disp_top = 0;
+uint8_t led_display_text_character = 0;
+uint8_t led_display_text_cursor = 0;
+
+uint8_t led_display_left_len = 0;
+uint8_t led_display_right_len = 0;
+uint8_t led_display_full_len = 0;
+uint8_t led_display_text_len = 0;
+
+uint8_t led_display_anim_skip = 0;
+uint8_t led_display_text_skip = 0;
+
+uint8_t led_display_anim_skip_index = 0;
+uint8_t led_display_text_skip_index = 0;
+
+spriteframe* led_display_left_sprite = 0;
+spriteframe* led_display_right_sprite = 0;
+fullframe* led_display_full_anim = 0;
+
+char* led_display_text_string = "";
+
+uint16_t disp_buffer[10] = { 0 }; // 10-row buffer - bottom is animation, top is text. MS 2 bits unused.
+uint8_t led_display_bottom = 5;
 
 volatile uint8_t f_time_loop = 0;
-uint8_t print_pixel_len = 0;
-uint8_t print_pixel_index = 0;
 
-uint8_t led_text_scrolling = 0;
-uint8_t f_animation_done = 0;
+#define DISP_MODE_ANIM  -1
+#define DISP_MODE_SCROLL 0
+#define DISP_MODE_TEXT   1
 
-volatile uint8_t led_skip_frame_text = 0;
-volatile uint8_t led_skip_frame_anim = 0;
-volatile uint8_t led_frames_skipped = 0;
-
-#define ANIMATION 0
-#define TEXT 1
-
-volatile uint8_t vscroll_to_text = 0;
-volatile uint8_t vscroll_to_anim = 0;
-volatile uint8_t vertical_mode = TEXT;
-
-void begin_sprite_animation(spriteframe* animation, uint8_t frameskip) {
-	sprite_display = 1;
-	sprite_animate = 1;
-	sprite_current_frame = 0;
-	sprite_x = 0;
-	sprite_y = 8;
-	sprite_animation = animation;
-	led_skip_frame_anim = frameskip;
-	f_animation_done = 0;
-
-	if (vscroll_to_text) { // interrupting text?
-		vscroll_to_text = 0;
-		vertical_mode = TEXT;
-	}
-
-	if (vertical_mode == TEXT) {
-		vscroll_to_anim = 1;
-	}
-}
-
-void disp_apply_mask(uint16_t mask) {
-	for (uint8_t i=0; i<BACK_BUFFER_WIDTH; i++) { // Clear only the sprite area:
-		disp_bit_buffer[i] &= mask;
-	}
-}
-
-//void draw_sprite() {
-//	disp_apply_mask(0b0000000011111111);
-//	for (uint8_t col = 0; col < 8; col++) {
-//		if (sprite_x+col >= 0)
-//			disp_bit_buffer[col + sprite_x] |= ((uint16_t) sprite_animation[sprite_current_frame].columns[col]) << (sprite_y);
-//	}
-//}
-
-void draw_row_major_sprite() {
-	disp_apply_mask(0b0000000011111111);
-	for (uint8_t row=0; row<5; row++) {
-		for (uint8_t col = 0; col < 8; col++) {
-			/*
-			 * What we need to do:
-			 * Put BIT7 of row0 in the bottom left (meaning it becomes BIT4 of col0)
-			 * Put BIT6 of row0 in the bottom next-to-left (BIT4 of col1)
-			 * Put BIT0 of row0 in the bottom-8 (BIT4 of col7)
-			 *
-			 * Put BIT7 of row4 in the top left (BIT0 of col0)
-			 */
-
-			if (sprite_x+col >= 0) {
-				// Start at row0,col0 so we're interested in:
-				//  row0 BIT7   for   col0 BIT4
-				if (sprite_animation[sprite_current_frame].rows[row] & (1 << (7-col))) {
-					// It's a 1, so we need to set col0 BIT4:
-					disp_bit_buffer[col+sprite_x] |= (1 << (12-row));
-				}
-			}
-//				disp_bit_buffer[col + sprite_x] |= ((uint16_t) sprite_animation[sprite_current_frame].columns[col]) << (sprite_y);
-		}
-	}
-}
-
-void sprite_next_frame() {
-	if (sprite_animation == stand && sprite_animation[sprite_current_frame].movement & BIT3) {
-		// last frame
-		sprite_animate = 0;
-		return;
-	} else if (sprite_animation[sprite_current_frame].movement & BIT3) {
-		sprite_animation = (spriteframe *)stand;
-		sprite_current_frame = 0;
-	} else {
-		sprite_current_frame++;
-		sprite_x += sprite_animation[sprite_current_frame].movement & 0b111;
-	}
-}
+volatile int8_t disp_mode = TEXT;
+volatile int8_t disp_mode_target = TEXT;
 
 void led_init() {
-#if BADGE_TARGET
 
 	// Setup LED module pins //////////////////////////////////////////////////
-	//   bit-banged serial data output:
-	//
-	// LED_PORT.LED_DATA, LED_CLOCK, LED_LATCH
-	//
-	GPIO_setAsOutputPin(
-			LED_PORT,
-			LED_DATA + LED_CLOCK + LED_LATCH // + LED_BLANK
-	);
+	// LED_PORT.LED_DATA, LED_CLOCK, LED_LATCH, LED_BLANK
+	P1DIR |= LED_DATA + LED_CLOCK + LED_LATCH + LED_BLANK;
 
-	// BLANK pin (we turn on PWM later as needed):
-	GPIO_setAsOutputPin(LED_PORT, LED_BLANK);
 	// Shift register input from LED controllers:
-//	GPIO_setAsInputPin(LED_PORT, GPIO_PIN6);
+	// LEDPORT.PIN6 as input:
 	P1DIR &= ~BIT6;
-#endif
+}
+
+void left_sprite_animate(spriteframe* animation, uint8_t frameskip) {
+	led_display_right = DISPLAY_ON_ANIMATE;
+	led_display_right_frame = 0;
+	led_display_anim_skip = frameskip;
+	led_display_right_sprite = animation;
+}
+
+void full_animate(fullframe* animation, uint8_t frameskip) {
+	led_display_full = DISPLAY_ON_ANIMATE;
+	led_display_full_frame = 0;
+	led_display_anim_skip = frameskip;
+	led_display_full_anim = animation;
+}
+
+void right_sprite_animate(spriteframe* animation, uint8_t frameskip, uint8_t flip) {
+	led_display_left = DISPLAY_ON_ANIMATE;
+	led_display_left_frame = 0;
+	led_display_anim_skip = frameskip;
+	led_display_left_sprite = animation;
+	if (flip)
+		led_display_left |= DISPLAY_MIRROR_BIT;
+}
+
+void led_print_scroll(char* text, uint8_t frameskip) {
+	led_display_text_string = text;
+	led_display_text_character = 0;
+	led_display_text_cursor = 0;
+	led_display_text_skip = frameskip;
+	led_display_text = DISPLAY_ANIMATE;
+	led_display_text_len = strlen(text);
+
+	disp_mode_target = DISP_MODE_TEXT; // Scroll to text mode if necessary.
+}
+
+void clear_anim() {
+	for (uint8_t i=5; i<10; i++)
+		disp_buffer[i] = 0;
+}
+
+void clear_text() {
+	for (uint8_t i=0; i<5; i++)
+		disp_buffer[i] = 0;
 }
 
 void led_clear() {
-	disp_apply_mask(0b0000000000000000);
-	led_disp_bit_to_values(disp_left, disp_top);
-	led_display_bits(led_values);
+	clear_anim();
+	clear_text();
 }
 
-void led_print_scroll(char* text, uint8_t scroll_on, uint8_t scroll_off, uint8_t frameskip) {
-	uint8_t character = 0;
-	uint8_t cursor = scroll_on? SCREEN_WIDTH : 0;
-	disp_apply_mask(0b1111111100000000); // Clear text area.
+// This puts the animations in rows i=0,1,2,3,4, with 0 being the bottom of the sprite.
+void draw_animations() {
+	clear_anim();
+	for (uint8_t i=0; i<5; i++) {
+		if (led_display_left)
+			disp_buffer[i] |= (led_display_left_sprite.rows[i] << 5);
 
-	do {
-		for (uint16_t i = d3_5ptFontInfo.charInfo[text[character] - d3_5ptFontInfo.startChar].offset; i < d3_5ptFontInfo.charInfo[text[character] - d3_5ptFontInfo.startChar].offset + d3_5ptFontInfo.charInfo[text[character] - d3_5ptFontInfo.startChar].widthBits; i++) {
-			disp_bit_buffer[cursor++] = d3_5ptFontInfo.data[i];
-			if (cursor == BACK_BUFFER_WIDTH)
-				break;
+		if (led_display_right & DISPLAY_MIRROR_BIT)
+			disp_buffer[i] |= (uint8_t)(((led_display_left_sprite.rows[i] * 0x0802LU & 0x22110LU) | (led_display_left_sprite.rows[i] * 0x8020LU & 0x88440LU)) * 0x10101LU >> 16);
+		else if (led_display_right)
+			disp_buffer[i] |= (led_display_left_sprite.rows[i]);
+
+		if (led_display_full) {
+			disp_buffer[i] |= (led_display_full_anim.rows[i]);
 		}
-		if (cursor == BACK_BUFFER_WIDTH)
-			break; // TODO: Clean this up
-		disp_bit_buffer[cursor++] = 0; // gap between letters
-		character++;
-		if (cursor == BACK_BUFFER_WIDTH)
-			break;
-	} while (text[character]);
+	}
+}
 
-	print_pixel_len = cursor;
+// This puts the text in rows i=5,6,7,8,9
+// with row 5 as the base of the text.
+void draw_text() {
+	// Character.Cursor is at the far right of the display. If Character == length, then we're filling the screen up with Cursor blank spaces.
+	// This has the happy effect that the first bits we're setting are the LSBs.
+	uint8_t buffer_location = 0;
+	uint8_t current_char = led_display_text_character;
+	uint8_t current_cursor = led_display_text_cursor;
+	clear_text();
 
-	if (!scroll_off) {
-		print_pixel_len -= SCREEN_WIDTH; // TODO: Bounds checking
+	if (current_char == led_display_text_len) {
+		buffer_location += current_cursor;
+		current_char--;
+		// set cursor to last column of font bitmap:
+		current_cursor = font_info.charInfo[led_display_text_string[current_char] - font_info.startChar].widthBits - 1;
+	}
+	// Else we'll just use what we've got in the global settings.
+
+	uint8_t font_bits_index = font_info.charInfo[led_display_text_string[current_char] - font_info.startChar].offset;
+
+	while (buffer_location < 14) {
+		// Current column in the buffer is buffer_location.
+		// Current column in the font is current_cursor
+		// Current character is current_char.
+
+		// Apply the current column of the current font bitmap:
+		for (uint8_t row=0; row<5; row++) {
+			// In the font bitmap, bit0 is the top
+			// bitmap starts at: font_bits[font_bits_index]
+			// column is: font_bits[font_bits_index + current_cursor]
+			// bit to copy is: font_bits[font_bits_index + current_cursor] & (1 << (4-row))
+			// destination is: disp_buffer[row+5] & (1 << buffer_location)
+			if (font_bits[font_bits_index + current_cursor] & (1 << (4-row))) {
+				disp_buffer[row+5] |= (1 << buffer_location)
+			}
+		}
+		buffer_location++;
+
+		if (current_cursor == 0) {
+			// We just finished with a character
+			// And we need to go on to the next character.
+			if (current_char == 0) {
+				break; // This was the last character to print, so we're done.
+			}
+			// So next we need a blank column too.
+			buffer_location++;
+		}
+	}
+}
+
+// NB: Don't call this function when we're in text mode. TODO.
+void animation_timestep() {
+	// Return if we're not animating or if we have to skip a frame:
+	if (!(led_display_left | led_display_right | led_display_full & DISPLAY_ANIMATE) || led_display_anim_skip_index) {
+		led_display_anim_skip_index--; // If we're not animating, this is DONTCARE because it's set when animations start.
+		return;
+	}
+	led_display_anim_skip_index = led_display_anim_skip;
+	draw_animations();
+	// end animation if done:
+	if (led_display_full & DISPLAY_ANIMATE) {
+		led_display_full_frame++;
+		if (led_display_full_frame == led_display_full_len) {
+			led_display_full &= ~DISPLAY_ANIMATE;
+		}
+	}
+	if (led_display_left & DISPLAY_ANIMATE) {
+		led_display_left_frame++;
+		// end animation if done::
+		if (led_display_left_sprite == stand && led_display_left_frame == led_display_left_len) {
+			led_display_left &= ~DISPLAY_ANIMATE;
+		} else if (led_display_left_frame == led_display_left_len) {
+			left_sprite_animate(stand, led_display_anim_skip);
+		}
+	}
+	if (led_display_right & DISPLAY_ANIMATE) {
+		led_display_right_frame++;
+		if (led_display_right_frame == led_display_right_len) {
+			// end animation
+			led_display_right &= ~DISPLAY_ANIMATE;
+		}
+	}
+}
+
+void text_timestep() {
+	// Return if we're not animating or if we have to skip a frame:
+	if (!(led_display_text & DISPLAY_ANIMATE) || led_display_text_skip_index) {
+		led_display_text_skip_index--; // If we're not animating, this is DONTCARE because it's set when animations start.
+		return;
 	}
 
-	if (vscroll_to_anim) { // we're interrupting an animation...
-		vertical_mode = ANIMATION;
-		vscroll_to_anim = 0;
-	}
+	led_display_text_skip_index = led_display_text_skip;
+	draw_text();
 
-	if (vertical_mode == ANIMATION) {
-		vscroll_to_text = 1;
-	}
+	// Next frame.
+	uint8_t current_cursor = led_display_text_cursor;
 
-	led_skip_frame_text = frameskip;
-	// NOTE: We specifically do NOT set anim_frames_skipped here because
-	// if we do, when we're moving from one animation to another with the
-	// same frameskip count, the transition looks jerky (which makes sense)
-	// We also specifically do NOT write anything to the display buffer
-	// at this time, for the same reason.
-	disp_left = 0;
-	led_text_scrolling = 1;
-	f_animation_done = 0;
-	if (!scroll_on && !scroll_off) {
-		led_disp_bit_to_values(disp_left, disp_top);
-		led_display_bits(led_values);
+	if (led_display_text_character == led_display_text_len && led_display_text_cursor == 14) {
+		// done animating.
+		led_display_text &= ~DISPLAY_ANIMATE;
+		return;
+	} else if (led_display_text_character == led_display_text_len) {
+		// Done with the text, now we're just scrolling.
+		led_display_cursor++;
+	} else {
+		// Need to go to the next bit of text:
+		led_display_text_cursor++;
+		if (led_display_text_cursor >= font_info.charInfo[led_display_text_string[led_display_text_character] - font_info.startChar].widthBits) {
+			led_display_text_character++;
+			led_display_text_cursor = 0;
+			// TODO: Need to make sure we're handling the spaces between letters.
+		}
 	}
 }
 
@@ -224,8 +280,7 @@ void led_set_rainbow(uint16_t value) {
 	led_values[4] |= ((value & BIT1)? BIT8 : 0) | ((value & BIT0)? BIT0 : 0);
 }
 
-void led_disp_bit_to_values(uint8_t left, uint8_t top) {
-
+void led_update_display() {
 	// Clear everything but the rainbows on the end:
 	led_values[0] &= 0b1000000000000001;
 	for (int i=1; i<5; i++) {
@@ -236,68 +291,34 @@ void led_disp_bit_to_values(uint8_t left, uint8_t top) {
 		}
 	}
 
-	int x_offset = 0;
+	// Top row:
+	led_values[0] |= disp_buffer[led_display_bottom+4] << 1;
 
-	uint8_t led_segment = 1;
-	uint8_t led_index = 0;
-	for (uint8_t x=0; x<14; x++) {
-		for (uint8_t y=0; y<5; y++) {
-			if (y == 0) {
-				led_segment = 0;
-				x_offset = 1;
-			} else {
-				if (x<7) {
-					led_segment = 1; // LED segment is odd  (left side)
-					// left side is x = [0 .. 6]
-					// so x_offset is set to skip the leftmost LEDs only,
-					// leading to x=0->out=1
-					x_offset = 1;
-				}
-				else {
-					led_segment = 2; // LED segment is even (right side)
-					// right side is x = [7 .. 13], skipping the far right LED
-					// so x_offset is set to make x=7->out=0
-					x_offset = -7;
-				}
-				if (y>2) {
-					led_segment+=2;
-				}
-				if (!(y % 2)) {
-					// if Y is even (second row of a controller's segment)
-					// then we need the offset to change. i.e. x=0->out=1->out'=9
-					// or x=7->out=0->out'=8
-					x_offset += 8;
-				}
-			}
+	// Left halves:
+	led_values[1] |= (disp_buffer[led_display_bottom+3] & 0b11111110000000) << 1;
+	led_values[1] |= (disp_buffer[led_display_bottom+2] & 0b11111110000000) >> 6;
+	led_values[3] |= (disp_buffer[led_display_bottom+1] & 0b11111110000000) << 1;
+	led_values[3] |= (disp_buffer[led_display_bottom]   & 0b11111110000000) >> 6;
 
-			led_index = x_offset + x;
+	// Right halves:
+	led_values[2] |= (disp_buffer[led_display_bottom+3] & 0b1111111) << 1;
+	led_values[2] |= (disp_buffer[led_display_bottom+2] & 0b1111111) << 8;
+	led_values[4] |= (disp_buffer[led_display_bottom+1] & 0b1111111) << 1;
+	led_values[4] |= (disp_buffer[led_display_bottom]   & 0b1111111) << 8;
 
-			// now we need to write to:
-			// segment: 	led_segment
-			// bit: 		x_offset + x
-			if (disp_bit_buffer[(x + left) % BACK_BUFFER_WIDTH] & (1 << ((y + top) % BACK_BUFFER_HEIGHT)))
-				led_values[led_segment] |= (1 << (15 - led_index));
-
-		}
-	}
-}
-
-void led_display_bits(uint16_t* val)
-{
 	//Set latch to low (should be already)
-	GPIO_setOutputLowOnPin(LED_PORT, LED_LATCH);
+	P1OUT &= ~LED_LATCH
 
-	uint16_t i;
-	uint8_t j;
-	for (j=0; j<5; j++) {
+	for (uint8_t j=0; j<5; j++) {
 		// Iterate over each bit, set data pin, and pulse the clock to send it
 		// to the shift register
-		for (i = 0; i < 16; i++)  {
-			WRITE_IF(LED_PORT, LED_DATA, (val[4-j] & (1 << i)));
+		for (uint8_t i = 0; i < 16; i++)  {
+			WRITE_IF(LED_PORT, LED_DATA, (led_values[4-j] & (1 << i)));
 			GPIO_pulse(LED_PORT, LED_CLOCK);
 		}
 	}
 	GPIO_pulse(LED_PORT, LED_LATCH);
+
 }
 
 uint8_t led_post()
@@ -309,7 +330,7 @@ uint8_t led_post()
 	uint16_t test_response = 0;
 	for (uint8_t j=0; j<6; j++) { // Fill all the registers with the test pattern.
 		for (uint8_t i = 0; i < 16; i++)  {
-			test_response |= GPIO_getInputPinValue(GPIO_PORT_P1, GPIO_PIN6) << i;
+			test_response |= (P1IN & GPIO_PIN6)? 1 << i : 0;
 			WRITE_IF(LED_PORT, LED_DATA, (test_pattern & (1 << i)));
 			GPIO_pulse(LED_PORT, LED_CLOCK);
 		}
@@ -348,7 +369,35 @@ void led_anim_init() {
 	RTC_A_enableInterrupt(RTC_A_BASE, RTC_A_PRESCALE_TIMER1_INTERRUPT);
 }
 
+void led_timestep() {
+	if (disp_mode != disp_mode_target) {
+		// we're scrolling between display modes.
+		// anim means bottom=5
+		// text means bottom=0
+		if (disp_mode_target == DISP_MODE_ANIM && led_display_bottom < 5) {
+			led_display_bottom++;
+		} else if (disp_mode_target == DISP_MODE_ANIM) {
+			led_display_bottom = 5;
+			disp_mode = disp_mode_target;
+		} else if (disp_mode_target == DISP_MODE_TEXT && led_display_bottom > 0) {
+			led_display_bottom--;
+		} else if (disp_mode_target == DISP_MODE_TEXT) {
+			led_display_bottom = 0; // TODO?
+			disp_mode = disp_mode_target;
+		}
+	} else {
+		animation_timestep();
+		text_timestep();
+
+		draw_animations();
+		draw_text();
+	}
+	// TODO: Maybe only do this if we know something is changing.
+	led_update_display();
+}
+
 void led_animate() {
+
 	static uint8_t led_skip_frame;
 
 	// Check to see if we're transitioning display modes:
