@@ -343,17 +343,7 @@ void ir_process_rx_ready() {
 		IR_ASSERT_PARTNER
 		if (opcode == IR_OP_PAIRACK) {
 			// decide we're paired.
-
-			strcpy(ir_rx_handle, (char *) &(ir_rx_frame[2]));
-			strcpy(ir_rx_message, (char *) &(ir_rx_frame[2+11]));
-
-			// See if this is a new pair.
-			if (!paired_badge(ir_partner)) {
-				f_paired_new_person = 1;
-				set_badge_paired(ir_partner);
-			}
-			f_paired = 1;
-			ir_pair_setstate(IR_PROTO_PAIRED_C);
+			set_badge_paired(ir_partner);
 			ir_proto_setup(ir_partner, IR_OP_KEEPALIVE, 0);
 		} else {
 			ir_pair_setstate(IR_PROTO_LISTEN);
@@ -417,22 +407,10 @@ void ir_process_rx_ready() {
 	case IR_PROTO_PAIRING_S: // can receive either ITP(16) (resend) or PAIRACC
 		IR_ASSERT_PARTNER
 		if (opcode == IR_OP_PAIRACC) {
-			ir_pair_setstate(IR_PROTO_PAIRED_S);
-			f_paired = 1;
-			strcpy(ir_rx_handle, &(ir_rx_frame[2]));
-			strcpy(ir_rx_message, &(ir_rx_frame[2+11]));
-
-			if (my_conf.met_ids[ir_partner/16] & (1 << ir_partner % 16)) {
-				// new person
-				f_paired_new_person = 1;
-				// TODO: see if it's a new trick.
-			}
+			set_badge_paired(ir_partner);
 			ir_proto_setup(ir_partner, IR_OP_PAIRACK, 0);
 			ir_write_global();
 		} else if (opcode == IR_OP_ITP && seqnum == ITPS_TO_PAIR) {
-			// resend:
-			// TODO: send PAIRREQ. Send message, etc; check if this is a new
-			// person.
 			ir_proto_setup(ir_partner, IR_OP_PAIRREQ, 0); // TODO: probably already done.
 			ir_write_global();
 		} else {
