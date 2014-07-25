@@ -178,6 +178,7 @@ void draw_text() {
 		if (current_cursor == 0) {
 			// We just finished with a character
 			// And we need to go on to the next character.
+			// TODO: This needs to be done.
 			if (current_char == 0) {
 				break; // This was the last character to print, so we're done.
 			}
@@ -231,11 +232,8 @@ void text_timestep() {
 	led_display_text_skip_index = led_display_text_skip;
 	draw_text();
 
-	// Next frame.
-	uint8_t current_cursor = led_display_text_cursor;
-
 	if (led_display_text_character == led_display_text_len && led_display_text_cursor == 14) {
-		// done animating.
+		// done animating. TODO: go back to anim
 		led_display_text &= ~DISPLAY_ANIMATE;
 		return;
 	} else if (led_display_text_character == led_display_text_len) {
@@ -284,26 +282,25 @@ void led_set_rainbow(uint16_t value) {
 void led_update_display() {
 	// Clear everything but the rainbows on the end:
 	led_values[0] &= 0b1000000000000001;
-	for (int i=1; i<5; i++) {
-		if (i & 1) {
-			led_values[i] &= 0b1000000010000000;
-		} else {
-			led_values[i] &= 0b0000000100000001;
-		}
-	}
+
+	led_values[1] &= 0b1000000010000000;
+	led_values[3] &= 0b1000000010000000;
+
+	led_values[2] &= 0b0000000100000001;
+	led_values[4] &= 0b0000000100000001;
 
 	// Top row:
 	led_values[0] |= (disp_buffer[led_display_bottom+4] << 1) & 0b0111111111111110;
 
 	// Left halves:
-	led_values[1] |= (disp_buffer[led_display_bottom+3] & 0b11111110000000) << 1;
-	led_values[1] |= (disp_buffer[led_display_bottom+2] & 0b11111110000000) >> 7;
+	led_values[1] |= (disp_buffer[led_display_bottom+3] & 0b11111110000000) << 1; // should look like 0b R 1111111 R 0000000
+	led_values[1] |= (disp_buffer[led_display_bottom+2] & 0b11111110000000) >> 7; // should look like 0b R 0000000 R 1111111
 	led_values[3] |= (disp_buffer[led_display_bottom+1] & 0b11111110000000) << 1;
 	led_values[3] |= (disp_buffer[led_display_bottom]   & 0b11111110000000) >> 7;
 
 	// Right halves:
-	led_values[2] |= (disp_buffer[led_display_bottom+3] & 0b1111111) << 9;
-	led_values[2] |= (disp_buffer[led_display_bottom+2] & 0b1111111) << 1; // need to invert these two
+	led_values[2] |= (disp_buffer[led_display_bottom+3] & 0b1111111) << 9; // should look like 0b 1111111 R 0000000 R
+	led_values[2] |= (disp_buffer[led_display_bottom+2] & 0b1111111) << 1; // should look like 0b 0000000 R 1111111 R
 	led_values[4] |= (disp_buffer[led_display_bottom+1] & 0b1111111) << 9;
 	led_values[4] |= (disp_buffer[led_display_bottom]   & 0b1111111) << 1;
 
