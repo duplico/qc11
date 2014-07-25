@@ -743,26 +743,13 @@ uint8_t post() {
 #if BADGE_TARGET
 
 	static const uint16_t tp0[5] = {0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF};
-	static const uint16_t tp1[5] = {0xFF00, 0xFF00, 0xFF00, 0xFF00, 0xFF00};
-	static const uint16_t tp2[5] = {0x00FF, 0x00FF, 0x00FF, 0x00FF, 0x00FF};
+	led_set_rainbow(0b1111111111);
 
 	if (led_post() == STATUS_FAIL) {
 		post_result |= POST_SHIFTF;
 	}
 	// LED test pattern
 	memcpy(&disp_buffer[5], tp0, sizeof tp0);
-	led_update_display();
-	for (uint8_t i=LED_PERIOD; i>0; i--) {
-		led_enable(i);
-		delay(8);
-	}
-	memcpy(&disp_buffer[5], tp1, sizeof tp1);
-	led_update_display();
-	for (uint8_t i=LED_PERIOD; i>0; i--) {
-		led_enable(i);
-		delay(8);
-	}
-	memcpy(&disp_buffer[5], tp2, sizeof tp2);
 	led_update_display();
 	for (uint8_t i=LED_PERIOD; i>0; i--) {
 		led_enable(i);

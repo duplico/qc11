@@ -71,10 +71,10 @@ void led_init() {
 }
 
 void left_sprite_animate(spriteframe* animation, uint8_t frameskip) {
-	led_display_right = DISPLAY_ON_ANIMATE;
-	led_display_right_frame = 0;
+	led_display_left = DISPLAY_ON_ANIMATE;
+	led_display_left_frame = 0;
 	led_display_anim_skip = frameskip;
-	led_display_right_sprite = animation;
+	led_display_left_sprite = animation;
 }
 
 void full_animate(fullframe* animation, uint8_t frameskip) {
@@ -85,12 +85,12 @@ void full_animate(fullframe* animation, uint8_t frameskip) {
 }
 
 void right_sprite_animate(spriteframe* animation, uint8_t frameskip, uint8_t flip) {
-	led_display_left = DISPLAY_ON_ANIMATE;
-	led_display_left_frame = 0;
+	led_display_right = DISPLAY_ON_ANIMATE;
+	led_display_right_frame = 0;
 	led_display_anim_skip = frameskip;
-	led_display_left_sprite = animation;
+	led_display_right_sprite = animation;
 	if (flip)
-		led_display_left |= DISPLAY_MIRROR_BIT;
+		led_display_right |= DISPLAY_MIRROR_BIT;
 }
 
 void led_print_scroll(char* text, uint8_t frameskip) {
@@ -105,18 +105,19 @@ void led_print_scroll(char* text, uint8_t frameskip) {
 }
 
 void clear_anim() {
-	for (uint8_t i=5; i<10; i++)
+	for (uint8_t i=0; i<5; i++)
 		disp_buffer[i] = 0;
 }
 
 void clear_text() {
-	for (uint8_t i=0; i<5; i++)
+	for (uint8_t i=5; i<10; i++)
 		disp_buffer[i] = 0;
 }
 
 void led_clear() {
 	clear_anim();
 	clear_text();
+	led_update_display();
 }
 
 // This puts the animations in rows i=0,1,2,3,4, with 0 being the bottom of the sprite.
@@ -155,7 +156,7 @@ void draw_text() {
 	}
 	// Else we'll just use what we've got in the global settings.
 
-	uint8_t font_bits_index = font_info.charInfo[led_display_text_string[current_char] - font_info.startChar].offset;
+	uint16_t font_bits_index = font_info.charInfo[led_display_text_string[current_char] - font_info.startChar].offset;
 
 	while (buffer_location < 14) {
 		// Current column in the buffer is buffer_location.
@@ -178,12 +179,16 @@ void draw_text() {
 		if (current_cursor == 0) {
 			// We just finished with a character
 			// And we need to go on to the next character.
-			// TODO: This needs to be done.
 			if (current_char == 0) {
 				break; // This was the last character to print, so we're done.
 			}
+			current_char--;
+			font_bits_index = font_info.charInfo[led_display_text_string[current_char] - font_info.startChar].offset;
+			current_cursor = font_info.charInfo[led_display_text_string[current_char] - font_info.startChar].widthBits - 1;
 			// So next we need a blank column too.
 			buffer_location++;
+		} else {
+			current_cursor--;
 		}
 	}
 }
@@ -202,6 +207,7 @@ void animation_timestep() {
 		led_display_full_frame++;
 		if (led_display_full_frame == led_display_full_len) {
 			led_display_full &= ~DISPLAY_ANIMATE;
+			f_animation_done = 1;
 		}
 	}
 	if (led_display_left & DISPLAY_ANIMATE) {
@@ -209,6 +215,7 @@ void animation_timestep() {
 		// end animation if done::
 		if (led_display_left_sprite == stand && led_display_left_frame == led_display_left_len) {
 			led_display_left &= ~DISPLAY_ANIMATE;
+			f_animation_done = 1;
 		} else if (led_display_left_frame == led_display_left_len) {
 			left_sprite_animate(stand, led_display_anim_skip);
 		}
@@ -218,6 +225,7 @@ void animation_timestep() {
 		if (led_display_right_frame == led_display_right_len) {
 			// end animation
 			led_display_right &= ~DISPLAY_ANIMATE;
+			f_animation_done = 1;
 		}
 	}
 }
@@ -235,6 +243,7 @@ void text_timestep() {
 	if (led_display_text_character == led_display_text_len && led_display_text_cursor == 14) {
 		// done animating. TODO: go back to anim
 		led_display_text &= ~DISPLAY_ANIMATE;
+		f_animation_done = 1;
 		return;
 	} else if (led_display_text_character == led_display_text_len) {
 		// Done with the text, now we're just scrolling.
