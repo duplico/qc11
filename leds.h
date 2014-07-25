@@ -34,19 +34,22 @@ typedef struct {
 
 extern uint16_t led_values[5];
 extern uint16_t led_zeroes[5];
+extern uint16_t disp_buffer[10];
 
 void led_init();
 
-void led_print_scroll(char*, uint8_t, uint8_t, uint8_t);
+void led_print_scroll(char*, uint8_t);
+void left_sprite_animate(spriteframe*, uint8_t);
+void full_animate(fullframe*, uint8_t);
+void right_sprite_animate(spriteframe*, uint8_t, uint8_t);
+void led_timestep();
 
 void led_set_rainbow(uint16_t value);
-void led_disp_bit_to_values(uint8_t, uint8_t);
-void led_display_bits(uint16_t*);
+void led_update_display();
 void led_enable(uint16_t);
 void led_disable( void );
 uint8_t led_post();
 void led_anim_init();
-void led_animate();
 inline void led_toggle( void );
 void begin_sprite_animation(spriteframe*, uint8_t);
 

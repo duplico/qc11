@@ -29,6 +29,7 @@ uint8_t f_paired = 0;
 uint8_t f_unpaired = 0;
 uint8_t f_paired_new_person = 0;
 uint8_t f_paired_new_trick = 0;
+uint8_t f_animation_done = 0;
 uint8_t start_new_animation = 0;
 uint8_t f_ir_itp_step = 0;
 uint8_t f_ir_pair_abort = 0;
@@ -244,7 +245,7 @@ int main( void )
 		char hex[4] = {0, 0, 0, 0};
 		hex[0] = (post_result/16 < 10)? '0' + post_result/16 : 'A' - 10 + post_result/16;
 		hex[1] = (post_result%16 < 10)? '0' + post_result%16 : 'A' - 10 + post_result%16;
-		led_print_scroll(hex, 0, 0, 0);
+		led_print_scroll(hex, 0);
 		for (uint8_t i=LED_PERIOD; i>0; i--) {
 			led_enable(i);
 			delay(25);
@@ -268,13 +269,13 @@ int main( void )
 	// Startup sequence:
 	uint8_t startup_seq_index = 0;
 	led_clear();
-	led_print_scroll("qcxi", 1, 1, 0);
+	led_print_scroll("qcxi", 0);
 
 	while (startup_seq_index<3) {
 		// Time to do something because of time?
 		if (f_time_loop) {
 			f_time_loop = 0;
-			led_animate();
+			led_timestep();
 		}
 
 		// Is an animation finished?
@@ -292,10 +293,10 @@ int main( void )
 //				led_print_scroll("Please leave my batteries in!", 1, 1, 0);
 //				break;
 			case 1:
-				begin_sprite_animation((spriteframe *) anim_sprite_walkin, 4);
+				left_sprite_animate((spriteframe *) anim_sprite_walkin, 4);
 				break;
 			case 2:
-				begin_sprite_animation((spriteframe *) anim_sprite_wave, 4);
+				left_sprite_animate((spriteframe *) anim_sprite_wave, 4);
 				break;
 
 			}
@@ -458,7 +459,7 @@ int main( void )
 					neighbor_count_cycle = window_position;
 				}
 
-				led_print_scroll("rx", 1, 1, 1);
+				led_print_scroll("rx", 1);
 
 			}
 
@@ -518,7 +519,7 @@ int main( void )
 					}
 					s_trick++; // because the s_trick flag is trick_id+1
 				}
-			} else if (!sprite_animate && !led_text_scrolling && !s_propped) {
+			} else { // if (!sprite_animate && !led_text_scrolling && !s_propped) {
 				trick_seconds--;
 			}
 
@@ -558,7 +559,7 @@ int main( void )
 		if (f_time_loop) {
 			f_time_loop = 0;
 #if BADGE_TARGET
-			led_animate();
+			led_timestep();
 #else
 			fillFrameBufferSingleColor(&leds[color], NUMBEROFLEDS, ws_frameBuffer, ENCODING);
 			ws_set_colors_async(NUMBEROFLEDS);
@@ -695,18 +696,18 @@ int main( void )
 #if BADGE_TARGET
 		if (s_event_alert) {
 			s_event_alert = 0;
-			led_print_scroll(message_to_send, 1, 1, 1);
+			led_print_scroll(message_to_send, 1);
 		}
 		if (s_pair) {
 			s_pair = 0;
-			led_print_scroll(ir_rx_message, 1, 1, 0);
+			led_print_scroll(ir_rx_message, 0);
 		}
 		if (s_unpair) {
 			s_unpair = 0;
-			led_print_scroll("unpair", 1, 1, 0);
+			led_print_scroll("unpair", 0);
 		}
 		if (s_trick) {
-			begin_sprite_animation((spriteframe *)tricks[s_trick-1], 4);
+			left_sprite_animate((spriteframe *)tricks[s_trick-1], 4);
 			s_trick = 0; // this needs to be after the above statement. Duh.
 		}
 		if (s_update_rainbow) {
@@ -749,17 +750,20 @@ uint8_t post() {
 		post_result |= POST_SHIFTF;
 	}
 	// LED test pattern
-	led_display_bits((uint16_t *) tp0);
+	memcpy(&disp_buffer[5], tp0, sizeof tp0);
+	led_update_display();
 	for (uint8_t i=LED_PERIOD; i>0; i--) {
 		led_enable(i);
 		delay(8);
 	}
-	led_display_bits((uint16_t *) tp1);
+	memcpy(&disp_buffer[5], tp1, sizeof tp1);
+	led_update_display();
 	for (uint8_t i=LED_PERIOD; i>0; i--) {
 		led_enable(i);
 		delay(8);
 	}
-	led_display_bits((uint16_t *) tp2);
+	memcpy(&disp_buffer[5], tp2, sizeof tp2);
+	led_update_display();
 	for (uint8_t i=LED_PERIOD; i>0; i--) {
 		led_enable(i);
 		delay(8);
@@ -902,7 +906,7 @@ inline void update_clock() {
 		my_clock_authority = in_payload.clock_authority;
 		out_payload.clock_authority = my_clock_authority;
 		init_alarms();
-		led_print_scroll("clock", 0, 1, 1);
+		led_print_scroll("clock", 1);
 	}
 }
 
