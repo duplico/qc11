@@ -12,6 +12,8 @@
 #include "driverlib.h"
 #include <string.h>
 
+#include "leds.h" // TODO
+
 #define SPICLK 9600
 
 uint8_t returnValue = 0;
@@ -127,18 +129,19 @@ void init_radio() {
 	// Setup addresses and length:
 	//  Fixed-length, Manchester encoding, CRC on, clear FIFO on bad CRC,
 	//  filter on address and broadcast:
-	write_single_register(0x37, 0b00010100);
+	write_single_register(0x37, 0b00110100);
 	write_single_register(0x38, sizeof(qcxipayload)); // PayloadLength
 	write_single_register(0x39, my_conf.badge_id); // NodeAddress
 	write_single_register(0x3A, RFM_BROADCAST); // BroadcastAddress
 
 	mode_sb_sync(); // Need to do this before we enable the interrupt for DIO0.
 
-	for (uint8_t sync_addr=0x2f; sync_addr<=0x36; sync_addr++) {
-		write_single_register(sync_addr, 0x01);
+	for (uint8_t sync_addr=0x2f, sync_byte = 0x01; sync_addr<=0x36; sync_addr++, sync_byte++) {
+		write_single_register(sync_addr, sync_byte);
 	}
 
-	write_single_register(0x3c, 0x8f);
+	write_single_register(0x3c, 0b10001111); // 0x8f);
+	write_single_register(0x2c, 0x10); // Lengthen preamble.
 	write_single_register(0x6f, 0x30);
 
 	write_single_register(0x25, 0b00000000); // GPIO map to default
@@ -352,7 +355,7 @@ __interrupt void USCI_B1_ISR(void)
 			rfm_reg_ifgs++; // RX thread is ready to go to the DAT state.
 			rfm_reg_rx_index = 0;
 		} // end of state machine (RX thread)
-		break; // End of RXIFG ///////////////////////////////////////////////////////
+		break; // End of RXIFG ////////////////////////////////////////////////
 
 	case 4: // Vector 4 - TXIFG : I just sent a byte.
 		switch(rfm_reg_state) {
@@ -407,17 +410,21 @@ __interrupt void USCI_B1_ISR(void)
 				rfm_reg_ifgs++; // TX thread is ready to go IDLE.
 			} else {
 				// We have more to send.
-				USCI_B_SPI_transmitData(USCI_B1_BASE, ((uint8_t *) &out_payload)[rfm_reg_tx_index]);
+				USCI_B_SPI_transmitData(USCI_B1_BASE,
+					((uint8_t *) &out_payload)[rfm_reg_tx_index]);
+				if (rfm_reg_tx_index == 4 && ((uint8_t *) &out_payload)[rfm_reg_tx_index] != 0xff) {
+					led_print_scroll("CLK???", 0);
+				}
 				rfm_reg_tx_index++;
 			}
 			break;
 		default: break;
 			// WTF?
 		} // end of state machine (TX thread)
-		break; // End of TXIFG /////////////////////////////////////////////////////
+		break; // End of TXIFG ////////////////////////////////////////////////
 
 	default: break;
-	} // End of ISR flag switch ////////////////////////////////////////////////////
+	} // End of ISR flag switch ///////////////////////////////////////////////
 
 	// If it's time to switch states:
 	if (rfm_reg_ifgs == 2) {
