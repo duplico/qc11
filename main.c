@@ -74,8 +74,8 @@ void init_power() {
 //	PMMCTL0 &= 0b11111100;
 //	PMMCTL0 |= 0b11;
 #else
-//	PMM_setVCore(PMM_CORE_LEVEL_3);
-	PMMCTL0 |= 0b11;
+	PMM_setVCore(PMM_CORE_LEVEL_3);
+//	PMMCTL0 |= 0b11;
 #endif
 }
 
