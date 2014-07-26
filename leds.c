@@ -94,6 +94,8 @@ void right_sprite_animate(spriteframe* animation, uint8_t frameskip, uint8_t fli
 	led_display_right_sprite = animation;
 	if (flip)
 		led_display_right |= DISPLAY_MIRROR_BIT;
+	led_display_right_len = 0;
+	while (!led_display_right_sprite[led_display_right_len++].lastframe);
 }
 
 void led_print_scroll(char* text, uint8_t frameskip) {
@@ -131,7 +133,7 @@ void draw_animations() {
 			disp_buffer[i] |= (led_display_left_sprite[led_display_left_frame].rows[i] << 6);
 
 		if (led_display_right & DISPLAY_MIRROR_BIT)
-			disp_buffer[i] |= (uint8_t)(((led_display_left_sprite[led_display_left_frame].rows[i] * 0x0802LU & 0x22110LU) | (led_display_left_sprite[led_display_left_frame].rows[i] * 0x8020LU & 0x88440LU)) * 0x10101LU >> 16);
+			disp_buffer[i] |= (uint8_t)(((led_display_right_sprite[led_display_right_frame].rows[i] * 0x0802LU & 0x22110LU) | (led_display_right_sprite[led_display_right_frame].rows[i] * 0x8020LU & 0x88440LU)) * 0x10101LU >> 16);
 		else if (led_display_right)
 			disp_buffer[i] |= (led_display_right_sprite[led_display_right_frame].rows[i]);
 
@@ -221,6 +223,7 @@ void animation_timestep() {
 		if (led_display_left_sprite == stand && led_display_left_frame == led_display_left_len) {
 			led_display_left &= ~DISPLAY_ANIMATE;
 			f_animation_done = 1;
+			led_display_left_frame--; // TODO: Is this right?
 		} else if (led_display_left_frame == led_display_left_len) {
 			left_sprite_animate(stand, led_display_anim_skip);
 		}
@@ -231,6 +234,7 @@ void animation_timestep() {
 			// end animation
 			led_display_right &= ~DISPLAY_ANIMATE;
 			f_animation_done = 1;
+			led_display_right_frame--; // TODO: Is this right?
 		}
 	}
 }
@@ -399,83 +403,13 @@ void led_timestep() {
 			disp_mode = disp_mode_target;
 		}
 	} else {
-//		draw_animations();
-//		draw_text();
 		animation_timestep();
 		text_timestep();
 
 	}
-	// TODO: Maybe only do this if we know something is changing.
+	// TODO: Maybe only do this if we know something is changing?
 	led_update_display();
 }
-
-//void led_animate() {
-//
-//	static uint8_t led_skip_frame;
-//
-//	// Check to see if we're transitioning display modes:
-//	if (vscroll_to_text && vertical_mode == DISP_MODE_ANIM) {
-//		disp_left = 0;
-//		if (disp_top > 0) {
-//			disp_top--;
-//		} else {
-//			// done...
-//			vscroll_to_text = 0;
-//			disp_top = 0; // just in case
-//			vertical_mode = TEXT;
-//		}
-//		led_disp_bit_to_values(disp_left, disp_top);
-//		led_display_bits(led_values);
-//		return;
-//	} else if (vscroll_to_anim && vertical_mode == TEXT) {
-//		disp_left = 0;
-//		if (disp_top < 8) {
-//			disp_top++;
-//		} else {
-//			// done...
-//			vscroll_to_anim = 0;
-//			disp_top = 8;
-//			vertical_mode = ANIMATION;
-//		}
-//		led_disp_bit_to_values(disp_left, disp_top);
-//		led_display_bits(led_values);
-//		return;
-//	}
-//
-//	// Check to see if we need to skip this frame.
-//	led_skip_frame = led_text_scrolling? led_skip_frame_text : led_skip_frame_anim;
-//	if (led_skip_frame && led_frames_skipped >= led_skip_frame) {
-//		led_frames_skipped = 0;
-//		// DISPLAY this frame.
-//	} else if (led_skip_frame) {
-//		led_frames_skipped++;
-//		return;
-//	}
-//
-//	if (led_text_scrolling) {
-//		if (disp_left < print_pixel_len) {
-//			led_disp_bit_to_values(disp_left, disp_top);
-//			led_display_bits(led_values);
-//			disp_left++;
-//		} else {
-//			f_animation_done = !sprite_animate;
-//			if (sprite_display) {
-//				vscroll_to_anim = 1;
-//			}
-//			led_text_scrolling = 0;
-//		}
-//	} else if (sprite_display) {
-//		draw_row_major_sprite();
-//		if (sprite_animate) {
-//			sprite_next_frame();
-//			if (!sprite_animate) {
-//				f_animation_done = 1;
-//			}
-//		}
-//		led_disp_bit_to_values(disp_left, disp_top);
-//		led_display_bits(led_values);
-//	}
-//}
 
 void led_disable( void )
 {

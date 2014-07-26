@@ -295,7 +295,7 @@ int main( void )
 				left_sprite_animate((spriteframe *) anim_sprite_walkin, 4);
 				break;
 			case 2:
-				left_sprite_animate((spriteframe *) anim_sprite_wave, 4);
+				right_sprite_animate((spriteframe *) anim_sprite_wave, 4, 1);
 				break;
 
 			}

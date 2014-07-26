@@ -15,6 +15,8 @@ void ir_write_single_byte(uint8_t);
 void ir_write(uint8_t*, uint8_t, uint8_t);
 void ir_process_rx_ready();
 void ir_process_timestep();
+void ir_pair_setstate(uint8_t);
+
 uint8_t ir_check_crc();
 inline uint8_t ir_paired();
 extern uint8_t ir_pair_payload[];
