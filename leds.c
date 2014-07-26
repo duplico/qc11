@@ -35,6 +35,8 @@ uint8_t led_display_right_len = 0;
 uint8_t led_display_full_len = 0;
 uint8_t led_display_text_len = 0;
 
+int8_t led_display_right_direction = 1;
+
 uint8_t led_display_anim_skip = 0;
 uint8_t led_display_text_skip = 0;
 
@@ -88,18 +90,27 @@ void full_animate(fullframe* animation, uint8_t frameskip) {
 	led_display_full_anim = animation;
 }
 
-void right_sprite_animate(spriteframe* animation, uint8_t frameskip, uint8_t flip) {
-	led_display_right = DISPLAY_ON_ANIMATE;
+void right_sprite_animate(spriteframe* animation, uint8_t frameskip, uint8_t flip, int8_t direction, uint8_t persistent_mask) {
+	led_display_right = persistent_mask;
+	led_display_right |= DISPLAY_ANIMATE;
 	led_display_right_frame = 0;
 	led_display_anim_skip = frameskip;
 	led_display_right_sprite = animation;
 	if (flip)
 		led_display_right |= DISPLAY_MIRROR_BIT;
 	led_display_right_len = 0;
+	led_display_right_direction = direction;
+
 	while (!led_display_right_sprite[led_display_right_len++].lastframe);
+
+	if (direction < 0)
+		led_display_right_frame = led_display_right_len-1;
+	else
+		led_display_right_frame = 0;
 }
 
 void led_print_scroll(char* text, uint8_t frameskip) {
+	am_idle = 0;
 	led_display_text_string = text;
 	led_display_text_character = 0;
 	led_display_text_cursor = 0;
@@ -133,9 +144,9 @@ void draw_animations() {
 		if (led_display_left)
 			disp_buffer[i] |= (led_display_left_sprite[led_display_left_frame].rows[i] << 6);
 
-		if (led_display_right & DISPLAY_MIRROR_BIT)
+		if ((led_display_right & DISPLAY_MIRROR_BIT) && (led_display_right & DISPLAY_ON_ANIMATE))
 			disp_buffer[i] |= (uint8_t)(((led_display_right_sprite[led_display_right_frame].rows[i] * 0x0802LU & 0x22110LU) | (led_display_right_sprite[led_display_right_frame].rows[i] * 0x8020LU & 0x88440LU)) * 0x10101LU >> 16);
-		else if (led_display_right)
+		else if (led_display_right & DISPLAY_ON_ANIMATE)
 			disp_buffer[i] |= (led_display_right_sprite[led_display_right_frame].rows[i]);
 
 		if (led_display_full) {
@@ -211,7 +222,6 @@ void animation_timestep() {
 		return;
 	}
 	led_display_anim_skip_index = led_display_anim_skip;
-	draw_animations();
 	// end animation if done:
 	if (led_display_full & DISPLAY_ANIMATE) {
 		led_display_full_frame++;
@@ -232,12 +242,12 @@ void animation_timestep() {
 		}
 	}
 	if (led_display_right & DISPLAY_ANIMATE) {
-		led_display_right_frame++;
-		if (led_display_right_frame == led_display_right_len) {
+		led_display_right_frame+= led_display_right_direction;
+		if ((led_display_right_direction >0 && led_display_right_frame == led_display_right_len) || (led_display_right_direction < 0 && led_display_right_frame == 255)) {
 			// end animation
 			led_display_right &= ~DISPLAY_ANIMATE;
 			f_animation_done = 1;
-			led_display_right_frame--; // TODO: Is this right?
+			led_display_right_frame-= led_display_right_direction; // TODO: Is this right?
 		}
 	}
 }
@@ -252,7 +262,6 @@ void text_timestep() {
 	}
 
 	led_display_text_skip_index = led_display_text_skip;
-	draw_text();
 
 	if (led_display_text_character == led_display_text_len && led_display_text_cursor == 14) {
 		// done animating. TODO: go back to anim
@@ -354,6 +363,7 @@ uint8_t led_post()
 	uint16_t test_pattern = 0b1111101010100001;
 	uint16_t test_response = 0;
 	for (uint8_t j=0; j<6; j++) { // Fill all the registers with the test pattern.
+		test_response = 0;
 		for (uint8_t i = 0; i < 16; i++)  {
 			test_response |= (P1IN & GPIO_PIN6)? 1 << i : 0;
 			WRITE_IF(LED_PORT, LED_DATA, (test_pattern & (1 << i)));
@@ -411,9 +421,10 @@ void led_timestep() {
 			disp_mode = disp_mode_target;
 		}
 	} else {
+		draw_animations();
+		draw_text();
 		animation_timestep();
 		text_timestep();
-
 	}
 	// TODO: Maybe only do this if we know something is changing?
 	led_update_display();

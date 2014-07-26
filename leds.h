@@ -41,7 +41,7 @@ void led_init();
 void led_print_scroll(char*, uint8_t);
 void left_sprite_animate(spriteframe*, uint8_t);
 void full_animate(fullframe*, uint8_t);
-void right_sprite_animate(spriteframe*, uint8_t, uint8_t);
+void right_sprite_animate(spriteframe*, uint8_t, uint8_t, int8_t, uint8_t);
 void led_timestep();
 
 void led_set_rainbow(uint16_t value);
