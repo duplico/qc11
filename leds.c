@@ -125,7 +125,7 @@ void draw_animations() {
 	clear_anim();
 	for (uint8_t i=0; i<5; i++) {
 		if (led_display_left)
-			disp_buffer[i] |= (led_display_left_sprite[led_display_left_frame].rows[i] << 5);
+			disp_buffer[i] |= (led_display_left_sprite[led_display_left_frame].rows[i] << 6);
 
 		if (led_display_right & DISPLAY_MIRROR_BIT)
 			disp_buffer[i] |= (uint8_t)(((led_display_left_sprite[led_display_left_frame].rows[i] * 0x0802LU & 0x22110LU) | (led_display_left_sprite[led_display_left_frame].rows[i] * 0x8020LU & 0x88440LU)) * 0x10101LU >> 16);
@@ -196,7 +196,9 @@ void draw_text() {
 // NB: Don't call this function when we're in text mode. TODO.
 void animation_timestep() {
 	// Return if we're not animating or if we have to skip a frame:
-	if (!(led_display_left | led_display_right | led_display_full & DISPLAY_ANIMATE) || led_display_anim_skip_index) {
+	if (!(led_display_left | led_display_right | led_display_full & DISPLAY_ANIMATE)) {
+		return;
+	} else if (led_display_anim_skip_index) {
 		led_display_anim_skip_index--; // If we're not animating, this is DONTCARE because it's set when animations start.
 		return;
 	}
@@ -244,6 +246,7 @@ void text_timestep() {
 		// done animating. TODO: go back to anim
 		led_display_text &= ~DISPLAY_ANIMATE;
 		f_animation_done = 1;
+		disp_mode_target = DISP_MODE_ANIM;
 		return;
 	} else if (led_display_text_character == led_display_text_len) {
 		// Done with the text, now we're just scrolling.
@@ -381,14 +384,14 @@ void led_timestep() {
 		// we're scrolling between display modes.
 		// anim means bottom=5
 		// text means bottom=0
-		if (disp_mode_target == DISP_MODE_ANIM && led_display_bottom < 5) {
+		if (disp_mode_target == DISP_MODE_TEXT && led_display_bottom < 5) {
 			led_display_bottom++;
-		} else if (disp_mode_target == DISP_MODE_ANIM) {
+		} else if (disp_mode_target == DISP_MODE_TEXT) {
 			led_display_bottom = 5;
 			disp_mode = disp_mode_target;
-		} else if (disp_mode_target == DISP_MODE_TEXT && led_display_bottom > 0) {
+		} else if (disp_mode_target == DISP_MODE_ANIM && led_display_bottom > 0) {
 			led_display_bottom--;
-		} else if (disp_mode_target == DISP_MODE_TEXT) {
+		} else if (disp_mode_target == DISP_MODE_ANIM) {
 			led_display_bottom = 0; // TODO?
 			disp_mode = disp_mode_target;
 		}
