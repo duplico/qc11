@@ -20,6 +20,7 @@ void ir_pair_setstate(uint8_t);
 uint8_t ir_check_crc();
 inline uint8_t ir_paired();
 extern uint8_t ir_pair_payload[];
+extern uint8_t ir_partner;
 
 extern char ir_rx_handle[11];
 extern char ir_rx_message[17];
