@@ -30,7 +30,6 @@ uint8_t f_unpaired = 0;
 uint8_t f_paired_new_person = 0;
 uint8_t f_paired_new_trick = 0;
 uint8_t f_animation_done = 0;
-uint8_t start_new_animation = 0;
 uint8_t f_ir_itp_step = 0;
 uint8_t f_ir_pair_abort = 0;
 
@@ -46,6 +45,10 @@ uint16_t known_tricks = 0;
 uint8_t known_trick_count = 0;
 qcxipayload in_payload, out_payload;
 uint16_t rainbow_lights = 0;
+
+// My general app-level status:
+uint8_t badge_status = 0;
+uint8_t am_idle = 1;
 
 // Gaydar - Stolen from QC10:
 uint8_t neighbor_counts[RECEIVE_WINDOW] = {0};
@@ -295,7 +298,7 @@ int main( void )
 				left_sprite_animate((spriteframe *) anim_sprite_walkin, 4);
 				break;
 			case 2:
-				right_sprite_animate((spriteframe *) anim_sprite_wave, 4, 1);
+				left_sprite_animate((spriteframe *) anim_sprite_wave, 4);
 				break;
 
 			}
@@ -341,45 +344,20 @@ int main( void )
 			f_ser_rx = 0;
 		}
 #endif
+
 		/*
 		 * From the IR
 		 * * Docking with base station
 		 * * Pairing
 		 * ** possibly new person
 		 * *** possibly new person with a new trick
-		 *
-		 * ir_process_rx_ready() will do all this processing for us, and
-		 *  if necessary set the flags for:
-		 *  f_paired
-		 *  f_unpaired
-		 *  f_paired_new_person
-		 *  f_paired_new_trick
-		 *
-		 * Here we can set:
-		 *
-		 *	   s_pair = 0, // f_pair
-		 *	   s_new_pair = 0,
-		 *	   s_new_trick = 0,
-		 *	   s_new_score = 0,
-		 *	   s_new_prop = 0,
-		 *	   s_unpair = 0, // f_unpair
-		 *
-		 *
 		 */
 		if (f_ir_rx_ready) {
 			f_ir_rx_ready = 0;
 			ir_process_rx_ready();
 		}
 
-		if (f_paired) {
-			f_paired = 0;
-			s_pair = 1;
-			itps_pattern = 0;
-		} else if (f_unpaired) {
-			f_unpaired = 0;
-			itps_pattern = 0;
-			s_unpair = 1;
-		} else if(f_ir_pair_abort) {
+		if (f_ir_pair_abort) {
 			f_ir_pair_abort = 0;
 			itps_pattern = 0;
 		}
@@ -605,15 +583,11 @@ int main( void )
 		 * Calendar interrupts:
 		 *
 		 * * Event alert raised (interrupt flag)
-		 * * Time to do a prop.
 		 *
 		 * s_event_alert = 0,
-		 * s_propped = 0,
 		 *
 		 */
-		if (f_alarm & BIT7) {
-			// TODO: prop
-		} else if (f_alarm) {
+		if (f_alarm) {
 			event_id = f_alarm & 0b0111;
 			if (f_alarm & ALARM_START_LIGHT) {
 				// TODO: setup a light blink for light number event_id.
@@ -679,6 +653,7 @@ int main( void )
 //		s_lose_puppy = 0,
 //		s_update_rainbow = 0;
 
+		// This is background:
 		if (s_need_rf_beacon && rfm_proto_state == RFM_PROTO_RX_IDLE) {
 			out_payload.beacon = 1;
 			out_payload.clock_age_seconds = clock_setting_age;
@@ -692,36 +667,72 @@ int main( void )
 			s_rf_retransmit = 0;
 		}
 
+		// Is an animation finished?
+		if (f_animation_done) {
+			f_animation_done = 0;
+			am_idle = 1;
+			#if !BADGE_TARGET
+			color = 0;
+			#endif
+		}
+
 #if BADGE_TARGET
-		if (s_event_alert) {
-			s_event_alert = 0;
-			led_print_scroll(message_to_send, 1);
-		}
-		if (s_pair) {
-			s_pair = 0;
-			led_print_scroll(ir_rx_message, 0);
-		}
-		if (s_unpair) {
-			s_unpair = 0;
-			led_print_scroll("unpair", 0);
-		}
-		if (s_trick) {
-			left_sprite_animate((spriteframe *)tricks[s_trick-1], 4);
-			s_trick = 0; // this needs to be after the above statement. Duh.
-		}
+		// Background:
 		if (s_update_rainbow) {
 			s_update_rainbow = 0;
 			led_set_rainbow(rainbow_lights);
 		}
-#endif
-		// Is an animation finished?
-		if (f_animation_done || start_new_animation) {
-			f_animation_done = 0;
-#if BADGE_TARGET
-#else
-			color = 0;
-#endif
+
+		// Pre-emptive:
+		if (s_event_alert) {
+			s_event_alert = 0;
+			led_print_scroll(message_to_send, 1);
 		}
+
+		if (am_idle) { // Can do another action now.
+			switch(badge_status) {
+			case BSTAT_GAYDAR:
+				if (f_paired) {
+					f_paired = 0;
+					itps_pattern = 0;
+					badge_status = BSTAT_PAIR;
+					am_idle = 0;
+					right_sprite_animate(anim_sprite_walkin, 2, 1, 1, 1);
+				}
+				break;
+			case BSTAT_PAIR:
+				if (f_unpaired) {
+					f_unpaired = 0;
+					itps_pattern = 0;
+					badge_status = BSTAT_GAYDAR;
+					am_idle = 0;
+					right_sprite_animate(anim_sprite_walkin, 2, 1, -1, 0);
+				}
+			}
+		}
+
+		if (f_paired) {
+			f_paired = 0;
+			s_pair = 1;
+			itps_pattern = 0;
+		} else if (f_unpaired) {
+			f_unpaired = 0;
+			itps_pattern = 0;
+			s_unpair = 1;
+		} else if(f_ir_pair_abort) {
+			f_ir_pair_abort = 0;
+			itps_pattern = 0;
+		}
+
+
+
+
+
+		if (s_trick) {
+			left_sprite_animate((spriteframe *)tricks[s_trick-1], 4);
+			s_trick = 0; // this needs to be after the above statement. Duh.
+		}
+#endif
 
 		// Going to sleep... mode...
 		__bis_SR_register(LPM3_bits + GIE);

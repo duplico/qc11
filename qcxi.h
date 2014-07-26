@@ -85,7 +85,13 @@ uint8_t have_trick(uint8_t);
 #define TIME_LOOP_HZ 32
 #define TIME_LOOP_SCALER RTC_A_PSEVENTDIVIDER_4
 
+#define BSTAT_GAYDAR 0
+#define BSTAT_PAIR   1
+#define BSTAT_PUPPY  2
+#define BSTAT_BUS    3
 
+extern uint8_t badge_status;
+extern uint8_t am_idle;
 extern uint8_t clock_is_set;
 
 // Power-on self test result codes:
