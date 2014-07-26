@@ -24,7 +24,7 @@
 
 typedef struct {
 	uint8_t rows[5];
-	uint8_t len;
+	uint8_t lastframe;
 } spriteframe;
 
 typedef struct {

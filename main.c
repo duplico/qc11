@@ -268,7 +268,6 @@ int main( void )
 #if BADGE_TARGET
 	// Startup sequence:
 	uint8_t startup_seq_index = 0;
-	led_clear();
 	led_print_scroll("qcxi", 0);
 
 	while (startup_seq_index<3) {
