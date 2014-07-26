@@ -75,6 +75,9 @@ void left_sprite_animate(spriteframe* animation, uint8_t frameskip) {
 	led_display_left_frame = 0;
 	led_display_anim_skip = frameskip;
 	led_display_left_sprite = animation;
+
+	led_display_left_len = 0;
+	while (!led_display_left_sprite[led_display_left_len++].lastframe);
 }
 
 void full_animate(fullframe* animation, uint8_t frameskip) {
@@ -196,7 +199,7 @@ void draw_text() {
 // NB: Don't call this function when we're in text mode. TODO.
 void animation_timestep() {
 	// Return if we're not animating or if we have to skip a frame:
-	if (!(led_display_left | led_display_right | led_display_full & DISPLAY_ANIMATE)) {
+	if (!((led_display_left | led_display_right | led_display_full) & DISPLAY_ANIMATE)) {
 		return;
 	} else if (led_display_anim_skip_index) {
 		led_display_anim_skip_index--; // If we're not animating, this is DONTCARE because it's set when animations start.
@@ -396,11 +399,11 @@ void led_timestep() {
 			disp_mode = disp_mode_target;
 		}
 	} else {
+//		draw_animations();
+//		draw_text();
 		animation_timestep();
 		text_timestep();
 
-		draw_animations();
-		draw_text();
 	}
 	// TODO: Maybe only do this if we know something is changing.
 	led_update_display();
