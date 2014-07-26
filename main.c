@@ -266,16 +266,14 @@ int main( void )
 		char hex[4] = {0, 0, 0, 0};
 		hex[0] = (post_result/16 < 10)? '0' + post_result/16 : 'A' - 10 + post_result/16;
 		hex[1] = (post_result%16 < 10)? '0' + post_result%16 : 'A' - 10 + post_result%16;
-		led_print_scroll(hex, 0);
-		for (uint8_t i=LED_PERIOD; i>0; i--) {
-			led_enable(i);
-			delay(25);
-		}
+		led_print_scroll(hex, 4);
 #else
 		fillFrameBufferSingleColor(&leds[6], NUMBEROFLEDS, ws_frameBuffer, ENCODING);
 		ws_set_colors_async(NUMBEROFLEDS);
 		delay(1000);
 #endif
+	} else {
+		led_print_scroll("qcxi", 0);
 	}
 #if BADGE_TARGET
 	led_set_rainbow(0);
@@ -289,7 +287,6 @@ int main( void )
 #if BADGE_TARGET
 	// Startup sequence:
 	uint8_t startup_seq_index = 0;
-	led_print_scroll("qcxi", 0);
 
 	while (startup_seq_index<3) {
 		// Time to do something because of time?
@@ -470,7 +467,7 @@ int main( void )
 				rainbow_lights ^= BIT9;
 				s_update_rainbow = 1;
 			}
-
+			clock_setting_age++;
 			currentTime.Seconds++;
 			if (currentTime.Seconds >= 60) {
 				currentTime = RTC_A_getCalendarTime(RTC_A_BASE);
@@ -672,12 +669,31 @@ int main( void )
 		if (s_need_rf_beacon && rfm_proto_state == RFM_PROTO_RX_IDLE) {
 			out_payload.beacon = 1;
 			out_payload.clock_age_seconds = clock_setting_age;
-//			memcpy(&out_payload.time, &currentTime, sizeof out_payload.time);
+			out_payload.time.Hours = currentTime.Hours;
+			out_payload.time.Minutes = currentTime.Minutes;
+			out_payload.time.Seconds = currentTime.Seconds;
+			out_payload.time.DayOfMonth = currentTime.DayOfMonth;
+			out_payload.time.DayOfWeek = currentTime.DayOfWeek;
+			out_payload.time.Month = currentTime.Month;
+			out_payload.time.Year = currentTime.Year;
+			if (!clock_is_set)
+				out_payload.clock_authority = 0xff;
 
 			radio_send_sync();
 			s_need_rf_beacon = 0;
 		} else if (s_rf_retransmit && rfm_proto_state == RFM_PROTO_RX_IDLE) {
 			out_payload.beacon = 0;
+			out_payload.clock_age_seconds = clock_setting_age;
+			out_payload.time.Hours = currentTime.Hours;
+			out_payload.time.Minutes = currentTime.Minutes;
+			out_payload.time.Seconds = currentTime.Seconds;
+			out_payload.time.DayOfMonth = currentTime.DayOfMonth;
+			out_payload.time.DayOfWeek = currentTime.DayOfWeek;
+			out_payload.time.Month = currentTime.Month;
+			out_payload.time.Year = currentTime.Year;
+			if (!clock_is_set)
+				out_payload.clock_authority = 0xff;
+
 			radio_send_half_async();
 			s_rf_retransmit = 0;
 		}
@@ -839,7 +855,7 @@ void check_config() {
 
 	CRC_setSeed(CRC_BASE, 0xBEEF);
 
-	for (uint8_t i=0; i<sizeof(my_conf) - 2; i++) {
+	for (uint8_t i=0; i<sizeof(qcxiconf) - 2; i++) {
 		CRC_set8BitData(CRC_BASE, config_bytes[i]);
 	}
 
@@ -862,7 +878,7 @@ void check_config() {
 
 		CRC_setSeed(CRC_BASE, 0xBEEF);
 
-		for (uint8_t i=0; i<sizeof(my_conf) - 2; i++) {
+		for (uint8_t i=0; i<sizeof(qcxiconf) - 2; i++) {
 			CRC_set8BitData(CRC_BASE, new_config_bytes[i]);
 		}
 
@@ -896,7 +912,7 @@ void check_config() {
 	}
 
 	// Time:
-	memcpy(&currentTime, &my_conf.datetime, sizeof currentTime);
+	memcpy(&currentTime, &my_conf.datetime, sizeof (Calendar));
 
 	// Setup our IR pairing payload:
 	strcpy(&(ir_pair_payload[0]), my_conf.handle);
@@ -912,7 +928,7 @@ void check_config() {
 	out_payload.base_id = 0xFF; // TODO: unless I'm a base
 	out_payload.puppy_flags = 0;
 	out_payload.clock_authority = 0xFF; // UNSET
-//	memcpy(&out_payload.time, &currentTime, sizeof out_payload.time);
+//	memcpy(&out_payload.time, &currentTime, sizeof out_payload.time); // I think I don't care about this.
 	out_payload.clock_age_seconds = 0;
 	out_payload.prop_id = 0;
 	out_payload.prop_time_loops_before_start = 0;
@@ -931,7 +947,7 @@ void update_clock() {
 		in_payload.time.Seconds < ((currentTime.Seconds-1) % 60) ||
 		in_payload.time.Seconds > ((currentTime.Seconds+1) % 60))
 	{
-		memcpy(&currentTime, &in_payload.time, sizeof currentTime);
+		memcpy(&currentTime, &in_payload.time, sizeof (Calendar));
 		clock_is_set = 1;
 		clock_setting_age = 0;
 		my_clock_authority = in_payload.clock_authority;
