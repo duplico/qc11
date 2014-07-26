@@ -50,6 +50,15 @@ uint16_t rainbow_lights = 0;
 uint8_t badge_status = 0;
 uint8_t am_idle = 1;
 
+#define PAIR_INIT 0
+#define PAIR_ONSCREEN 1
+#define PAIR_WAVE 2
+#define PAIR_GREETING 3
+#define PAIR_MESSAGE 4
+#define PAIR_IDLE 5
+
+uint8_t pair_state = 0;
+
 // Gaydar - Stolen from QC10:
 uint8_t neighbor_counts[RECEIVE_WINDOW] = {0};
 uint8_t window_position = 0;
@@ -61,6 +70,8 @@ uint8_t neighbor_count = 0;
 uint8_t neighbor_count_cycle = 0;
 uint8_t window_seconds = RECEIVE_WINDOW_LENGTH_SECONDS;
 uint8_t trick_seconds = TRICK_INTERVAL_SECONDS;
+uint8_t target_gaydar_index = 0;
+uint8_t gaydar_index = 0;
 
 uint8_t my_score = 0;
 
@@ -153,6 +164,13 @@ void set_badge_paired(uint8_t id) {
 
 uint8_t have_trick(uint8_t trick_id) {
 	return known_tricks & (1 << trick_id);
+}
+
+void set_gaydar_target() {
+	if (neighbor_count > 3)
+		target_gaydar_index = 3;
+	else
+		target_gaydar_index = neighbor_count;
 }
 
 /*
@@ -346,11 +364,7 @@ int main( void )
 #endif
 
 		/*
-		 * From the IR
-		 * * Docking with base station
-		 * * Pairing
-		 * ** possibly new person
-		 * *** possibly new person with a new trick
+		 * Process link-layer IR messages if needed.
 		 */
 		if (f_ir_rx_ready) {
 			f_ir_rx_ready = 0;
@@ -398,15 +412,17 @@ int main( void )
 				// Base station, may need to check in.
 				// TODO: can set s_event_arrival
 			}
-
 			if (in_payload.prop_from != 0xFF) {
 				// It's a prop notification.
 				// If we don't currently have a prop scheduled, or if this prop is
 				// more authoritative than our currently scheduled prop, it's time
 				// to do a prop.
-				// TODO: If we're paired, and this is from the person
-				//  we're paired with, it's the most authoritative thing possible.
-				if ((!s_propped || in_payload.prop_from > s_prop_authority) && in_payload.prop_time_loops_before_start) {
+				// If we're paired, and this is from the person
+				// we're paired with, it's the most authoritative prop possible.
+				uint8_t prop_authority = in_payload.prop_from;
+				if (badge_status == BSTAT_PAIR && in_payload.prop_from == ir_partner)
+					prop_authority = 0;
+				if ((!s_propped || prop_authority < s_prop_authority) && in_payload.prop_time_loops_before_start) {
 					s_propped = 1;
 					s_prop_authority = in_payload.prop_from;
 					s_prop_cycles = in_payload.prop_time_loops_before_start;
@@ -428,21 +444,19 @@ int main( void )
 					set_badge_seen(in_payload.from_addr);
 				}
 
-				// TODO: If this marks a new max we should show it immediately.
 				if (neighbor_counts[window_position] > neighbor_count) {
 					neighbor_count = neighbor_counts[window_position];
 					neighbor_count_cycle = window_position;
+					set_gaydar_target();
 				} else if (neighbor_counts[window_position] == neighbor_count) {
 					neighbor_count_cycle = window_position;
 				}
-
-				led_print_scroll("rx", 1);
-
 			}
 
 			if (in_payload.clock_authority != 0xff &&
 					(!clock_is_set ||
 							in_payload.clock_authority < my_clock_authority)) {
+				led_print_scroll("clock", 1);
 				update_clock();
 			}
 		}
@@ -463,7 +477,7 @@ int main( void )
 			}
 
 			if (!trick_seconds && !s_propped) {
-				trick_seconds = TRICK_INTERVAL_SECONDS;
+				trick_seconds = TRICK_INTERVAL_SECONDS-1 + (rand()%3);
 				if (rand() % 3) {
 					// wave
 					s_trick = TRICK_COUNT+1;
@@ -514,6 +528,7 @@ int main( void )
 						}
 					}
 				}
+				set_gaydar_target();
 			} else {
 				window_seconds--;
 			}
@@ -657,9 +672,9 @@ int main( void )
 		if (s_need_rf_beacon && rfm_proto_state == RFM_PROTO_RX_IDLE) {
 			out_payload.beacon = 1;
 			out_payload.clock_age_seconds = clock_setting_age;
-			memcpy(&out_payload.time, &currentTime, sizeof currentTime);
+//			memcpy(&out_payload.time, &currentTime, sizeof out_payload.time);
 
-			radio_send_half_async();
+			radio_send_sync();
 			s_need_rf_beacon = 0;
 		} else if (s_rf_retransmit && rfm_proto_state == RFM_PROTO_RX_IDLE) {
 			out_payload.beacon = 0;
@@ -692,12 +707,26 @@ int main( void )
 		if (am_idle) { // Can do another action now.
 			switch(badge_status) {
 			case BSTAT_GAYDAR:
-				if (f_paired) {
+				if (f_paired) { // TODO: This might should be pre-emptive.
 					f_paired = 0;
+					pair_state = PAIR_INIT;
 					itps_pattern = 0;
 					badge_status = BSTAT_PAIR;
 					am_idle = 0;
+					gaydar_index = 0;
 					right_sprite_animate(anim_sprite_walkin, 2, 1, 1, 1);
+				} else if (s_on_bus) {
+
+				} else if (target_gaydar_index > gaydar_index) {
+					am_idle = 0;
+					right_sprite_animate(gaydar[gaydar_index], 4, 0, 1, 1);
+					left_sprite_animate(anim_sprite_wave, 4);
+					gaydar_index++;
+				} else if (target_gaydar_index < gaydar_index) {
+					am_idle = 1;
+					gaydar_index--;
+					right_sprite_animate(gaydar[gaydar_index], 4, 0, -1, gaydar_index!=0);
+					left_sprite_animate(anim_sprite_wave, 4);
 				}
 				break;
 			case BSTAT_PAIR:
@@ -707,19 +736,24 @@ int main( void )
 					badge_status = BSTAT_GAYDAR;
 					am_idle = 0;
 					right_sprite_animate(anim_sprite_walkin, 2, 1, -1, 0);
+					break;
+				}
+				switch(pair_state) {
+				case PAIR_INIT: // Pat just walked on
+					am_idle = 0;
+					pair_state = PAIR_WAVE;
+					right_sprite_animate(anim_sprite_wave, 5, 1, 1, 1);
+					left_sprite_animate(anim_sprite_wave, 5);
+					break;
+				case PAIR_WAVE:
+					am_idle = 0;
+					// TODO: print hi handle
+					break;
 				}
 			}
 		}
 
-		if (f_paired) {
-			f_paired = 0;
-			s_pair = 1;
-			itps_pattern = 0;
-		} else if (f_unpaired) {
-			f_unpaired = 0;
-			itps_pattern = 0;
-			s_unpair = 1;
-		} else if(f_ir_pair_abort) {
+		if(f_ir_pair_abort) {
 			f_ir_pair_abort = 0;
 			itps_pattern = 0;
 		}
@@ -819,7 +853,7 @@ void check_config() {
 			// paired_ids, seen_ids, scores, events occurred and attended.
 		}
 		// TODO: set self to seen/paired, I guess.
-		new_conf.badge_id = 100;
+		new_conf.badge_id = 101;
 		// new_conf.datetime is a DONTCARE because the clock's damn well not
 		// going to be set anyway, and we have no idea what time it is,
 		// and this section should (c) never be reached.
@@ -878,7 +912,7 @@ void check_config() {
 	out_payload.base_id = 0xFF; // TODO: unless I'm a base
 	out_payload.puppy_flags = 0;
 	out_payload.clock_authority = 0xFF; // UNSET
-	memcpy(&out_payload.time, &currentTime, sizeof currentTime);
+//	memcpy(&out_payload.time, &currentTime, sizeof out_payload.time);
 	out_payload.clock_age_seconds = 0;
 	out_payload.prop_id = 0;
 	out_payload.prop_time_loops_before_start = 0;
@@ -889,7 +923,7 @@ void check_config() {
 	// probably.
 }
 
-inline void update_clock() {
+void update_clock() {
 
 	if (memcmp(&currentTime.Minutes,
 				&in_payload.time.Minutes,
@@ -903,7 +937,6 @@ inline void update_clock() {
 		my_clock_authority = in_payload.clock_authority;
 		out_payload.clock_authority = my_clock_authority;
 		init_alarms();
-		led_print_scroll("clock", 1);
 	}
 }
 

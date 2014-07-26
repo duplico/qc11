@@ -292,7 +292,6 @@ void init_alarms() {
 	);
 }
 
-
 void init_rtc() {
 	//Starting Time for Calendar: // TODO:
 	currentTime.Seconds    = 00;
