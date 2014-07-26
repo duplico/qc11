@@ -4,7 +4,7 @@
  *  Created on: Jul 21, 2014
  *      Author: glouthan
  */
-
+#if BADGE_TARGET
 #include "qcxi.h"
 #include "anim.h"
 
@@ -111,3 +111,4 @@ spriteframe * gaydar[] = {
 		anim_sprite_crowd_2_to_3,
 		anim_sprite_crowd_3_to_4
 };
+#endif
