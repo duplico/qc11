@@ -4,8 +4,8 @@
  *  Created on: Jul 21, 2014
  *      Author: glouthan
  */
-#if BADGE_TARGET
 #include "qcxi.h"
+#if BADGE_TARGET
 #include "anim.h"
 
 // Auto-generated animation sprite_bus_arrive

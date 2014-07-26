@@ -12,7 +12,7 @@
 #include "driverlib.h"
 
 // Configuration flags
-#define BADGE_TARGET 0
+#define BADGE_TARGET 1
 #define DEBUG_SERIAL 0
 #define BADGES_IN_SYSTEM 160
 #define RECEIVE_WINDOW 5

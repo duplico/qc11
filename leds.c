@@ -28,6 +28,7 @@ uint8_t led_display_full_frame = 0;
 
 uint8_t led_display_text_character = 0;
 uint8_t led_display_text_cursor = 0;
+uint8_t led_display_text_between = 0;
 
 uint8_t led_display_left_len = 0;
 uint8_t led_display_right_len = 0;
@@ -158,6 +159,8 @@ void draw_text() {
 		current_char--;
 		// set cursor to last column of font bitmap:
 		current_cursor = font_info.charInfo[led_display_text_string[current_char] - font_info.startChar].widthBits - 1;
+	} else if (led_display_text_between) {
+		buffer_location++;
 	}
 	// Else we'll just use what we've got in the global settings.
 
@@ -241,8 +244,10 @@ void animation_timestep() {
 
 void text_timestep() {
 	// Return if we're not animating or if we have to skip a frame:
-	if (!(led_display_text & DISPLAY_ANIMATE) || led_display_text_skip_index) {
-		led_display_text_skip_index--; // If we're not animating, this is DONTCARE because it's set when animations start.
+	if (!(led_display_text & DISPLAY_ANIMATE)) {
+		return;
+	} else if (led_display_text_skip_index) {
+		led_display_text_skip_index--;
 		return;
 	}
 
@@ -258,13 +263,16 @@ void text_timestep() {
 	} else if (led_display_text_character == led_display_text_len) {
 		// Done with the text, now we're just scrolling.
 		led_display_text_cursor++;
+	} else if (led_display_text_between) {
+		led_display_text_between = 0;
+		led_display_text_character++;
+		led_display_text_cursor = led_display_text_character == led_display_text_len? 2 : 0;
 	} else {
 		// Need to go to the next bit of text:
 		led_display_text_cursor++;
 		if (led_display_text_cursor >= font_info.charInfo[led_display_text_string[led_display_text_character] - font_info.startChar].widthBits) {
-			led_display_text_character++;
-			led_display_text_cursor = 0;
-			// TODO: Need to make sure we're handling the spaces between letters.
+			led_display_text_cursor--;
+			led_display_text_between = 1;
 		}
 	}
 }
