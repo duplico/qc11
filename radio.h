@@ -20,6 +20,7 @@
 
 // The protocol machine:
 extern volatile uint8_t rfm_proto_state;
+extern volatile uint8_t rfm_reg_state;
 
 #define RFM_PROTO_RX_IDLE 0
 #define RFM_PROTO_RX_FIFO 1
@@ -29,6 +30,16 @@ extern volatile uint8_t rfm_proto_state;
 #define RFM_PROTO_TX 5
 #define RFM_PROTO_RX_UNSET_CMD 6
 #define RFM_PROTO_RX_UNSET_DAT 7
+
+#define RFM_REG_IDLE			0
+#define RFM_REG_RX_SINGLE_CMD	1
+#define RFM_REG_RX_SINGLE_DAT	2
+#define RFM_REG_TX_SINGLE_CMD	3
+#define RFM_REG_TX_SINGLE_DAT	4
+#define RFM_REG_RX_FIFO_CMD		5
+#define RFM_REG_RX_FIFO_DAT		6
+#define RFM_REG_TX_FIFO_CMD		7
+#define RFM_REG_TX_FIFO_DAT		8
 
 void init_radio();
 
