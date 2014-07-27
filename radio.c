@@ -7,6 +7,7 @@
 
 #include "radio.h"
 #include "qcxi.h"
+#include "leds.h" // TODO
 
 #include <stdint.h>
 #include "driverlib.h"
@@ -104,47 +105,49 @@ void init_radio() {
 	USCI_B_SPI_clearInterruptFlag(USCI_B1_BASE, USCI_B_SPI_TRANSMIT_INTERRUPT);
 	USCI_B_SPI_enableInterrupt(USCI_B1_BASE, USCI_B_SPI_TRANSMIT_INTERRUPT);
 
+	mode_sb_sync();
+
 	// init radio to recommended "defaults" (seriously, wtf are they
 	//  calling them defaults for if they're not set BY DEFAULT?????
 	//  Sheesh.), per datasheet:
-	write_single_register(0x18, 0b00001000); // Low-noise amplifier - TODO
+	write_single_register(0x18, 0b00001000); // Low-noise amplifier
 	write_single_register(0x19, 0b01010101); // Bandwidth control
-	write_single_register(0x1a, 0x8b); // Auto Frequency Control settings
+	write_single_register(0x1a, 0b10001011); // Auto Frequency Correction BW
 	write_single_register(0x26, 0x07); // Disable ClkOut
 	write_single_register(0x29, 0xe0); // RSSI Threshold
-//	write_single_register(0x29, 0xd0); // Another option, lower floor.
 
 	// Other configuration:
-
-	// Bitrate:
-//	write_single_register(0x03, 0x06);
-//	write_single_register(0x04, 0x83);
 
 	/// Output configuration:
 	write_single_register(0x11, 0b10011010); // Output power
 	write_single_register(0x12, 0b00001111); // PA0 ramp time
 
-	// Bandwidth (see pg 26, 3.4.6):
-	// For, say, 100 Kbps, we need 50+ on the bandwidth.
-	// Sooooo, we need to have 01b, 3 setting for bandwidth.
-//	write_single_register(0x19, 0b01001011);
-
 	write_single_register(0x25, 0b00000000); // GPIO map to default
 
-	// Preamble LSB:
-//	write_single_register(0x2d, 0x10); // 16 preamble bytes
-
 	// Setup addresses and length:
-	write_single_register(0x37, 0b00010100); // Packet configuration (see DS)
+	write_single_register(0x37, 0b00110100); // Packet configuration (see DS)
 	write_single_register(0x38, sizeof(qcxipayload)); // PayloadLength
 	write_single_register(0x39, my_conf.badge_id); // NodeAddress
 	write_single_register(0x3A, RFM_BROADCAST); // BroadcastAddress
 
 	write_single_register(0x3c, 0x8f); // TxStartCondition - FifoNotEmpty
 
-	write_single_register(0x6f, 0x30); // Fading margin improvement
-
-	mode_sb_sync(); // Need to do this before we enable the interrupt for DIO0.
+	// Bandwidth settings we're currently mucking around with:
+	// Bandwidth (see pg 26, 3.4.6):
+	// For, say, 100 Kbps, we need 50+ on the bandwidth.
+	// Sooooo, we need to have 01b, 3 setting for bandwidth.
+	write_single_register(0x19, 0b01001011);
+	// Set Fdev, so 2xFDEV/BR \in [0.5,10]
+	// Bitrate:
+//	write_single_register(0x03, 0x06);
+//	write_single_register(0x04, 0x83);
+	// Auto frequency correction settings:
+//	write_single_register(0x1a, 0b01001011); // AFC bandwidth
+	write_single_register(0x1e, 0b00001100); // Restart every time we hit RX mode
+	// Preamble LSB:
+	write_single_register(0x2d, 0x10); // 16 preamble bytes
+	// TODO: Dependent on our \beta
+//	write_single_register(0x6f, 0x30); // Fading margin improvement
 
 	for (uint8_t sync_addr=0x2f; sync_addr<=0x36; sync_addr++) {
 		write_single_register(sync_addr, 0x01);
@@ -158,11 +161,14 @@ void init_radio() {
 
 	// Here's an idea...
 	// Auto packet mode: RX->SB->RX on receive.
+	mode_rx_sync();
 	write_single_register(0x3b, 0b01100101);
+	volatile uint8_t ret = 0;
 
 	GPIO_enableInterrupt(GPIO_PORT_P2, GPIO_PIN0);
 	GPIO_interruptEdgeSelect(GPIO_PORT_P2, GPIO_PIN0, GPIO_LOW_TO_HIGH_TRANSITION);
 	GPIO_clearInterruptFlag(GPIO_PORT_P2, GPIO_PIN0);
+	ret = read_single_register_sync(0x01);
 
 }
 
@@ -504,6 +510,7 @@ __interrupt void USCI_B1_ISR(void)
 		case RFM_PROTO_RX_UNSET_DAT:
 			if (rfm_single_msg & (BIT7 + BIT5)) {
 				rfm_proto_state = RFM_PROTO_RX_IDLE;
+				write_single_register(0x3b, 0b01100101);
 			} else {
 				read_single_register_async(RFM_IRQ1);
 			}
@@ -528,10 +535,10 @@ __interrupt void radio_interrupt_0(void)
 		// We just finished sending something.
 		rfm_proto_state = RFM_PROTO_RX_UNSET_CMD;
 		mode_rx_async();
-		// TODO: enter mode.
 		break;
 	default:
 		// WTF?
+		led_print_scroll("???", 2);
 		break;
 	}
 	GPIO_clearInterruptFlag(GPIO_PORT_P2, GPIO_PIN0);
