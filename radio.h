@@ -40,6 +40,10 @@ extern volatile uint8_t rfm_reg_state;
 #define RFM_REG_RX_FIFO_DAT		6
 #define RFM_REG_TX_FIFO_CMD		7
 #define RFM_REG_TX_FIFO_DAT		8
+#define RFM_REG_TX_FIFO_AM		9
+
+#define RFM_AUTOMODE_RX 0b01100101
+#define RFM_AUTOMODE_TX 0b01011011
 
 void init_radio();
 

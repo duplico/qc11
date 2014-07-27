@@ -151,6 +151,7 @@ extern volatile uint8_t f_ir_tx_done;
 extern volatile uint8_t f_ir_rx_ready;
 extern volatile uint8_t f_time_loop;
 extern volatile uint8_t f_rfm_rx_done;
+extern volatile uint8_t f_rfm_tx_done;
 extern volatile uint8_t f_new_second;
 extern volatile uint8_t f_alarm;
 
