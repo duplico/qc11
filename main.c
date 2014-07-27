@@ -819,14 +819,13 @@ uint8_t post() {
 	}
 #if BADGE_TARGET
 
-	static const uint16_t tp0[5] = {0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF};
 	led_set_rainbow(0b1111111111);
 
 	if (led_post() == STATUS_FAIL) {
 		post_result |= POST_SHIFTF;
 	}
 	// LED test pattern
-	memcpy(&disp_buffer[5], tp0, sizeof tp0);
+	memset(disp_buffer, 0xff, sizeof disp_buffer);
 	led_update_display();
 	for (uint8_t i=LED_PERIOD; i>0; i--) {
 		led_enable(i);
@@ -839,8 +838,7 @@ uint8_t post() {
 
 	ir_reject_loopback = 0;
 	// IR loopback
-	static const char test_str[] = "qcxi";
-	ir_write((uint8_t *) test_str, 0xff, 0);
+	ir_write("test", 0xff, 0);
 #if BADGE_TARGET
 	uint16_t spin = 65535;
 #else
@@ -853,7 +851,7 @@ uint8_t post() {
 			// IR integrity fault
 			post_result |= POST_IRIF;
 		} else {
-			if (strcmp(test_str, (char *) ir_rx_frame) != 0)
+			if (strcmp("test", (char *) ir_rx_frame) != 0)
 				post_result |= POST_IRVF; // IR value fault
 		}
 	} else {
