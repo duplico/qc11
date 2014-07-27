@@ -118,6 +118,8 @@ void init_radio() {
 
 	// Other configuration:
 
+	write_single_register(0x3c, sizeof(qcxipayload));
+
 	/// Output configuration:
 	write_single_register(0x11, 0b10011010); // Output power
 	write_single_register(0x12, 0b00001111); // PA0 ramp time
@@ -162,7 +164,7 @@ void init_radio() {
 	// Here's an idea...
 	// Auto packet mode: RX->SB->RX on receive.
 	mode_rx_sync();
-	write_single_register(0x3b, 0b01100101);
+	write_single_register(0x3b, RFM_AUTOMODE_RX);
 	volatile uint8_t ret = 0;
 
 	GPIO_enableInterrupt(GPIO_PORT_P2, GPIO_PIN0);
@@ -172,7 +174,7 @@ void init_radio() {
 
 }
 
- void write_single_register_async(uint8_t addr, uint8_t data) {
+void write_single_register_async(uint8_t addr, uint8_t data) {
 	if (rfm_reg_state != RFM_REG_IDLE)
 		return; // TODO: flag a fault?
 	rfm_reg_state = RFM_REG_TX_SINGLE_CMD;
@@ -182,7 +184,7 @@ void init_radio() {
 	USCI_B_SPI_transmitData(USCI_B1_BASE, addr); // Send our command.
 }
 
- void write_single_register(uint8_t addr, uint8_t data) {
+void write_single_register(uint8_t addr, uint8_t data) {
 	/*
 	 * This blocks.
 	 */
@@ -191,27 +193,27 @@ void init_radio() {
 	while (rfm_reg_state != RFM_REG_IDLE); // Block until written.
 }
 
- void read_single_register_async(uint8_t addr) {
+void read_single_register_async(uint8_t addr) {
 	if (rfm_reg_state != RFM_REG_IDLE)
-			return; // TODO: flag a fault?
+		return; // TODO: flag a fault?
 	rfm_reg_state = RFM_REG_RX_SINGLE_CMD;
 	addr = 0b01111111 & addr; // MSB=0 => write command
 	GPIO_setOutputLowOnPin(RFM_NSS_PORT, RFM_NSS_PIN); // Hold NSS low to begin frame.
 	USCI_B_SPI_transmitData(USCI_B1_BASE, addr); // Send our command.
 }
 
- uint8_t read_single_register_sync(uint8_t addr) {
+uint8_t read_single_register_sync(uint8_t addr) {
 	while (rfm_reg_state != RFM_REG_IDLE); // Block until ready to read.
 	read_single_register_async(addr);
 	while (rfm_reg_state != RFM_REG_IDLE); // Block until read finished.
 	return rfm_single_msg;
 }
 
- void mode_rx_async() {
+void mode_rx_async() {
 	write_single_register_async(RFM_OPMODE, 0b00010000);
 }
 
- void mode_rx_sync() {
+void mode_rx_sync() {
 	while (rfm_reg_state != RFM_REG_IDLE);
 	mode_rx_async(); // Receive mode.
 	while (rfm_reg_state != RFM_REG_IDLE);
@@ -222,11 +224,11 @@ void init_radio() {
 	while (!(BIT7 & reg_read) || !(BIT6 & reg_read));
 }
 
- void mode_sb_async() {
+void mode_sb_async() {
 	write_single_register_async(RFM_OPMODE, 0b00000100);
 }
 
- void mode_sb_sync() {
+void mode_sb_sync() {
 	while (rfm_reg_state != RFM_REG_IDLE);
 	mode_sb_async();
 	while (rfm_reg_state != RFM_REG_IDLE);
@@ -241,7 +243,7 @@ void mode_tx_async() {
 	write_single_register_async(RFM_OPMODE, 0b00001100); // TX mode.
 }
 
- void mode_tx_sync() {
+void mode_tx_sync() {
 	while (rfm_reg_state != RFM_REG_IDLE);
 	mode_tx_async(); // TX mode.
 	while (rfm_reg_state != RFM_REG_IDLE);
@@ -252,38 +254,32 @@ void mode_tx_async() {
 	while (!(BIT7 & reg_read) || !(BIT5 & reg_read));
 }
 
- void radio_send_dispatch(uint8_t len) {
-	if (rfm_reg_state != RFM_REG_IDLE) return; // TODO
+uint8_t expected_dio_interrupt = 0;
+
+void radio_send_sync() {
+	// Wait for, e.g., completion of receiving something.
+	while (rfm_reg_state != RFM_REG_IDLE);
+	mode_sb_sync(); // Enter standby mode.
+	// Intermediate mode is TX
+	// Enter condition is FIFO level
+	// Exit condition is PacketSent.
+	// During sending, let's set the end mode to RX
+	write_single_register(0x3b, RFM_AUTOMODE_TX);
+
+	expected_dio_interrupt = 1; // will be xmit finished.
+
 	rfm_reg_state = RFM_REG_TX_FIFO_CMD;
 	GPIO_setOutputLowOnPin(RFM_NSS_PORT, RFM_NSS_PIN); // Hold NSS low to begin frame.
 	USCI_B_SPI_transmitData(USCI_B1_BASE, RFM_FIFO | 0b10000000); // Send write command.
-}
-
-void radio_send_sync() {
-	while (rfm_reg_state != RFM_REG_IDLE || rfm_proto_state != RFM_PROTO_RX_IDLE); // Block until ready to write.
-	rfm_proto_state = RFM_PROTO_SB_UNSET_CMD;
-	mode_sb_async();
-	while (rfm_reg_state != RFM_REG_IDLE || rfm_proto_state != RFM_PROTO_RX_IDLE); // Block until written.
-}
-
-void radio_send_half_async() {
-	if (rfm_reg_state != RFM_REG_IDLE || rfm_proto_state != RFM_PROTO_RX_IDLE)
-		return;
-	rfm_proto_state = RFM_PROTO_SB_UNSET_CMD;
-	mode_sb_async();
-	while (rfm_reg_state != RFM_REG_IDLE || rfm_proto_state != RFM_PROTO_RX_IDLE); // Block until written.
-}
-
-void radio_send_async() {
-	if (rfm_reg_state != RFM_REG_IDLE || rfm_proto_state != RFM_PROTO_RX_IDLE)
-		return;
-	rfm_proto_state = RFM_PROTO_SB_UNSET_CMD;
-	mode_sb_async();
+	while (rfm_reg_state != RFM_REG_IDLE);
+	mode_rx_async(); // Set the mode so we'll re-enter RX mode once xmit is done.
 }
 
  void radio_recv_start() {
-	if (rfm_reg_state != RFM_REG_IDLE)
-			return; // TODO: flag a fault?
+	if (rfm_reg_state != RFM_REG_IDLE) {
+		led_print_scroll("??!!", 1);
+		return; // TODO: flag a fault?
+	}
 	rfm_reg_state = RFM_REG_RX_FIFO_CMD;
 	GPIO_setOutputLowOnPin(RFM_NSS_PORT, RFM_NSS_PIN); // Hold NSS low to begin frame.
 	USCI_B_SPI_transmitData(USCI_B1_BASE, RFM_FIFO); // Send our read command.
@@ -460,12 +456,15 @@ __interrupt void USCI_B1_ISR(void)
 			break;
 		case RFM_REG_RX_FIFO_DAT:
 			rfm_reg_state = RFM_REG_IDLE;
+			f_rfm_rx_done = 1;
 			break;
 		case RFM_REG_TX_FIFO_CMD:
 			rfm_reg_state = RFM_REG_TX_FIFO_DAT;
 			break;
 		case RFM_REG_TX_FIFO_DAT:
-			rfm_reg_state = RFM_REG_IDLE;
+			// After we send the FIFO, we need to set the mode to RX so the
+			// thing will automagically return to the RX mode once we're done.
+			rfm_reg_state = RFM_REG_TX_FIFO_AM;
 			break;
 		default:
 			// WTF?
@@ -476,46 +475,10 @@ __interrupt void USCI_B1_ISR(void)
 
 	if (rfm_reg_state == RFM_REG_IDLE) {
 		GPIO_setOutputHighOnPin(RFM_NSS_PORT, RFM_NSS_PIN); // NSS high to end frame
-
-		// It also might be time to transition our state in the protocol machine:
-		switch(rfm_proto_state) {
-		case RFM_PROTO_RX_FIFO:
-			rfm_proto_state = RFM_PROTO_RX_IDLE;
-			f_rfm_rx_done = 1; // Just received something.
-			__bic_SR_register_on_exit(LPM3_bits);
-			break;
-		case RFM_PROTO_SB_UNSET_CMD:
-			rfm_proto_state = RFM_PROTO_SB_UNSET_DAT;
-			// Start reading the register that says whether we're
-			read_single_register_async(RFM_IRQ1);
-			break;
-		case RFM_PROTO_SB_UNSET_DAT:
-			if (rfm_single_msg & BIT7) {
-				// mode change went well
-				rfm_proto_state = RFM_PROTO_SB_FIFO;
-				// time to start filling the FIFO:
-				radio_send_dispatch(sizeof(qcxipayload));
-			} else {
-				read_single_register_async(RFM_IRQ1);
-			}
-			break;
-		case RFM_PROTO_SB_FIFO:
-			rfm_proto_state = RFM_PROTO_TX;
-			mode_tx_async();
-			break;
-		case RFM_PROTO_RX_UNSET_CMD:
-			rfm_proto_state = RFM_PROTO_RX_UNSET_DAT;
-			read_single_register_async(RFM_IRQ1);
-			break;
-		case RFM_PROTO_RX_UNSET_DAT:
-			if (rfm_single_msg & (BIT7 + BIT5)) {
-				rfm_proto_state = RFM_PROTO_RX_IDLE;
-				write_single_register(0x3b, 0b01100101);
-			} else {
-				read_single_register_async(RFM_IRQ1);
-			}
-			break;
-		}
+	} else if (rfm_reg_state == RFM_REG_TX_FIFO_AM) { // Automode:
+		GPIO_setOutputHighOnPin(RFM_NSS_PORT, RFM_NSS_PIN); // NSS high to end frame
+		rfm_reg_state = RFM_REG_IDLE;
+		mode_rx_async();
 	}
 }
 
@@ -523,23 +486,14 @@ __interrupt void USCI_B1_ISR(void)
  * ISR for DIO0 from the RFM module. It's asserted when a job (TX or RX) is finished.
  */
 #pragma vector=PORT2_VECTOR
-__interrupt void radio_interrupt_0(void)
-{
-	switch (rfm_proto_state) {
-	case RFM_PROTO_RX_IDLE:
-		// We just received something from the radio. Let's read it.
-		rfm_proto_state = RFM_PROTO_RX_FIFO;
+__interrupt void radio_interrupt_0(void) {
+	if (expected_dio_interrupt) { // tx finished.
+		// Auto packet mode: RX->SB->RX on receive.
+		f_rfm_tx_done = 1;
+		expected_dio_interrupt = 0;
+		__bic_SR_register_on_exit(LPM3_bits);
+	} else { // rx
 		radio_recv_start();
-		break;
-	case RFM_PROTO_TX:
-		// We just finished sending something.
-		rfm_proto_state = RFM_PROTO_RX_UNSET_CMD;
-		mode_rx_async();
-		break;
-	default:
-		// WTF?
-		led_print_scroll("???", 2);
-		break;
 	}
-	GPIO_clearInterruptFlag(GPIO_PORT_P2, GPIO_PIN0);
+	GPIO_clearInterruptFlag(GPIO_PORT_P2, GPIO_PIN0); // TODO?
 }
