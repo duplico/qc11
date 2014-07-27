@@ -104,44 +104,45 @@ void init_radio() {
 	USCI_B_SPI_clearInterruptFlag(USCI_B1_BASE, USCI_B_SPI_TRANSMIT_INTERRUPT);
 	USCI_B_SPI_enableInterrupt(USCI_B1_BASE, USCI_B_SPI_TRANSMIT_INTERRUPT);
 
-	// Here's an idea...
-	write_single_register(0x3b, 0b01100101);
-
 	// init radio to recommended "defaults" (seriously, wtf are they
 	//  calling them defaults for if they're not set BY DEFAULT?????
 	//  Sheesh.), per datasheet:
-	write_single_register(0x18, 0x88);
-	write_single_register(0x19, 0x55);
-	write_single_register(0x1a, 0x8b);
-	write_single_register(0x26, 0x07);
-	write_single_register(0x29, 0xe0);
+	write_single_register(0x18, 0b00001000); // Low-noise amplifier - TODO
+	write_single_register(0x19, 0b01010101); // Bandwidth control
+	write_single_register(0x1a, 0x8b); // Auto Frequency Control settings
+	write_single_register(0x26, 0x07); // Disable ClkOut
+	write_single_register(0x29, 0xe0); // RSSI Threshold
 //	write_single_register(0x29, 0xd0); // Another option, lower floor.
 
 	// Other configuration:
 
+	// Bitrate:
+//	write_single_register(0x03, 0x06);
+//	write_single_register(0x04, 0x83);
+
+	/// Output configuration:
 	write_single_register(0x11, 0b10011010); // Output power
-	// Crank way down the PA ramp-up time because we have RX mode
-	//  on all the time:
-	write_single_register(0x12, 0b00001111);
+	write_single_register(0x12, 0b00001111); // PA0 ramp time
+
+	// Bandwidth (see pg 26, 3.4.6):
+	// For, say, 100 Kbps, we need 50+ on the bandwidth.
+	// Sooooo, we need to have 01b, 3 setting for bandwidth.
+//	write_single_register(0x19, 0b01001011);
+
+	write_single_register(0x25, 0b00000000); // GPIO map to default
 
 	// Preamble LSB:
-	write_single_register(0x2d, 0x10);
-	// Bitrate:
-	write_single_register(0x03, 0x01);
-	write_single_register(0x04, 0xa1);
+//	write_single_register(0x2d, 0x10); // 16 preamble bytes
 
 	// Setup addresses and length:
-	//  Fixed-length, Manchester encoding, CRC on, clear FIFO on bad CRC,
-	//  filter on address and broadcast:
-	write_single_register(0x37, 0b00010100);
+	write_single_register(0x37, 0b00010100); // Packet configuration (see DS)
 	write_single_register(0x38, sizeof(qcxipayload)); // PayloadLength
 	write_single_register(0x39, my_conf.badge_id); // NodeAddress
 	write_single_register(0x3A, RFM_BROADCAST); // BroadcastAddress
 
-//	write_single_register(0x03, 0x02);
-//	write_single_register(0x04, 0x2c);
+	write_single_register(0x3c, 0x8f); // TxStartCondition - FifoNotEmpty
 
-//	write_single_register(0x2c, 0x10); // Lengthen preamble.
+	write_single_register(0x6f, 0x30); // Fading margin improvement
 
 	mode_sb_sync(); // Need to do this before we enable the interrupt for DIO0.
 
@@ -149,16 +150,15 @@ void init_radio() {
 		write_single_register(sync_addr, 0x01);
 	}
 
-	write_single_register(0x3c, 0x8f);
-	write_single_register(0x6f, 0x30);
-
-	write_single_register(0x25, 0b00000000); // GPIO map to default
-
 	// Now that we're done with this setup business, we can enable the
 	// DIO interrupts. We have to wait until now because otherwise if
 	// the is radio activity during setup it will enter our protocol
 	// state machine way too early, which can cause the system to hang
 	// indefinitely.
+
+	// Here's an idea...
+	// Auto packet mode: RX->SB->RX on receive.
+	write_single_register(0x3b, 0b01100101);
 
 	GPIO_enableInterrupt(GPIO_PORT_P2, GPIO_PIN0);
 	GPIO_interruptEdgeSelect(GPIO_PORT_P2, GPIO_PIN0, GPIO_LOW_TO_HIGH_TRANSITION);
