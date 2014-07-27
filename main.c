@@ -109,12 +109,6 @@ void init_gpio() {
 	P6OUT = 0x00;
 }
 
-uint8_t seen_badge(uint8_t id) {
-	uint8_t badge_frame = id / 16;
-	uint8_t badge_bit = 1 << (id % 16);
-	return (~(my_conf.met_ids[badge_frame]) & badge_bit)? 1: 0;
-}
-
 void set_badge_seen(uint8_t id) {
 	uint8_t badge_frame = id / 16;
 	uint8_t badge_bit = 1 << (id % 16);
@@ -437,9 +431,7 @@ int main( void )
 				// sliding window.
 				neighbor_counts[window_position]+=1;
 
-				if (!seen_badge(in_payload.from_addr)) { // new acquaintance
-					set_badge_seen(in_payload.from_addr);
-				}
+				set_badge_seen(in_payload.from_addr);
 
 				if (neighbor_counts[window_position] > neighbor_count) {
 					neighbor_count = neighbor_counts[window_position];
