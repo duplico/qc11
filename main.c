@@ -677,7 +677,9 @@ int main( void )
 			if (!clock_is_set)
 				out_payload.clock_authority = 0xff;
 
-			radio_send_async();
+//			radio_send_async();
+			volatile uint8_t ret = 0;
+			ret = read_single_register_sync(0x01);
 			s_need_rf_beacon = 0;
 		} else if (s_rf_retransmit && rfm_proto_state == RFM_PROTO_RX_IDLE && rfm_reg_state == RFM_REG_IDLE) {
 			out_payload.beacon = 0;
@@ -692,7 +694,7 @@ int main( void )
 			if (!clock_is_set)
 				out_payload.clock_authority = 0xff;
 
-			radio_send_half_async();
+//			radio_send_half_async();
 			s_rf_retransmit = 0;
 		}
 

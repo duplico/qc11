@@ -294,13 +294,15 @@ void init_alarms() {
 
 void init_rtc() {
 	//Starting Time for Calendar: // TODO:
-	currentTime.Seconds    = 00;
-	currentTime.Minutes    = 19;
-	currentTime.Hours      = 18;
-	currentTime.DayOfWeek  = 03;
-	currentTime.DayOfMonth = 20;
-	currentTime.Month      = 07;
-	currentTime.Year       = 2011;
+	currentTime.Seconds    = 40;
+	currentTime.Minutes    = 29;
+	currentTime.Hours      = 15;
+	currentTime.DayOfWeek  = 6;
+	currentTime.DayOfMonth = 8;
+	currentTime.Month      = 8;
+	currentTime.Year       = 2014;
+
+	clock_is_set = 1; // TODO: remove.
 
 	//Initialize Calendar Mode of RTC
 	RTC_A_calendarInit(RTC_A_BASE,
