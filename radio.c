@@ -107,15 +107,28 @@ void init_radio() {
 	// Here's an idea...
 	write_single_register(0x3b, 0b01100101);
 
-	// init radio to recommended "defaults" per datasheet:
+	// init radio to recommended "defaults" (seriously, wtf are they
+	//  calling them defaults for if they're not set BY DEFAULT?????
+	//  Sheesh.), per datasheet:
 	write_single_register(0x18, 0x88);
 	write_single_register(0x19, 0x55);
 	write_single_register(0x1a, 0x8b);
 	write_single_register(0x26, 0x07);
 	write_single_register(0x29, 0xe0);
-//	write_single_register(0x29, 0xd0);
+//	write_single_register(0x29, 0xd0); // Another option, lower floor.
 
-	write_single_register(0x11, 0b10011010); // Output power to 0 dBm
+	// Other configuration:
+
+	write_single_register(0x11, 0b10011010); // Output power
+	// Crank way down the PA ramp-up time because we have RX mode
+	//  on all the time:
+	write_single_register(0x12, 0b00001111);
+
+	// Preamble LSB:
+	write_single_register(0x2d, 0x10);
+	// Bitrate:
+	write_single_register(0x03, 0x01);
+	write_single_register(0x04, 0xa1);
 
 	// Setup addresses and length:
 	//  Fixed-length, Manchester encoding, CRC on, clear FIFO on bad CRC,
