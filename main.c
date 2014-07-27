@@ -397,7 +397,7 @@ int main( void )
 			out_payload.beacon = 1;
 			radio_send_sync();
 			s_need_rf_beacon = 0;
-		} else if (s_rf_retransmit && rfm_proto_state == RFM_PROTO_RX_IDLE && rfm_reg_state == RFM_REG_IDLE) {
+		} else if (s_rf_retransmit && rfm_reg_state == RFM_REG_IDLE) {
 			out_payload.beacon = 0;
 			radio_send_sync();
 			s_rf_retransmit = 0;

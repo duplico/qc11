@@ -22,15 +22,6 @@
 extern volatile uint8_t rfm_proto_state;
 extern volatile uint8_t rfm_reg_state;
 
-#define RFM_PROTO_RX_IDLE 0
-#define RFM_PROTO_RX_FIFO 1
-#define RFM_PROTO_SB_UNSET_CMD 2
-#define RFM_PROTO_SB_UNSET_DAT 3
-#define RFM_PROTO_SB_FIFO 4
-#define RFM_PROTO_TX 5
-#define RFM_PROTO_RX_UNSET_CMD 6
-#define RFM_PROTO_RX_UNSET_DAT 7
-
 #define RFM_REG_IDLE			0
 #define RFM_REG_RX_SINGLE_CMD	1
 #define RFM_REG_RX_SINGLE_DAT	2
