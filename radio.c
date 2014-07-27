@@ -12,9 +12,7 @@
 #include "driverlib.h"
 #include <string.h>
 
-#include "leds.h" // TODO
-
-#define SPICLK 9600
+#define SPICLK 8000000
 
 uint8_t returnValue = 0;
 
@@ -25,16 +23,6 @@ volatile uint8_t rfm_begin = 0;
 volatile uint8_t rfm_rw_reading  = 0; // 0- read, 1- write
 volatile uint8_t rfm_rw_single = 0; // 0- single, 1- fifo
 volatile uint8_t rfm_single_msg = 0;
-
-#define RFM_REG_IDLE			0
-#define RFM_REG_RX_SINGLE_CMD	1
-#define RFM_REG_RX_SINGLE_DAT	2
-#define RFM_REG_TX_SINGLE_CMD	3
-#define RFM_REG_TX_SINGLE_DAT	4
-#define RFM_REG_RX_FIFO_CMD		5
-#define RFM_REG_RX_FIFO_DAT		6
-#define RFM_REG_TX_FIFO_CMD		7
-#define RFM_REG_TX_FIFO_DAT		8
 
 volatile uint8_t rfm_reg_ifgs = 0;
 volatile uint8_t rfm_reg_state = RFM_REG_IDLE;
@@ -116,6 +104,9 @@ void init_radio() {
 	USCI_B_SPI_clearInterruptFlag(USCI_B1_BASE, USCI_B_SPI_TRANSMIT_INTERRUPT);
 	USCI_B_SPI_enableInterrupt(USCI_B1_BASE, USCI_B_SPI_TRANSMIT_INTERRUPT);
 
+	// Here's an idea...
+	write_single_register(0x3b, 0b01100101);
+
 	// init radio to recommended "defaults" per datasheet:
 	write_single_register(0x18, 0x88);
 	write_single_register(0x19, 0x55);
@@ -124,24 +115,28 @@ void init_radio() {
 	write_single_register(0x29, 0xe0);
 //	write_single_register(0x29, 0xd0);
 
-	write_single_register(0x11, 0b10010010); // Output power to 0 dBm
+	write_single_register(0x11, 0b10011010); // Output power to 0 dBm
 
 	// Setup addresses and length:
 	//  Fixed-length, Manchester encoding, CRC on, clear FIFO on bad CRC,
 	//  filter on address and broadcast:
-	write_single_register(0x37, 0b00110100);
+	write_single_register(0x37, 0b00010100);
 	write_single_register(0x38, sizeof(qcxipayload)); // PayloadLength
 	write_single_register(0x39, my_conf.badge_id); // NodeAddress
 	write_single_register(0x3A, RFM_BROADCAST); // BroadcastAddress
 
+//	write_single_register(0x03, 0x02);
+//	write_single_register(0x04, 0x2c);
+
+//	write_single_register(0x2c, 0x10); // Lengthen preamble.
+
 	mode_sb_sync(); // Need to do this before we enable the interrupt for DIO0.
 
-	for (uint8_t sync_addr=0x2f, sync_byte = 0x01; sync_addr<=0x36; sync_addr++, sync_byte++) {
-		write_single_register(sync_addr, sync_byte);
+	for (uint8_t sync_addr=0x2f; sync_addr<=0x36; sync_addr++) {
+		write_single_register(sync_addr, 0x01);
 	}
 
-	write_single_register(0x3c, 0b10001111); // 0x8f);
-	write_single_register(0x2c, 0x10); // Lengthen preamble.
+	write_single_register(0x3c, 0x8f);
 	write_single_register(0x6f, 0x30);
 
 	write_single_register(0x25, 0b00000000); // GPIO map to default
@@ -355,7 +350,7 @@ __interrupt void USCI_B1_ISR(void)
 			rfm_reg_ifgs++; // RX thread is ready to go to the DAT state.
 			rfm_reg_rx_index = 0;
 		} // end of state machine (RX thread)
-		break; // End of RXIFG ////////////////////////////////////////////////
+		break; // End of RXIFG ///////////////////////////////////////////////////////
 
 	case 4: // Vector 4 - TXIFG : I just sent a byte.
 		switch(rfm_reg_state) {
@@ -410,21 +405,17 @@ __interrupt void USCI_B1_ISR(void)
 				rfm_reg_ifgs++; // TX thread is ready to go IDLE.
 			} else {
 				// We have more to send.
-				USCI_B_SPI_transmitData(USCI_B1_BASE,
-					((uint8_t *) &out_payload)[rfm_reg_tx_index]);
-				if (rfm_reg_tx_index == 4 && ((uint8_t *) &out_payload)[rfm_reg_tx_index] != 0xff) {
-					led_print_scroll("CLK???", 0);
-				}
+				USCI_B_SPI_transmitData(USCI_B1_BASE, ((uint8_t *) &out_payload)[rfm_reg_tx_index]);
 				rfm_reg_tx_index++;
 			}
 			break;
 		default: break;
 			// WTF?
 		} // end of state machine (TX thread)
-		break; // End of TXIFG ////////////////////////////////////////////////
+		break; // End of TXIFG /////////////////////////////////////////////////////
 
 	default: break;
-	} // End of ISR flag switch ///////////////////////////////////////////////
+	} // End of ISR flag switch ////////////////////////////////////////////////////
 
 	// If it's time to switch states:
 	if (rfm_reg_ifgs == 2) {

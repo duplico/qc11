@@ -511,9 +511,15 @@ int main( void )
 				trick_seconds--;
 			}
 
+			static uint8_t skip_window = 1;
+
 			if (!window_seconds) {
 				window_seconds = RECEIVE_WINDOW_LENGTH_SECONDS;
-				s_need_rf_beacon = 1;
+				if (skip_window == window_position) {
+					skip_window = rand() % RECEIVE_WINDOW;
+				} else {
+					s_need_rf_beacon = 1;
+				}
 				// TODO: mess with s_on_bus and s_off_bus here.
 				window_position = (window_position + 1) % RECEIVE_WINDOW;
 				neighbor_counts[window_position] = 0;
@@ -666,7 +672,7 @@ int main( void )
 //		s_update_rainbow = 0;
 
 		// This is background:
-		if (s_need_rf_beacon && rfm_proto_state == RFM_PROTO_RX_IDLE) {
+		if (s_need_rf_beacon && rfm_proto_state == RFM_PROTO_RX_IDLE && rfm_reg_state == RFM_REG_IDLE) {
 			out_payload.beacon = 1;
 			out_payload.clock_age_seconds = clock_setting_age;
 			out_payload.time.Hours = currentTime.Hours;
@@ -679,9 +685,9 @@ int main( void )
 			if (!clock_is_set)
 				out_payload.clock_authority = 0xff;
 
-			radio_send_sync();
+			radio_send_async();
 			s_need_rf_beacon = 0;
-		} else if (s_rf_retransmit && rfm_proto_state == RFM_PROTO_RX_IDLE) {
+		} else if (s_rf_retransmit && rfm_proto_state == RFM_PROTO_RX_IDLE && rfm_reg_state == RFM_REG_IDLE) {
 			out_payload.beacon = 0;
 			out_payload.clock_age_seconds = clock_setting_age;
 			out_payload.time.Hours = currentTime.Hours;
@@ -813,7 +819,7 @@ uint8_t post() {
 	led_update_display();
 	for (uint8_t i=LED_PERIOD; i>0; i--) {
 		led_enable(i);
-		delay(8);
+		delay(20);
 	}
 	led_disable();
 	delay(500);
@@ -869,7 +875,7 @@ void check_config() {
 			// paired_ids, seen_ids, scores, events occurred and attended.
 		}
 		// TODO: set self to seen/paired, I guess.
-		new_conf.badge_id = 101;
+		new_conf.badge_id = 102;
 		// new_conf.datetime is a DONTCARE because the clock's damn well not
 		// going to be set anyway, and we have no idea what time it is,
 		// and this section should (c) never be reached.
