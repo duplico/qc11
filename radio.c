@@ -440,35 +440,23 @@ __interrupt void USCI_B1_ISR(void)
 		case RFM_REG_IDLE:
 			// WTF?
 			break;
-		case RFM_REG_RX_SINGLE_CMD:
-			rfm_reg_state = RFM_REG_RX_SINGLE_DAT;
-			break;
 		case RFM_REG_RX_SINGLE_DAT:
 			rfm_reg_state = RFM_REG_IDLE;
-			break;
-		case RFM_REG_TX_SINGLE_CMD:
-			rfm_reg_state = RFM_REG_TX_SINGLE_DAT;
 			break;
 		case RFM_REG_TX_SINGLE_DAT:
 			rfm_reg_state = RFM_REG_IDLE;
 			break;
-		case RFM_REG_RX_FIFO_CMD:
-			rfm_reg_state = RFM_REG_RX_FIFO_DAT;
-			break;
 		case RFM_REG_RX_FIFO_DAT:
 			rfm_reg_state = RFM_REG_IDLE;
 			f_rfm_rx_done = 1;
-			break;
-		case RFM_REG_TX_FIFO_CMD:
-			rfm_reg_state = RFM_REG_TX_FIFO_DAT;
 			break;
 		case RFM_REG_TX_FIFO_DAT:
 			// After we send the FIFO, we need to set the mode to RX so the
 			// thing will automagically return to the RX mode once we're done.
 			rfm_reg_state = RFM_REG_TX_FIFO_AM;
 			break;
-		default:
-			// WTF?
+		default: // Covers all the CMD cases:
+			rfm_reg_state++;
 			break;
 		}
 
