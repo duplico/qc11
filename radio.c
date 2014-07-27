@@ -105,6 +105,7 @@ void init_radio() {
 	USCI_B_SPI_clearInterruptFlag(USCI_B1_BASE, USCI_B_SPI_TRANSMIT_INTERRUPT);
 	USCI_B_SPI_enableInterrupt(USCI_B1_BASE, USCI_B_SPI_TRANSMIT_INTERRUPT);
 
+	rfm_reg_state = RFM_REG_IDLE;
 	mode_sb_sync();
 
 	// init radio to recommended "defaults" (seriously, wtf are they
@@ -114,7 +115,7 @@ void init_radio() {
 	write_single_register(0x19, 0b01010101); // Bandwidth control
 	write_single_register(0x1a, 0b10001011); // Auto Frequency Correction BW
 	write_single_register(0x26, 0x07); // Disable ClkOut
-	write_single_register(0x29, 0xe0); // RSSI Threshold
+	write_single_register(0x29, 100); // 0xe0); // RSSI Threshold
 
 	// Other configuration:
 
@@ -221,7 +222,7 @@ void mode_rx_sync() {
 	do {
 		reg_read = read_single_register_sync(RFM_IRQ1);
 	}
-	while (!(BIT7 & reg_read) || !(BIT6 & reg_read));
+	while (!(BIT7 & reg_read));
 }
 
 void mode_sb_async() {
@@ -251,7 +252,7 @@ void mode_tx_sync() {
 	do {
 		reg_read = read_single_register_sync(RFM_IRQ1);
 	}
-	while (!(BIT7 & reg_read) || !(BIT5 & reg_read));
+	while (!(BIT7 & reg_read));
 }
 
 uint8_t expected_dio_interrupt = 0;

@@ -369,6 +369,13 @@ int main( void )
 					}
 				}
 
+				// If we're rolling over the window and have no neighbors,
+				// try a radio reboot, in case that can gin up some better
+				// performance.
+				if (!window_position && neighbor_count == 0) {
+					init_radio();
+				}
+
 				set_gaydar_target();
 			}
 		}
