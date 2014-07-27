@@ -227,7 +227,6 @@ void animation_timestep() {
 		led_display_full_frame++;
 		if (led_display_full_frame == led_display_full_len) {
 			led_display_full &= ~DISPLAY_ANIMATE;
-			f_animation_done = 1;
 		}
 	}
 	if (led_display_left & DISPLAY_ANIMATE) {
@@ -235,7 +234,6 @@ void animation_timestep() {
 		// end animation if done::
 		if (led_display_left_sprite == stand && led_display_left_frame == led_display_left_len) {
 			led_display_left &= ~DISPLAY_ANIMATE;
-			f_animation_done = 1;
 			led_display_left_frame--; // TODO: Is this right?
 		} else if (led_display_left_frame == led_display_left_len) {
 			left_sprite_animate(stand, led_display_anim_skip);
@@ -246,10 +244,11 @@ void animation_timestep() {
 		if ((led_display_right_direction >0 && led_display_right_frame == led_display_right_len) || (led_display_right_direction < 0 && led_display_right_frame == 255)) {
 			// end animation
 			led_display_right &= ~DISPLAY_ANIMATE;
-			f_animation_done = 1;
 			led_display_right_frame-= led_display_right_direction; // TODO: Is this right?
 		}
 	}
+	if (!((led_display_right | led_display_left | led_display_full | led_display_text) & DISPLAY_ANIMATE))
+		f_animation_done = 1;
 }
 
 void text_timestep() {
@@ -266,7 +265,8 @@ void text_timestep() {
 	if (led_display_text_character == led_display_text_len && led_display_text_cursor == 14) {
 		// done animating. TODO: go back to anim
 		led_display_text &= ~DISPLAY_ANIMATE;
-		f_animation_done = 1;
+		if (!((led_display_right | led_display_left | led_display_full | led_display_text) & DISPLAY_ANIMATE))
+			f_animation_done = 1;
 		disp_mode_target = DISP_MODE_ANIM;
 		return;
 	} else if (led_display_text_character == led_display_text_len) {

@@ -769,7 +769,26 @@ int main( void )
 					break;
 				case PAIR_WAVE:
 					am_idle = 0;
-					// TODO: print hi handle
+					memset(message_to_send, 0, MTS_LEN);
+					strcat(message_to_send, "Hi ");
+					strcat(message_to_send, ir_rx_handle);
+					led_print_scroll(message_to_send, 2);
+					pair_state = PAIR_GREETING;
+					break;
+				case PAIR_GREETING:
+					if (!ir_rx_message[0]) {
+						pair_state = PAIR_IDLE;
+						// TODO: send IR ready message?
+					} else {
+						am_idle = 0;
+						led_print_scroll(ir_rx_message, 2);
+						pair_state = PAIR_MESSAGE;
+						break;
+					}
+					break;
+				case PAIR_MESSAGE:
+					pair_state = PAIR_IDLE;
+					// TODO: send IR ready message?
 					break;
 				}
 			}
