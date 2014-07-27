@@ -9,6 +9,7 @@
 #include "leds.h"
 #include "fonts.h"
 #include "anim.h"
+#include <string.h>
 
 #define DISPLAY_OFF 	0
 #define DISPLAY_ON  	1

@@ -21,7 +21,6 @@
 #define TRICK_INTERVAL_SECONDS 6
 #define TRICK_COUNT 14
 
-
 // Memory organization (same for F5529 and F5308)
 #define INFOA_START 0x001980
 
