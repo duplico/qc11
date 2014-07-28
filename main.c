@@ -582,17 +582,10 @@ int main( void )
 				for (uint8_t i=0; i< (ir_proto_seqnum-ITPS_TO_SHOW_PAIRING) / ((ITPS_TO_PAIR - ITPS_TO_SHOW_PAIRING) / 5); i++) {
 					itps_pattern |= (1 << i);
 				}
+				s_update_rainbow = 1;
 			} else if (itps_pattern) {
 				itps_pattern = 0;
-			}
-
-			if (itps_pattern) {
 				s_update_rainbow = 1;
-				rainbow_lights &= 0b1111111111100000;
-				rainbow_lights |= itps_pattern;
-			} else {
-				rainbow_lights &= 0b1111111111100000;
-				rainbow_lights |= (my_score & 0b11111); // TODO
 			}
 
 			if (s_propped) {
@@ -722,6 +715,12 @@ int main( void )
 		// Background:
 		if (s_update_rainbow) {
 			s_update_rainbow = 0;
+			rainbow_lights &= 0b1111111111100000;
+			if (itps_pattern) {
+				rainbow_lights |= itps_pattern;
+			} else {
+				rainbow_lights |= (my_score & 0b11111);
+			}
 			led_set_rainbow(rainbow_lights);
 		}
 
@@ -760,6 +759,7 @@ int main( void )
 				if (f_unpaired) {
 					f_unpaired = 0;
 					itps_pattern = 0;
+					s_update_rainbow = 1;
 					badge_status = BSTAT_GAYDAR;
 					am_idle = 0;
 					right_sprite_animate(anim_sprite_walkin, 2, 1, -1, 0);
