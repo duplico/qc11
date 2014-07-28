@@ -18,8 +18,6 @@
 
 #define RFM_BROADCAST 0xff
 
-// The protocol machine:
-extern volatile uint8_t rfm_proto_state;
 extern volatile uint8_t rfm_reg_state;
 
 #define RFM_REG_IDLE			0
