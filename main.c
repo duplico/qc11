@@ -20,6 +20,7 @@ qcxiconf my_conf;
 volatile uint8_t f_new_minute = 0;
 volatile uint8_t f_timer = 0;
 volatile uint8_t f_rfm_rx_done = 0;
+volatile uint8_t f_rfm_tx_done = 0;
 volatile uint8_t f_ir_tx_done = 0;
 volatile uint8_t f_ir_rx_ready = 0;
 uint8_t f_config_clobbered = 0;
@@ -354,6 +355,12 @@ int main( void )
 		}
 #endif
 
+		if (f_rfm_tx_done) {
+			f_rfm_tx_done = 0;
+			// Back to normal RX automode:
+			write_single_register(0x3b, RFM_AUTOMODE_RX);
+		}
+
 		/*
 		 * Process link-layer IR messages if needed.
 		 */
@@ -523,10 +530,15 @@ int main( void )
 						}
 					}
 				}
+				// If we're rolling over the window and have no neighbors,
+				// try a radio reboot, in case that can gin up some better
+				// performance for some reason.
+				if (!window_position && neighbor_count == 0) {
+					init_radio();
+				}
 				set_gaydar_target();
-			} else {
-				window_seconds--;
 			}
+			window_seconds--;
 		}
 
 		/*
@@ -664,7 +676,7 @@ int main( void )
 //		s_update_rainbow = 0;
 
 		// This is background:
-		if (s_need_rf_beacon && rfm_proto_state == RFM_PROTO_RX_IDLE && rfm_reg_state == RFM_REG_IDLE) {
+		if (s_need_rf_beacon && rfm_reg_state == RFM_REG_IDLE) {
 			out_payload.beacon = 1;
 			out_payload.clock_age_seconds = clock_setting_age;
 			out_payload.time.Hours = currentTime.Hours;
@@ -680,7 +692,7 @@ int main( void )
 			// This should probably be renamed:
 			radio_send_sync();
 			s_need_rf_beacon = 0;
-		} else if (s_rf_retransmit && rfm_proto_state == RFM_PROTO_RX_IDLE && rfm_reg_state == RFM_REG_IDLE) {
+		} else if (s_rf_retransmit && rfm_reg_state == RFM_REG_IDLE) {
 			out_payload.beacon = 0;
 			out_payload.clock_age_seconds = clock_setting_age;
 			out_payload.time.Hours = currentTime.Hours;
