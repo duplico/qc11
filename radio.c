@@ -115,14 +115,14 @@ void init_radio() {
 	write_single_register(0x19, 0b01010101); // Bandwidth control
 	write_single_register(0x1a, 0b10001011); // Auto Frequency Correction BW
 	write_single_register(0x26, 0x07); // Disable ClkOut
-	write_single_register(0x29, 100); // 0xe0); // RSSI Threshold
+	write_single_register(0x29, 210); // RSSI Threshold
 
 	// Other configuration:
 
 	write_single_register(0x3c, sizeof(qcxipayload));
 
 	/// Output configuration:
-	write_single_register(0x11, 0b10011010); // Output power
+	write_single_register(0x11, 0b10011100); // Output power
 	write_single_register(0x12, 0b00001111); // PA0 ramp time
 
 	write_single_register(0x25, 0b00000000); // GPIO map to default
@@ -137,20 +137,23 @@ void init_radio() {
 
 	// Bandwidth settings we're currently mucking around with:
 	// Bandwidth (see pg 26, 3.4.6):
-	// For, say, 100 Kbps, we need 50+ on the bandwidth.
-	// Sooooo, we need to have 01b, 3 setting for bandwidth.
+	// BW > 1/2 BR
+	// Our BW needs to be >= 1/2 of bitrate
 	write_single_register(0x19, 0b01001011);
+	// Beta = 2 * FDEV / BR
 	// Set Fdev, so 2xFDEV/BR \in [0.5,10]
+//	write_single_register(0x06, 0x52); // FDEV = 61*this value.
 	// Bitrate:
-//	write_single_register(0x03, 0x06);
-//	write_single_register(0x04, 0x83);
+	write_single_register(0x03, 0x06);
+	write_single_register(0x04, 0x83);
 	// Auto frequency correction settings:
-//	write_single_register(0x1a, 0b01001011); // AFC bandwidth
+//	write_single_register(0x0b, 0b00100000); // Special AFC for low-beta
+//	write_single_register(0x71, 1); // Low-beta AFC offset / 488 Hz
+//	write_single_register(0x6f, 0x20); // Fading margin improvement // 0x20 for low beta, 0x30 for high beta
+//	write_single_register(0x1a, 0b10000101); // AFC bandwidth
 	write_single_register(0x1e, 0b00001100); // Restart every time we hit RX mode
 	// Preamble LSB:
 	write_single_register(0x2d, 0x10); // 16 preamble bytes
-	// TODO: Dependent on our \beta
-//	write_single_register(0x6f, 0x30); // Fading margin improvement
 
 	for (uint8_t sync_addr=0x2f; sync_addr<=0x36; sync_addr++) {
 		write_single_register(sync_addr, 0x01);
@@ -162,7 +165,6 @@ void init_radio() {
 	// state machine way too early, which can cause the system to hang
 	// indefinitely.
 
-	// Here's an idea...
 	// Auto packet mode: RX->SB->RX on receive.
 	mode_rx_sync();
 	write_single_register(0x3b, RFM_AUTOMODE_RX);
