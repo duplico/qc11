@@ -677,7 +677,8 @@ int main( void )
 			if (!clock_is_set)
 				out_payload.clock_authority = 0xff;
 
-			radio_send_async();
+			// This should probably be renamed:
+			radio_send_sync();
 			s_need_rf_beacon = 0;
 		} else if (s_rf_retransmit && rfm_proto_state == RFM_PROTO_RX_IDLE && rfm_reg_state == RFM_REG_IDLE) {
 			out_payload.beacon = 0;
@@ -692,7 +693,7 @@ int main( void )
 			if (!clock_is_set)
 				out_payload.clock_authority = 0xff;
 
-			radio_send_half_async();
+			radio_send_sync();
 			s_rf_retransmit = 0;
 		}
 
