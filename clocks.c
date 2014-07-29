@@ -11,23 +11,15 @@
 volatile Calendar currentTime;
 uint8_t next_event_flag = 0;
 
-char *event_times[8] = {
-		"",
+char *event_times[] = {
 		"4pm!",
-		"4pm!",
-		"4pm!",
-		"",
 		"10pm!",
 		"9pm!",
 		"12am!"
 };
 
-char *event_messages[8] = {
-		"",
+char *event_messages[] = {
 		"Mixer @ IBar ",
-		"Mixer @ IBar ",
-		"Mixer @ IBar ",
-		"",
 		"Pool party @ Palms ",
 		"Party @ Piranha ",
 		"Karaoke ",
@@ -184,6 +176,7 @@ void init_clocks() {
 // reminder: yes/no
 // light: yes/no
 
+
 /*
  * NB:
  *    The order of these items in this array MUST be chronological.
@@ -193,63 +186,19 @@ void init_clocks() {
  *    the ID of an event correspond with the ID of its respective light (if
  *    it gets one).
  */
-const alarm_time alarms[49] = {
-		{8, 15, 30, 1 + ALARM_DISP_MSG + ALARM_START_LIGHT}, // Reminder: Friday mixer at iBar
-		{8, 15, 45, 1 + ALARM_DISP_MSG}, // Reminder: Friday mixer at iBar
-		{8, 15, 50, 1 + ALARM_DISP_MSG}, // Reminder: Friday mixer at iBar
-		{8, 15, 55, 1 + ALARM_DISP_MSG}, // Reminder: Friday mixer at iBar
-		{8, 16, 00, 1 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Friday mixer at iBar
-		{8, 16, 15, 1 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Friday mixer at iBar
-		{8, 16, 30, 1 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Friday mixer at iBar
-		{8, 17, 00, 1 + ALARM_STOP_LIGHT}, // End: Friday mixer at iBar
-
-		{8, 21, 30, 5 + ALARM_DISP_MSG + ALARM_START_LIGHT}, // Reminder: Friday pool party at Palms
-		{8, 21, 45, 5 + ALARM_DISP_MSG}, // Reminder: Friday pool party at Palms
-		{8, 21, 50, 5 + ALARM_DISP_MSG}, // Reminder: Friday pool party at Palms
-		{8, 21, 55, 5 + ALARM_DISP_MSG}, // Reminder: Friday pool party at Palms
-		{8, 22, 00, 5 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Friday pool party at Palms
-		{8, 22, 15, 5 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Friday pool party at Palms
-		{8, 22, 30, 5 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Friday pool party at Palms
-		{9, 03, 00, 5 + ALARM_STOP_LIGHT}, // End: Friday pool party at Palms
-
-		{9, 15, 30, 2 + ALARM_DISP_MSG + ALARM_START_LIGHT}, // Reminder: Saturday mixer at iBar
-		{9, 15, 45, 2 + ALARM_DISP_MSG}, // Reminder: Saturday mixer at iBar
-		{9, 15, 50, 2 + ALARM_DISP_MSG}, // Reminder: Saturday mixer at iBar
-		{9, 15, 55, 2 + ALARM_DISP_MSG}, // Reminder: Saturday mixer at iBar
-		{9, 16, 00, 2 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Saturday mixer at iBar
-		{9, 16, 15, 2 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Saturday mixer at iBar
-		{9, 16, 30, 2 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Saturday mixer at iBar
-		{9, 17, 00, 2 + ALARM_STOP_LIGHT}, // End: Saturday mixer at iBar
-
-		{9, 20, 30, 6 + ALARM_DISP_MSG}, // Reminder: Saturday party at Piranha
-		{9, 20, 45, 6 + ALARM_DISP_MSG}, // Reminder: Saturday party at Piranha
-		{9, 20, 50, 6 + ALARM_DISP_MSG}, // Reminder: Saturday party at Piranha
-		{9, 20, 55, 6 + ALARM_DISP_MSG}, // Reminder: Saturday party at Piranha
-		{9, 21, 00, 6 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Saturday party at Piranha
-		{9, 21, 15, 6 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Saturday party at Piranha
-		{9, 21, 30, 6 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Saturday party at Piranha
-
-		{9, 23, 30, 7 + ALARM_DISP_MSG}, // Reminder: Saturday karaoke
-		{9, 23, 45, 7 + ALARM_DISP_MSG}, // Reminder: Saturday karaoke
-		{9, 23, 50, 7 + ALARM_DISP_MSG}, // Reminder: Saturday karaoke
-		{9, 23, 55, 7 + ALARM_DISP_MSG}, // Reminder: Saturday karaoke
-		{10, 00, 00, 7 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Saturday karaoke
-		{10, 00, 15, 7 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Saturday karaoke
-		{10, 00, 30, 7 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Saturday karaoke
-
-		{10, 15, 30, 3 + ALARM_DISP_MSG + ALARM_START_LIGHT}, // Reminder: Sunday mixer at iBar
-		{10, 15, 45, 3 + ALARM_DISP_MSG}, // Reminder: Sunday mixer at iBar
-		{10, 15, 50, 3 + ALARM_DISP_MSG}, // Reminder: Sunday mixer at iBar
-		{10, 15, 55, 3 + ALARM_DISP_MSG}, // Reminder: Sunday mixer at iBar
-		{10, 16, 00, 3 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Sunday mixer at iBar
-		{10, 16, 15, 3 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Sunday mixer at iBar
-		{10, 16, 30, 3 + ALARM_DISP_MSG + ALARM_NOW_MSG}, // Now: Sunday mixer at iBar
-		{10, 17, 00, 3 + ALARM_STOP_LIGHT}, // End: Sunday mixer at iBar
-
-		{10, 9, 30, 4 + ALARM_START_LIGHT}, // Reminder: Sunday after-party
-		{10, 9, 00, 4}, // Now: Sunday after-party
-		{11, 3, 00, 4 + ALARM_STOP_LIGHT}, // End: Sunday after-party
+const alarm_time alarms[] = {
+		{8, 16, 1 + ALARM_DISP_MSG + ALARM_START_LIGHT, 2, 0}, // Friday mixer at iBar
+		{8, 22, 5 + ALARM_DISP_MSG + ALARM_START_LIGHT, 4, 1}, // Now: Friday pool party at Palms
+		{9, 16, 2 + ALARM_DISP_MSG + ALARM_START_LIGHT, 2, 0}, // Now: Saturday mixer at iBar
+		{9, 21, 6 + ALARM_DISP_MSG, 0, 2}, // Now: Saturday party at Piranha
+		{10, 00, 7 + ALARM_DISP_MSG, 0, 3}, // Now: Saturday karaoke
+		{10, 16, 3 + ALARM_DISP_MSG + ALARM_START_LIGHT, 2, 0}, // Now: Sunday mixer at iBar
+		{10, 21, 4 + ALARM_START_LIGHT, 4}, // Now: Sunday after-party
 };
+
+uint8_t offsets[] = {0, 15, 20, 25, 30, 45, 60, 0};
+
+char alarm_msg[32] = "";
 
 void init_alarms() {
 	if (!clock_is_set)
@@ -259,37 +208,75 @@ void init_alarms() {
 
 	// Find the next alarm:
 	uint8_t next_alarm = 0;
-	while (next_alarm < 49) {
-		// TODO: Check to see if the current alarm is "ALARM_NOW_MSG". If so,
-		//  first look 30, 15, 10, 5 minutes beforehand;
-		//  then look 15 and 30 minutes afterwards.
+	uint8_t min;
+	uint8_t hour;
+	uint8_t day;
+	uint8_t done = 0;
 
-		// If current alarm is in the past or less than a minute away, go to next.
-		if (alarms[next_alarm].day < currentTime.DayOfMonth &&
-				alarms[next_alarm].hour < currentTime.Hours &&
-				alarms[next_alarm].min < currentTime.Minutes + 1) { // TODO: I think there's some wrong math here...
-			next_alarm++;
-		} else {
-			next_event_flag = alarms[next_alarm].flag;
+	while (!done && next_alarm < 7) {
+		offsets[7] = alarms[next_alarm].light_length;
+		for (uint8_t offset_index = 0; offset_index < 8; offset_index++) {
+			min = offsets[offset_index] % 60;
+			hour = (alarms[next_alarm].hour + (offsets[offset_index]/60)) % 24;
+			day = alarms[next_alarm].day + (alarms[next_alarm].hour + (offsets[offset_index]/60)) / 24;
+
+			// If current alarm is in the past or less than a minute away, go to next.
+			if (day < currentTime.DayOfMonth &&
+					hour < currentTime.Hours &&
+					min < currentTime.Minutes + 1) { // TODO: I think there's some wrong math here...
+				next_alarm++;
+				continue;
+			}
+
+			next_event_flag = alarms[next_alarm].event_id;
+
+			// index != 6 => message
+			if (next_alarm != 6 && offset_index == 4) {
+				// now
+				next_event_flag |= ALARM_NOW_MSG+ALARM_DISP_MSG;
+				memset(alarm_msg, 0, 32);
+				strcat(alarm_msg, "!!! ");
+				strcat(alarm_msg, event_messages[alarms[next_alarm].msg_index]);
+				strcat(alarm_msg, "NOW!");
+			} else if (next_alarm != 6) {
+				// disp
+				next_event_flag |= ALARM_DISP_MSG;
+				memset(alarm_msg, 0, 32);
+				strcat(alarm_msg, event_messages[alarms[next_alarm].msg_index]);
+				strcat(alarm_msg, event_times[alarms[next_alarm].msg_index]);
+			}
+
+			// index < 4 => lights <= light_length exists
+			if (offset_index == 0 && alarms[next_alarm].light_length) {
+				// start light
+				next_event_flag |= ALARM_START_LIGHT;
+			} else if (offset_index == 7 && alarms[next_alarm].light_length) {
+				// no msg
+				next_event_flag &= ~ALARM_DISP_MSG;
+				// stop light
+				next_event_flag |= ALARM_STOP_LIGHT;
+			}
+
+			// Set the next alarm!
+			RTC_A_setCalendarAlarm(
+					RTC_A_BASE,
+					min,
+					hour,
+					RTC_A_ALARMCONDITION_OFF,
+					day
+			);
+			done = 1;
+
 			break;
+			// TODO: If we're in between a start light and a stop light, go ahead
+			//  and take it upon ourselves to issue an f_alarm now.
 		}
-		// TODO: If we're in between a start light and a stop light, go ahead
-		//  and take it upon ourselves to issue an f_alarm now.
 	}
-	if (next_alarm == 49) {
+	if (next_alarm == 7) {
 		// queercon is over.
 		// TODO
 		return;
 	}
-
-	// Set the next alarm!
-	RTC_A_setCalendarAlarm(
-			RTC_A_BASE,
-			alarms[next_alarm].min,
-			alarms[next_alarm].hour,
-			RTC_A_ALARMCONDITION_OFF,
-			alarms[next_alarm].day
-	);
 }
 
 void init_rtc() {

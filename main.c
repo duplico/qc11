@@ -611,15 +611,6 @@ int main( void )
 				// TODO: stop the blinking if applicable.
 			}
 			if (f_alarm & ALARM_DISP_MSG) {
-				memset(message_to_send, 0, MTS_LEN);
-				if (f_alarm & ALARM_NOW_MSG)
-					strcat(message_to_send, "!!! ");
-				strcat(message_to_send, event_messages[event_id]);
-				if (f_alarm & ALARM_NOW_MSG)
-					strcat(message_to_send, "NOW!");
-				else {
-					strcat(message_to_send, event_times[event_id]);
-				}
 				// TODO: move this to a signal handler later:
 				s_event_alert = 1;
 			}
@@ -727,7 +718,7 @@ int main( void )
 		// Pre-emptive:
 		if (s_event_alert) {
 			s_event_alert = 0;
-			led_print_scroll(message_to_send, 1);
+			led_print_scroll(alarm_msg, 1);
 		}
 
 		if (am_idle) { // Can do another action now.
