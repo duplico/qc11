@@ -49,12 +49,14 @@ void init_alarms();
 void init_rtc();
 void init_watchdog();
 
+extern char alarm_msg[];
 
 typedef struct {
 	uint8_t day;
 	uint8_t hour;
-	uint8_t min;
-	uint8_t flag;
+	uint8_t event_id;
+	uint8_t light_length;
+	uint8_t msg_index;
 } alarm_time;
 
 extern char *event_times[8];
