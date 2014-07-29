@@ -212,9 +212,11 @@ void init_alarms() {
 	uint8_t hour;
 	uint8_t day;
 	uint8_t done = 0;
+	memset(alarm_msg, 0, 32);
 
 	while (!done && next_alarm < 7) {
-		offsets[7] = alarms[next_alarm].light_length;
+		uint8_t light_length = alarms[next_alarm].light_length;
+		offsets[7] = light_length;
 		for (uint8_t offset_index = 0; offset_index < 8; offset_index++) {
 			min = offsets[offset_index] % 60;
 			hour = (alarms[next_alarm].hour + (offsets[offset_index]/60)) % 24;
@@ -234,23 +236,26 @@ void init_alarms() {
 			if (next_alarm != 6 && offset_index == 4) {
 				// now
 				next_event_flag |= ALARM_NOW_MSG+ALARM_DISP_MSG;
-				memset(alarm_msg, 0, 32);
-				strcat(alarm_msg, "!!! ");
-				strcat(alarm_msg, event_messages[alarms[next_alarm].msg_index]);
-				strcat(alarm_msg, "NOW!");
 			} else if (next_alarm != 6) {
 				// disp
 				next_event_flag |= ALARM_DISP_MSG;
-				memset(alarm_msg, 0, 32);
+			}
+
+			if (next_event_flag & ALARM_DISP_MSG) {
+				if (next_event_flag & ALARM_NOW_MSG)
+					strcat(alarm_msg, "!!! ");
 				strcat(alarm_msg, event_messages[alarms[next_alarm].msg_index]);
-				strcat(alarm_msg, event_times[alarms[next_alarm].msg_index]);
+				if (next_event_flag & ALARM_NOW_MSG)
+					strcat(alarm_msg, "NOW!");
+				else
+					strcat(alarm_msg, event_times[alarms[next_alarm].msg_index]);
 			}
 
 			// index < 4 => lights <= light_length exists
-			if (offset_index == 0 && alarms[next_alarm].light_length) {
+			if (offset_index == 0 && light_length) {
 				// start light
 				next_event_flag |= ALARM_START_LIGHT;
-			} else if (offset_index == 7 && alarms[next_alarm].light_length) {
+			} else if (offset_index == 7 && light_length) {
 				// no msg
 				next_event_flag &= ~ALARM_DISP_MSG;
 				// stop light
