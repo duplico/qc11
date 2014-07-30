@@ -39,6 +39,7 @@
 uint8_t xt2_status;
 uint8_t xt1_status; // 1 = working, 0 = fault condition
 
+#define ALARM_NO_REINIT		BIT7
 #define ALARM_STOP_LIGHT 	BIT6
 #define ALARM_START_LIGHT 	BIT5
 #define ALARM_NOW_MSG 		BIT4

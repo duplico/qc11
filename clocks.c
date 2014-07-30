@@ -7,6 +7,7 @@
 
 #include "qcxi.h"
 #include "clocks.h"
+#include <string.h>
 
 volatile Calendar currentTime;
 uint8_t next_event_flag = 0;
@@ -187,13 +188,13 @@ void init_clocks() {
  *    it gets one).
  */
 const alarm_time alarms[] = {
-		{8, 16, 1 + ALARM_DISP_MSG + ALARM_START_LIGHT, 2, 0}, // Friday mixer at iBar
-		{8, 22, 5 + ALARM_DISP_MSG + ALARM_START_LIGHT, 4, 1}, // Now: Friday pool party at Palms
-		{9, 16, 2 + ALARM_DISP_MSG + ALARM_START_LIGHT, 2, 0}, // Now: Saturday mixer at iBar
-		{9, 21, 6 + ALARM_DISP_MSG, 0, 2}, // Now: Saturday party at Piranha
-		{10, 00, 7 + ALARM_DISP_MSG, 0, 3}, // Now: Saturday karaoke
-		{10, 16, 3 + ALARM_DISP_MSG + ALARM_START_LIGHT, 2, 0}, // Now: Sunday mixer at iBar
-		{10, 21, 4 + ALARM_START_LIGHT, 4}, // Now: Sunday after-party
+		{8, 16, 1, 120, 0}, // Friday mixer at iBar
+		{8, 22, 5, 225, 1}, // Now: Friday pool party at Palms
+		{9, 16, 2, 120, 0}, // Now: Saturday mixer at iBar
+		{9, 21, 6, 0, 2}, // Now: Saturday party at Piranha
+		{10, 0, 7, 0, 3}, // Now: Saturday karaoke
+		{10, 16, 3, 120, 0}, // Now: Sunday mixer at iBar
+		{10, 21, 4, 225, 0}, // Now: Sunday after-party
 };
 
 uint8_t offsets[] = {0, 15, 20, 25, 30, 45, 60, 0};
@@ -215,18 +216,18 @@ void init_alarms() {
 	memset(alarm_msg, 0, 32);
 
 	while (!done && next_alarm < 7) {
-		uint8_t light_length = alarms[next_alarm].light_length;
-		offsets[7] = light_length;
+		uint8_t light_length = alarms[next_alarm].light_length; // TODO: should be minutes
+		if (light_length)
+			offsets[7] = light_length + 30;
 		for (uint8_t offset_index = 0; offset_index < 8; offset_index++) {
-			min = offsets[offset_index] % 60;
-			hour = (alarms[next_alarm].hour + (offsets[offset_index]/60)) % 24;
-			day = alarms[next_alarm].day + (alarms[next_alarm].hour + (offsets[offset_index]/60)) / 24;
+			min = (offsets[offset_index] + 30) % 60;
+			hour = (alarms[next_alarm].hour + 23 + ((offsets[offset_index]+30)/60)) % 24;
+			day = alarms[next_alarm].day + (alarms[next_alarm].hour + ((offsets[offset_index]+30)/60)) / 24;
 
 			// If current alarm is in the past or less than a minute away, go to next.
-			if (day < currentTime.DayOfMonth &&
-					hour < currentTime.Hours &&
-					min < currentTime.Minutes + 1) { // TODO: I think there's some wrong math here...
-				next_alarm++;
+			if (day < currentTime.DayOfMonth ||
+			 (day == currentTime.DayOfMonth && hour < currentTime.Hours) ||
+			 (day == currentTime.DayOfMonth && hour == currentTime.Hours && min < currentTime.Minutes)) { // TODO: re-add the +1
 				continue;
 			}
 
@@ -262,6 +263,12 @@ void init_alarms() {
 				next_event_flag |= ALARM_STOP_LIGHT;
 			}
 
+			// If we're in between a start light and a stop light, go ahead
+			//  and take it upon ourselves to issue an f_alarm now.
+			if (offset_index && light_length) {
+				f_alarm = ALARM_NO_REINIT + ALARM_START_LIGHT + alarms[next_alarm].event_id;
+			}
+
 			// Set the next alarm!
 			RTC_A_setCalendarAlarm(
 					RTC_A_BASE,
@@ -273,9 +280,8 @@ void init_alarms() {
 			done = 1;
 
 			break;
-			// TODO: If we're in between a start light and a stop light, go ahead
-			//  and take it upon ourselves to issue an f_alarm now.
 		}
+		next_alarm++;
 	}
 	if (next_alarm == 7) {
 		// queercon is over.
@@ -287,8 +293,8 @@ void init_alarms() {
 void init_rtc() {
 	//Starting Time for Calendar: // TODO:
 	currentTime.Seconds    = 40;
-	currentTime.Minutes    = 29;
-	currentTime.Hours      = 15;
+	currentTime.Minutes    = 59;
+	currentTime.Hours      = 17;
 	currentTime.DayOfWeek  = 6;
 	currentTime.DayOfMonth = 8;
 	currentTime.Month      = 8;

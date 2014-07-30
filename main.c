@@ -48,6 +48,7 @@ uint16_t known_tricks = 0;
 uint8_t known_trick_count = 0;
 qcxipayload in_payload, out_payload;
 uint16_t rainbow_lights = 0;
+uint8_t light_blink = 0;
 
 // My general app-level status:
 uint8_t badge_status = 0;
@@ -460,11 +461,17 @@ int main( void )
 			f_new_second = 0;
 
 			// BIT7 of events_occurred is !defcon_over:
-			if (!clock_is_set && (BIT7 & my_conf.events_occurred)) {
-				// TODO
-				rainbow_lights ^= BIT9;
-				s_update_rainbow = 1;
+			if (BIT7 & my_conf.events_occurred) {
+				if (light_blink) {
+					rainbow_lights ^= 1 << (9-(light_blink & 127));
+					s_update_rainbow = 1;
+				}
+				if (!clock_is_set) {
+					rainbow_lights ^= BIT9;
+					s_update_rainbow = 1;
+				}
 			}
+
 			clock_setting_age++;
 			currentTime.Seconds++;
 			if (currentTime.Seconds >= 60) {
@@ -605,18 +612,20 @@ int main( void )
 			event_id = f_alarm & 0b0111;
 			if (f_alarm & ALARM_START_LIGHT) {
 				// TODO: setup a light blink for light number event_id.
+				light_blink = 128 + event_id;
 			}
 			if (f_alarm & ALARM_STOP_LIGHT) {
 				// TODO: stop the blinking if applicable.
+				light_blink = 0;
 			}
 			if (f_alarm & ALARM_DISP_MSG) {
 				// TODO: move this to a signal handler later:
 				s_event_alert = 1;
 			}
-		}
-		if (f_alarm) {
+			if (!(f_alarm & ALARM_NO_REINIT)) {
+				init_alarms();
+			}
 			f_alarm = 0;
-			init_alarms();
 		}
 
 		/*
