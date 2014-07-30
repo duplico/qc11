@@ -34,6 +34,8 @@ uint8_t f_animation_done = 0;
 uint8_t f_ir_itp_step = 0;
 uint8_t f_ir_pair_abort = 0;
 
+uint8_t neighbor_badges[BADGES_IN_SYSTEM] = {0};
+
 // Global state:
 uint8_t clock_is_set = 0;
 uint8_t my_clock_authority = 0;
@@ -60,15 +62,10 @@ uint8_t am_idle = 1;
 
 uint8_t pair_state = 0;
 
-// Gaydar - Stolen from QC10:
-uint8_t neighbor_counts[RECEIVE_WINDOW] = {0};
 uint8_t window_position = 0;
 uint8_t badges_seen[BADGES_IN_SYSTEM];
-uint8_t total_badges_seen = 0;
-uint8_t uber_badges_seen = 0;
-uint8_t last_neighbor_count = 0;
 uint8_t neighbor_count = 0;
-uint8_t neighbor_count_cycle = 0;
+uint8_t neighbor_count_curr = 0;
 uint8_t window_seconds = RECEIVE_WINDOW_LENGTH_SECONDS;
 uint8_t trick_seconds = TRICK_INTERVAL_SECONDS;
 uint8_t target_gaydar_index = 0;
@@ -440,16 +437,14 @@ int main( void )
 				// sliding window.
 				led_print_scroll("rxb",0);
 
-				neighbor_counts[window_position]+=1;
+				neighbor_count_curr+=1;
+				neighbor_badges[in_payload.from_addr] = RECEIVE_WINDOW;
 
 				set_badge_seen(in_payload.from_addr);
 
-				if (neighbor_counts[window_position] > neighbor_count) {
-					neighbor_count = neighbor_counts[window_position];
-					neighbor_count_cycle = window_position;
+				if (neighbor_count_curr > neighbor_count) {
+					neighbor_count = neighbor_count_curr;
 					set_gaydar_target();
-				} else if (neighbor_counts[window_position] == neighbor_count) {
-					neighbor_count_cycle = window_position;
 				}
 			}
 
@@ -521,19 +516,19 @@ int main( void )
 					led_print_scroll("need",0);
 					s_need_rf_beacon = 1;
 				}
+				neighbor_count = 0;
+				neighbor_count_curr = 0;
+				for (uint8_t i=0; i<BADGES_IN_SYSTEM; i++) {
+					if (neighbor_badges[i]) {
+						neighbor_count++;
+						neighbor_badges[i]--;
+					}
+				}
+
 				// TODO: mess with s_on_bus and s_off_bus here.
 				window_position = (window_position + 1) % RECEIVE_WINDOW;
 				if (!window_position) {
 					skip_window = rand() % RECEIVE_WINDOW;
-				}
-				neighbor_counts[window_position] = 0;
-				if (neighbor_count_cycle == window_position) {
-					neighbor_count = 0;
-					for (uint8_t i=0; i<RECEIVE_WINDOW; i++) {
-						if (neighbor_counts[i] > neighbor_count) {
-							neighbor_count = neighbor_counts[i];
-						}
-					}
 				}
 				// If we're rolling over the window and have no neighbors,
 				// try a radio reboot, in case that can gin up some better
