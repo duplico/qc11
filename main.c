@@ -233,6 +233,8 @@ void set_gaydar_target() {
  *
  */
 
+uint8_t skip_window = 1;
+
 int main( void )
 {
 	init_watchdog();
@@ -436,6 +438,8 @@ int main( void )
 				// It's a beacon (one per cycle).
 				// Increment our beacon count in the current position in our
 				// sliding window.
+				led_print_scroll("rxb",0);
+
 				neighbor_counts[window_position]+=1;
 
 				set_badge_seen(in_payload.from_addr);
@@ -510,17 +514,18 @@ int main( void )
 				trick_seconds--;
 			}
 
-			static uint8_t skip_window = 1;
-
+			window_seconds--;
 			if (!window_seconds) {
 				window_seconds = RECEIVE_WINDOW_LENGTH_SECONDS;
-				if (skip_window == window_position) {
-					skip_window = rand() % RECEIVE_WINDOW;
-				} else {
+				if (skip_window != window_position) {
+					led_print_scroll("need",0);
 					s_need_rf_beacon = 1;
 				}
 				// TODO: mess with s_on_bus and s_off_bus here.
 				window_position = (window_position + 1) % RECEIVE_WINDOW;
+				if (!window_position) {
+					skip_window = rand() % RECEIVE_WINDOW;
+				}
 				neighbor_counts[window_position] = 0;
 				if (neighbor_count_cycle == window_position) {
 					neighbor_count = 0;
@@ -538,7 +543,6 @@ int main( void )
 				}
 				set_gaydar_target();
 			}
-			window_seconds--;
 		}
 
 		/*
@@ -660,7 +664,7 @@ int main( void )
 //		s_update_rainbow = 0;
 
 		// This is background:
-		if (s_need_rf_beacon && rfm_reg_state == RFM_REG_IDLE) {
+		if (s_need_rf_beacon && rfm_reg_state == RFM_REG_IDLE  && !(read_single_register_sync(0x27) & (BIT1+BIT0))) {
 			out_payload.beacon = 1;
 			out_payload.clock_age_seconds = clock_setting_age;
 			out_payload.time.Hours = currentTime.Hours;
@@ -674,6 +678,7 @@ int main( void )
 				out_payload.clock_authority = 0xff;
 
 			// This should probably be renamed:
+			led_print_scroll("tx",0);
 			radio_send_sync();
 			s_need_rf_beacon = 0;
 		} else if (s_rf_retransmit && rfm_reg_state == RFM_REG_IDLE) {
