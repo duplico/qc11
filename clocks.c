@@ -101,7 +101,7 @@ void init_clocks() {
 			DCO_FLLREF_RATIO			   // 8 MHz / 32KHz
 	);
 	UCS_clockSignalInit(UCS_MCLK, UCS_DCOCLKDIV_SELECT,
-			UCS_CLOCK_DIVIDER_8);
+			UCS_CLOCK_DIVIDER_8); // TODO
 #else
 
 	// Init XT2:
