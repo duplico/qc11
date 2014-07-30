@@ -112,8 +112,9 @@ void init_radio() {
 	//  calling them defaults for if they're not set BY DEFAULT?????
 	//  Sheesh.), per datasheet:
 	write_single_register(0x18, 0b00001000); // Low-noise amplifier
-	write_single_register(0x19, 0b01010101); // Bandwidth control
-	write_single_register(0x1a, 0b10001011); // Auto Frequency Correction BW
+	write_single_register(0x19, 0b01010101); // Bandwidth control "default"
+//	write_single_register(0x1a, 0b10001011); // Auto Frequency Correction BW
+	write_single_register(0x1a, 0x8b); // Auto Frequency Correction BW "default"
 	write_single_register(0x26, 0x07); // Disable ClkOut
 	write_single_register(0x29, 210); // RSSI Threshold
 
@@ -123,7 +124,7 @@ void init_radio() {
 
 	/// Output configuration:
 	write_single_register(0x11, 0b10011100); // Output power
-	write_single_register(0x12, 0b00001111); // PA0 ramp time
+//	write_single_register(0x12, 0b00001111); // PA0 ramp time
 
 	write_single_register(0x25, 0b00000000); // GPIO map to default
 
@@ -139,21 +140,21 @@ void init_radio() {
 	// Bandwidth (see pg 26, 3.4.6):
 	// BW > 1/2 BR
 	// Our BW needs to be >= 1/2 of bitrate
-	write_single_register(0x19, 0b01001011);
+//	write_single_register(0x19, 0b01001011);
 	// Beta = 2 * FDEV / BR
 	// Set Fdev, so 2xFDEV/BR \in [0.5,10]
 //	write_single_register(0x06, 0x52); // FDEV = 61*this value.
 	// Bitrate:
-	write_single_register(0x03, 0x06);
-	write_single_register(0x04, 0x83);
+//	write_single_register(0x03, 0x06);
+//	write_single_register(0x04, 0x83);
 	// Auto frequency correction settings:
 //	write_single_register(0x0b, 0b00100000); // Special AFC for low-beta
 //	write_single_register(0x71, 1); // Low-beta AFC offset / 488 Hz
 //	write_single_register(0x6f, 0x20); // Fading margin improvement // 0x20 for low beta, 0x30 for high beta
 //	write_single_register(0x1a, 0b10000101); // AFC bandwidth
-	write_single_register(0x1e, 0b00001100); // Restart every time we hit RX mode
+//	write_single_register(0x1e, 0b00001100); // Restart every time we hit RX mode
 	// Preamble LSB:
-	write_single_register(0x2d, 0x10); // 16 preamble bytes
+//	write_single_register(0x2d, 0x10); // 16 preamble bytes
 
 	for (uint8_t sync_addr=0x2f; sync_addr<=0x36; sync_addr++) {
 		write_single_register(sync_addr, 0x01);
