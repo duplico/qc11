@@ -271,12 +271,10 @@ void ir_process_timestep() {
 			ir_timesteps_to_beacon--;
 		}
 		break;
-	case IR_PROTO_PAIRED_C: // TODO: Anything special here? // fall through
-	case IR_PROTO_PAIRED_S: // TODO: Anything special here? // fall through
 	default:
 		if (ir_proto_tto--) {
 			// re-send, don't time out
-			if (ir_proto_state >= IR_PROTO_HELLO_C && ir_proto_state <= IR_PROTO_PAIRED_C) {
+			if (ir_pair_role == IR_ROLE_C) {
 				ir_write_global();
 			}
 		} else {
@@ -335,8 +333,6 @@ void ir_process_rx_ready() {
 				ir_pair_setstate(IR_PROTO_PAIRED);
 				set_badge_paired(ir_partner);
 			}
-
-			// TODO: decide if paired...
 			break;
 		case IR_PROTO_PAIRED:
 			break; // ignore if paired.
@@ -358,15 +354,6 @@ void ir_process_rx_ready() {
 				ir_write_global();
 				break;
 			}
-		}
-		if (ir_proto_state == IR_PROTO_ITP && ir_pair_role == IR_ROLE_S && ir_rx_from == ir_partner) {
-
-		}
-		if (ir_proto_state == IR_PROTO_PAIRED && ir_pair_role == IR_ROLE_S && ir_rx_from == ir_partner) {
-			// send a stillalive
-			ir_proto_setup(ir_partner, IR_OP_STILLALIVE, 0);
-			ir_write_global();
-			ir_pair_setstate(IR_PROTO_PAIRED);
 		}
 		break;
 	case IR_OP_STILLALIVE:
