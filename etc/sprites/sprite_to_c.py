@@ -12,21 +12,41 @@ for f in infiles:
     for value in values:
         animation = ast.literal_eval(value)
         animname = f.split('.')[0]
-        outcode = "// Auto-generated animation %s\n" % animname
-        outcode += "const spriteframe anim_%s[] = {" % animname
-        for frame in animation:
+        # outcode = "// Auto-generated animation %s\n" % animname
+        outcode = ""
+        if len(animation[0][0]) == 8:
+            outcode += "const spriteframe anim_%s[] = {" % animname
+        else:
+            outcode += "const fullframe anim_%s[] = {" % animname
+        frame_flag = 0
+        framecode = ""
+        for i in range(len(animation)):
+            frame = animation[i]
+            
             assert len(frame) in [5, 6]
-            outcode += "{"
+            framecode = "{"
             for row in frame[4::-1]:
-                outcode += "0b" + ''.join(map(str,row)) + ', '
-            if len(frame) == 6:
-                frame_flag = frame[-1]
-            else:
-                frame_flag = 0
+                framecode += "0b" + ''.join(map(str,row)) + ', '
+            
             if frame is animation[-1]:
-                frame_flag += 8
-            outcode += "%d}," % frame_flag
+                frame_flag += 128
+                framecode += "%d}," % frame_flag
+                outcode += framecode
+                frame_flag = 0
+                # if this is the last frame, flush. frame_flag += 128.
+                # flush
+            elif frame == animation[i+1]:
+                # wait and let last frame flush.
+                frame_flag += 1
+            else:
+                framecode += "%d}," % frame_flag
+                outcode += framecode
+                frame_flag = 0
+                # if this is the last frame of its value, flush. frame_flag=0 after.
+            
+            
         outcode += "};\n"
         with open('%s.qsprite' % animname, 'w') as wfile:
             wfile.write(outcode)
+            pass
         print outcode
