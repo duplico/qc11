@@ -281,7 +281,8 @@ void radio_send_sync() {
 	expected_dio_interrupt = 1; // will be xmit finished.
 
 	rfm_reg_state = RFM_REG_TX_FIFO_CMD;
-	GPIO_setOutputLowOnPin(RFM_NSS_PORT, RFM_NSS_PIN); // Hold NSS low to begin frame.
+//	GPIO_setOutputLowOnPin(RFM_NSS_PORT, RFM_NSS_PIN); // Hold NSS low to begin frame.
+	RFM_NSS_PORT_OUT &= ~RFM_NSS_PIN;
 	USCI_B_SPI_transmitData(USCI_B1_BASE, RFM_FIFO | 0b10000000); // Send write command.
 	while (rfm_reg_state != RFM_REG_IDLE);
 	mode_rx_async(); // Set the mode so we'll re-enter RX mode once xmit is done.
@@ -475,9 +476,11 @@ __interrupt void USCI_B1_ISR(void)
 	} // end of state machine (transitions)
 
 	if (rfm_reg_state == RFM_REG_IDLE) {
-		GPIO_setOutputHighOnPin(RFM_NSS_PORT, RFM_NSS_PIN); // NSS high to end frame
+//		GPIO_setOutputHighOnPin(RFM_NSS_PORT, RFM_NSS_PIN); // NSS high to end frame
+		RFM_NSS_PORT_OUT |= RFM_NSS_PIN;
 	} else if (rfm_reg_state == RFM_REG_TX_FIFO_AM) { // Automode:
-		GPIO_setOutputHighOnPin(RFM_NSS_PORT, RFM_NSS_PIN); // NSS high to end frame
+//		GPIO_setOutputHighOnPin(RFM_NSS_PORT, RFM_NSS_PIN); // NSS high to end frame
+		RFM_NSS_PORT_OUT |= RFM_NSS_PIN;
 		rfm_reg_state = RFM_REG_IDLE;
 		mode_rx_async();
 	}
