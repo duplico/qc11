@@ -341,7 +341,6 @@ void RTC_A_ISR(void)
 		break;
 	case 4:         //RTCEVIFG
 		//Interrupts every minute // TODO: make sure this is on if we need it
-		f_new_minute = 1;
 		__bic_SR_register_on_exit(LPM3_bits);
 		break;
 	case 6:         //RTCAIFG

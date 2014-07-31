@@ -182,7 +182,6 @@ extern uint8_t f_ir_pair_abort;
 typedef struct {
 	uint8_t to_addr, from_addr, base_id, puppy_flags, clock_authority;
 	Calendar time;
-	uint16_t clock_age_seconds;
 	uint8_t prop_id;
 	uint16_t prop_time_loops_before_start;
 	uint8_t prop_from;
