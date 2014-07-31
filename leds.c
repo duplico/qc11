@@ -27,6 +27,10 @@ uint8_t led_display_left_frame = 0;
 uint8_t led_display_right_frame = 0;
 uint8_t led_display_full_frame = 0;
 
+uint8_t led_display_left_dup = 0;
+uint8_t led_display_right_dup = 0;
+uint8_t led_display_full_dup = 0;
+
 uint8_t led_display_text_character = 0;
 uint8_t led_display_text_cursor = 0;
 uint8_t led_display_text_between = 0;
@@ -79,16 +83,20 @@ void left_sprite_animate(spriteframe* animation, uint8_t frameskip) {
 	led_display_left_frame = 0;
 	led_display_anim_skip = frameskip;
 	led_display_left_sprite = animation;
+	led_display_left_dup = led_display_left_sprite[0].lastframe & ~BIT7;
 
 	led_display_left_len = 0;
-	while (!led_display_left_sprite[led_display_left_len++].lastframe);
+	while (!(led_display_left_sprite[led_display_left_len++].lastframe & BIT7));
 }
 
 void full_animate(fullframe* animation, uint8_t frameskip) {
-	led_display_full = DISPLAY_ON_ANIMATE;
+	led_display_full = DISPLAY_ANIMATE;
 	led_display_full_frame = 0;
 	led_display_anim_skip = frameskip;
 	led_display_full_anim = animation;
+	led_display_full_len = 0;
+	led_display_full_dup = led_display_full_anim[0].lastframe & ~BIT7;
+	while (!(led_display_full_anim[led_display_full_len++].lastframe & BIT7));
 }
 
 void right_sprite_animate(spriteframe* animation, uint8_t frameskip, uint8_t flip, int8_t direction, uint8_t persistent_mask) {
@@ -102,16 +110,16 @@ void right_sprite_animate(spriteframe* animation, uint8_t frameskip, uint8_t fli
 	led_display_right_len = 0;
 	led_display_right_direction = direction;
 
-	while (!led_display_right_sprite[led_display_right_len++].lastframe);
+	while (!(led_display_right_sprite[led_display_right_len++].lastframe & BIT7));
 
 	if (direction < 0)
 		led_display_right_frame = led_display_right_len-1;
 	else
 		led_display_right_frame = 0;
+	led_display_right_dup = led_display_right_sprite[led_display_right_frame].lastframe & ~BIT7;
 }
 
 void led_print_scroll(char* text, uint8_t frameskip) {
-	am_idle = 0;
 	led_display_text_string = text;
 	led_display_text_character = 0;
 	led_display_text_cursor = 0;
@@ -225,13 +233,23 @@ void animation_timestep() {
 	led_display_anim_skip_index = led_display_anim_skip;
 	// end animation if done:
 	if (led_display_full & DISPLAY_ANIMATE) {
-		led_display_full_frame++;
+		if (led_display_full_dup) {
+			led_display_full_dup--;
+		} else {
+			led_display_full_frame++;
+			led_display_left_dup = led_display_full_anim[led_display_full_frame].lastframe & ~BIT7;
+		}
 		if (led_display_full_frame == led_display_full_len) {
 			led_display_full &= ~DISPLAY_ANIMATE;
 		}
 	}
 	if (led_display_left & DISPLAY_ANIMATE) {
-		led_display_left_frame++;
+		if (led_display_left_dup) {
+			led_display_left_dup--;
+		} else {
+			led_display_left_frame++;
+			led_display_left_dup = led_display_left_sprite[led_display_left_frame].lastframe & ~BIT7;
+		}
 		// end animation if done::
 		if (led_display_left_sprite == stand && led_display_left_frame == led_display_left_len) {
 			led_display_left &= ~DISPLAY_ANIMATE;
@@ -241,7 +259,12 @@ void animation_timestep() {
 		}
 	}
 	if (led_display_right & DISPLAY_ANIMATE) {
-		led_display_right_frame+= led_display_right_direction;
+		if (led_display_right_dup) {
+			led_display_right_dup--;
+		} else {
+			led_display_right_frame+= led_display_right_direction;
+			led_display_right_dup = led_display_right_sprite[led_display_right_frame].lastframe & ~BIT7;
+		}
 		if ((led_display_right_direction >0 && led_display_right_frame == led_display_right_len) || (led_display_right_direction < 0 && led_display_right_frame == 255)) {
 			// end animation
 			led_display_right &= ~DISPLAY_ANIMATE;

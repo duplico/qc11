@@ -332,31 +332,31 @@ int main( void )
 #endif
 
 	static uint8_t s_prop_id = 0,
-				   s_prop_cycles = 0,
 				   s_prop_authority = 0,
 				   s_propped = 0;
+	uint16_t s_prop_cycles;
 
 	// Signals within the main thread:
-	static uint8_t s_event_arrival = 0,
-				   s_on_bus = 0,
-				   s_off_bus = 0,
-				   s_event_alert = 0,
-				   s_need_rf_beacon = 0,
-				   s_rf_retransmit = 0,
-				   s_pair = 0, // f_pair
-				   s_new_pair = 0,
-				   s_new_trick = 0,
-				   s_new_score = 0,
-				   s_new_prop = 0,
-				   s_unpair = 0, // f_unpair
-				   s_trick = 0,
-				   s_prop = 0,
-				   s_prop_animation_length = 0,
-				   s_get_puppy = 0,
-				   s_lose_puppy = 0,
-				   s_update_rainbow = 0;
+	uint8_t s_event_arrival = 0,
+			s_on_bus = 0,
+			s_off_bus = 0,
+			s_event_alert = 0,
+			s_need_rf_beacon = 0,
+			s_rf_retransmit = 0,
+			s_pair = 0, // f_pair
+			s_new_pair = 0,
+			s_new_trick = 0,
+			s_new_score = 0,
+			s_new_prop = 0,
+			s_unpair = 0, // f_unpair
+			s_trick = 0,
+			s_prop = 0,
+			s_get_puppy = 0,
+			s_lose_puppy = 0,
+			s_update_rainbow = 0;
 
-	static uint8_t itps_pattern = 0;
+	uint16_t s_prop_animation_length = 0;
+	uint8_t itps_pattern = 0;
 
 	// Main sequence:
 	while (1) {
@@ -416,6 +416,7 @@ int main( void )
 			if (in_payload.clock_authority != 0xff &&
 					(!clock_is_set ||
 							in_payload.clock_authority < my_clock_authority)) {
+				am_idle = 0;
 				led_print_scroll("clock", 1);
 				update_clock();
 			}
@@ -461,8 +462,6 @@ int main( void )
 				// It's a beacon (one per cycle).
 				// Increment our beacon count in the current position in our
 				// sliding window.
-				led_print_scroll("rxb",0);
-
 				neighbor_count_curr+=1;
 				neighbor_badges[in_payload.from_addr] = RECEIVE_WINDOW;
 
@@ -527,20 +526,36 @@ int main( void )
 				currentTime = RTC_A_getCalendarTime(RTC_A_BASE);
 			}
 
-			if (!trick_seconds && !s_propped) {
+			out_payload.clock_age_seconds = clock_setting_age;
+			out_payload.time.Hours = currentTime.Hours;
+			out_payload.time.Minutes = currentTime.Minutes;
+			out_payload.time.Seconds = currentTime.Seconds;
+			out_payload.time.DayOfMonth = currentTime.DayOfMonth;
+			out_payload.time.DayOfWeek = currentTime.DayOfWeek;
+			out_payload.time.Month = currentTime.Month;
+			out_payload.time.Year = currentTime.Year;
+
+			if (!trick_seconds) {
 				trick_seconds = TRICK_INTERVAL_SECONDS-1 + (rand()%3);
 				if (rand() % 3) {
 					// wave
 					s_trick = TRICK_COUNT+1;
-				} else if (!s_propped && neighbor_count && !(rand() % 4)){
+				} else if (!s_prop && !s_propped && neighbor_count) { // && !(rand() % 4)) { // TODO
 					// prop
 					// TODO
 					s_prop = 1;
 					s_prop_authority = my_conf.badge_id;
-					// TODO: s_prop_id =
-					// TODO: s_prop_animation_length =
+					s_prop_id = 0; // TODO: for now.
+					s_prop_animation_length = 0;
+					while(!(prop_uses[s_prop_id][s_prop_animation_length++].lastframe & BIT7));
+					s_prop_animation_length *= 4; // TODO: this should be configured...
 					// s_prop_cycles = SOME_DELAY + ANIM_LENGTH
-					// Then we're testing whether s_prop_cycles == ANIM_LENGTH
+					s_prop_cycles = ANIM_DELAY + s_prop_animation_length;
+					out_payload.prop_from = my_conf.badge_id;
+					out_payload.prop_id = s_prop_id;
+					out_payload.prop_time_loops_before_start = s_prop_cycles;
+					s_rf_retransmit = 1;
+					// Then we're testing whether s_prop_cycles == s_prop_animation_length
 				} else {
 					// trick
 					static uint8_t known_trick_to_do;
@@ -559,6 +574,7 @@ int main( void )
 							known_trick_to_do--;
 						}
 					}
+					// doing s_trick...
 					s_trick++; // because the s_trick flag is trick_id+1
 				}
 			} else { // if (!sprite_animate && !led_text_scrolling && !s_propped) {
@@ -569,7 +585,6 @@ int main( void )
 			if (!window_seconds) {
 				window_seconds = RECEIVE_WINDOW_LENGTH_SECONDS;
 				if (skip_window != window_position) {
-					led_print_scroll("need",0);
 					s_need_rf_beacon = 1;
 				}
 				neighbor_count = 0;
@@ -643,8 +658,9 @@ int main( void )
 				s_update_rainbow = 1;
 			}
 
-			if (s_propped) {
+			if (s_prop_cycles) {
 				s_prop_cycles--;
+				out_payload.prop_time_loops_before_start = s_prop_cycles;
 			}
 		}
 
@@ -690,31 +706,14 @@ int main( void )
 		// This is background:
 		if (s_need_rf_beacon && rfm_reg_state == RFM_REG_IDLE  && !(read_single_register_sync(0x27) & (BIT1+BIT0))) {
 			out_payload.beacon = 1;
-			out_payload.clock_age_seconds = clock_setting_age;
-			out_payload.time.Hours = currentTime.Hours;
-			out_payload.time.Minutes = currentTime.Minutes;
-			out_payload.time.Seconds = currentTime.Seconds;
-			out_payload.time.DayOfMonth = currentTime.DayOfMonth;
-			out_payload.time.DayOfWeek = currentTime.DayOfWeek;
-			out_payload.time.Month = currentTime.Month;
-			out_payload.time.Year = currentTime.Year;
 			if (!clock_is_set)
 				out_payload.clock_authority = 0xff;
 
-			// This should probably be renamed:
-			led_print_scroll("tx",0);
 			radio_send_sync();
 			s_need_rf_beacon = 0;
 		} else if (s_rf_retransmit && rfm_reg_state == RFM_REG_IDLE) {
 			out_payload.beacon = 0;
-			out_payload.clock_age_seconds = clock_setting_age;
-			out_payload.time.Hours = currentTime.Hours;
-			out_payload.time.Minutes = currentTime.Minutes;
-			out_payload.time.Seconds = currentTime.Seconds;
-			out_payload.time.DayOfMonth = currentTime.DayOfMonth;
-			out_payload.time.DayOfWeek = currentTime.DayOfWeek;
-			out_payload.time.Month = currentTime.Month;
-			out_payload.time.Year = currentTime.Year;
+
 			if (!clock_is_set)
 				out_payload.clock_authority = 0xff;
 
@@ -725,6 +724,7 @@ int main( void )
 		// Is an animation finished?
 		if (f_animation_done) {
 			f_animation_done = 0;
+			led_display_left |= BIT0;
 			am_idle = 1;
 			#if !BADGE_TARGET
 			color = 0;
@@ -754,12 +754,25 @@ int main( void )
 		if (s_event_alert) {
 			s_event_alert = 0;
 			led_print_scroll(alarm_msg, 1);
+			am_idle = 0;
 		}
 
 		if (am_idle) { // Can do another action now.
 			switch(badge_status) {
 			case BSTAT_GAYDAR:
-				if (f_paired) { // TODO: This might should be pre-emptive.
+				if (s_prop && s_prop_cycles <= s_prop_animation_length) {
+					// TODO: do a prop.
+					am_idle = 0;
+					s_prop = 0;
+					led_display_left &= ~BIT0;
+					full_animate(prop_uses[s_prop_id], 4);
+				} else if (s_propped && !s_prop_cycles) {
+					// TODO: do a prop effect.
+					am_idle = 0;
+					s_propped = 0;
+					led_display_left &= ~BIT0;
+					full_animate(prop_effects[s_prop_id], 4);
+				} else if (f_paired) { // TODO: This might should be pre-emptive?
 					f_paired = 0;
 					pair_state = PAIR_INIT;
 					itps_pattern = 0;
@@ -768,7 +781,6 @@ int main( void )
 					gaydar_index = 0;
 					right_sprite_animate(anim_sprite_walkin, 2, 1, 1, 1);
 				} else if (s_on_bus) {
-
 				} else if (target_gaydar_index > gaydar_index) {
 					am_idle = 0;
 					right_sprite_animate(gaydar[gaydar_index], 4, 0, 1, 1);
@@ -835,13 +847,19 @@ int main( void )
 			itps_pattern = 0;
 		}
 
+		if (am_idle && s_trick) {
+			uint16_t trick_len = 0;
+			while (!(tricks[s_trick-1][trick_len++].lastframe & BIT7));
+			trick_len *= 4; // TODO.
+			if (!(s_propped || s_prop) ||
+				(s_propped && trick_len < s_prop_cycles) ||
+				(trick_len < s_prop_cycles - s_prop_animation_length))
+			{
+				am_idle = 0;
+				left_sprite_animate((spriteframe *)tricks[s_trick-1], 4);
+				s_trick = 0; // this needs to be after the above statement. Duh.
+			}
 
-
-
-
-		if (s_trick) {
-			left_sprite_animate((spriteframe *)tricks[s_trick-1], 4);
-			s_trick = 0; // this needs to be after the above statement. Duh.
 		}
 #endif
 

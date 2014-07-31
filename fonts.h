@@ -27,12 +27,8 @@ typedef struct
 } FONT_INFO;
 
 /* Font data for D3 5pt */
-extern const uint8_t font_bits[];
-extern const FONT_INFO font_info;
-extern const FONT_CHAR_INFO d3_5ptDescriptors[];
-
-extern const uint8_t microsoftSansSerif_5ptBitmaps[];
-extern const FONT_INFO microsoftSansSerif_5ptFontInfo;
-extern const FONT_CHAR_INFO microsoftSansSerif_5ptDescriptors[];
+extern uint8_t font_bits[];
+extern FONT_INFO font_info;
+extern FONT_CHAR_INFO d3_5ptDescriptors[];
 
 #endif /* FONTS_H_ */
