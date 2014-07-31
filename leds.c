@@ -288,7 +288,6 @@ void text_timestep() {
 }
 
 void led_set_rainbow(uint16_t value) {
-	value &= 0b01111111111;
 	// 0.15 = value.9,
 	// 1.15 = value.8
 	// 1.7 = value.7
@@ -305,15 +304,15 @@ void led_set_rainbow(uint16_t value) {
 	led_values[3] &= 0b0111111101111111;
 	led_values[4] &= 0b1111111011111110;
 
-	led_values[0] |= (value & BIT9)? BIT15 : 0;
-	led_values[1] |= (value & BIT8)? BIT15 : 0;
-	led_values[1] |= (value & BIT7)? BIT7 : 0;
-	led_values[3] |= (value & BIT6)? BIT15 : 0;
-	led_values[3] |= (value & BIT5)? BIT7 : 0;
-	led_values[0] |= (value & BIT4)? BIT0 : 0;
-	led_values[2] |= (value & BIT3)? BIT8 : 0;
-	led_values[2] |= (value & BIT2)? BIT0 : 0;
-	led_values[4] |= ((value & BIT1)? BIT8 : 0) | ((value & BIT0)? BIT0 : 0);
+	led_values[0] |= (value & BIT9) << 6;
+	led_values[1] |= (value & BIT8) << 7;
+	led_values[1] |= (value & BIT7);
+	led_values[3] |= (value & BIT6) << 9;
+	led_values[3] |= (value & BIT5) << 2;
+	led_values[0] |= (value & BIT4) >> 4;
+	led_values[2] |= (value & BIT3) << 5;
+	led_values[2] |= (value & BIT2) >> 2;
+	led_values[4] |= ((value & BIT1) << 7) | (value & BIT0);
 }
 
 void led_update_display() {
@@ -348,11 +347,13 @@ void led_update_display() {
 		// Iterate over each bit, set data pin, and pulse the clock to send it
 		// to the shift register
 		for (uint8_t i = 0; i < 16; i++)  {
-			WRITE_IF(LED_PORT, LED_DATA, (led_values[4-j] & (1 << i)));
-			GPIO_pulse(LED_PORT, LED_CLOCK);
+			DATA_IF(led_values[4-j] & (1 << i));
+//			GPIO_pulse(LED_PORT, LED_CLOCK);
+			P1OUT |= BIT4; P1OUT &= ~BIT4;
 		}
 	}
-	GPIO_pulse(LED_PORT, LED_LATCH);
+//	GPIO_pulse(LED_PORT, LED_LATCH);
+	P1OUT |= BIT7; P1OUT &= ~BIT7;
 
 }
 
@@ -367,28 +368,47 @@ uint8_t led_post()
 		test_response = 0;
 		for (uint8_t i = 0; i < 16; i++)  {
 			test_response |= (P1IN & GPIO_PIN6)? 1 << i : 0;
-			WRITE_IF(LED_PORT, LED_DATA, (test_pattern & (1 << i)));
-			GPIO_pulse(LED_PORT, LED_CLOCK);
+			DATA_IF(test_pattern & (1 << i));
+//			GPIO_pulse(LED_PORT, LED_CLOCK);
+			P1OUT |= BIT4; P1OUT &= ~BIT4;
 		}
 	}
 	return test_response == test_pattern;
 }
 
 void led_enable(uint16_t duty_cycle) {
-//	led_disable(); // TODO
-	GPIO_setAsPeripheralModuleFunctionOutputPin(LED_PORT, LED_BLANK);
+//	GPIO_setAsPeripheralModuleFunctionOutputPin(LED_PORT, LED_BLANK);
+	P1SEL |= LED_BLANK;
 
-	TIMER_A_generatePWM(
-		TIMER_A0_BASE,
-		TIMER_A_CLOCKSOURCE_ACLK,
-		TIMER_A_CLOCKSOURCE_DIVIDER_1,
-		LED_PERIOD, // period
-		TIMER_A_CAPTURECOMPARE_REGISTER_2,
-		TIMER_A_OUTPUTMODE_RESET_SET,
-		LED_PERIOD - duty_cycle // duty cycle
-	);
+//	TIMER_A_generatePWM(
+//		TIMER_A0_BASE,
+//		TIMER_A_CLOCKSOURCE_ACLK,
+//		TIMER_A_CLOCKSOURCE_DIVIDER_1,
+//		LED_PERIOD, // period
+//		TIMER_A_CAPTURECOMPARE_REGISTER_2,
+//		TIMER_A_OUTPUTMODE_RESET_SET,
+//		LED_PERIOD - duty_cycle // duty cycle
+//	);
 
-	TIMER_A_startCounter(TIMER_A0_BASE, TIMER_A_UP_MODE);
+	TA0CTL &= ~( TIMER_A_CLOCKSOURCE_INVERTED_EXTERNAL_TXCLK +
+	           TIMER_A_UPDOWN_MODE + TIMER_A_DO_CLEAR +
+	           TIMER_A_TAIE_INTERRUPT_ENABLE
+	           );
+
+	TA0CTL |= ( TIMER_A_CLOCKSOURCE_ACLK +
+				TIMER_A_UP_MODE +
+				TIMER_A_DO_CLEAR
+			  );
+
+	TA0CCR0 = LED_PERIOD;
+
+	TA0CCTL0 &= ~(TIMER_A_CAPTURECOMPARE_INTERRUPT_ENABLE +
+	          	  TIMER_A_OUTPUTMODE_RESET_SET
+	          	 );
+
+	TA0CCTL2 |= TIMER_A_OUTPUTMODE_RESET_SET;
+	TA0CCR2 = LED_PERIOD - duty_cycle;
+	TA1CTL |= TIMER_A_UP_MODE;
 
 }
 
@@ -433,14 +453,15 @@ void led_timestep() {
 
 void led_disable( void )
 {
-	GPIO_setAsOutputPin(
-			LED_PORT,
-			LED_BLANK
-	);
-
-	GPIO_setOutputHighOnPin(LED_PORT, LED_BLANK);
+//	GPIO_setAsOutputPin(
+//			LED_PORT,
+//			LED_BLANK
+//	);
+	P1SEL &= ~BIT3;
+	P1OUT |= BIT3;
 }
 
 inline void led_toggle( void ) {
-	GPIO_toggleOutputOnPin(LED_PORT, LED_BLANK);
+//	GPIO_toggleOutputOnPin(LED_PORT, LED_BLANK);
+	P1OUT ^= BIT3;
 }
