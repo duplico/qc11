@@ -190,7 +190,8 @@ void write_single_register_async(uint8_t addr, uint8_t data) {
 	rfm_reg_state = RFM_REG_TX_SINGLE_CMD;
 	rfm_single_msg = data;
 	addr = addr | 0b10000000; // MSB=1 => write command
-	GPIO_setOutputLowOnPin(RFM_NSS_PORT, RFM_NSS_PIN); // Hold NSS low to begin frame.
+//	GPIO_setOutputLowOnPin(RFM_NSS_PORT, RFM_NSS_PIN); // Hold NSS low to begin frame.
+	RFM_NSS_PORT_OUT &= ~RFM_NSS_PIN;
 	USCI_B_SPI_transmitData(USCI_B1_BASE, addr); // Send our command.
 }
 
@@ -208,7 +209,8 @@ void read_single_register_async(uint8_t addr) {
 		return; // TODO: flag a fault?
 	rfm_reg_state = RFM_REG_RX_SINGLE_CMD;
 	addr = 0b01111111 & addr; // MSB=0 => write command
-	GPIO_setOutputLowOnPin(RFM_NSS_PORT, RFM_NSS_PIN); // Hold NSS low to begin frame.
+//	GPIO_setOutputLowOnPin(RFM_NSS_PORT, RFM_NSS_PIN); // Hold NSS low to begin frame.
+	RFM_NSS_PORT_OUT &= ~RFM_NSS_PIN;
 	USCI_B_SPI_transmitData(USCI_B1_BASE, addr); // Send our command.
 }
 
@@ -291,7 +293,8 @@ void radio_send_sync() {
 		return; // TODO: flag a fault?
 	}
 	rfm_reg_state = RFM_REG_RX_FIFO_CMD;
-	GPIO_setOutputLowOnPin(RFM_NSS_PORT, RFM_NSS_PIN); // Hold NSS low to begin frame.
+//	GPIO_setOutputLowOnPin(RFM_NSS_PORT, RFM_NSS_PIN); // Hold NSS low to begin frame.
+	RFM_NSS_PORT_OUT &= ~RFM_NSS_PIN;
 	USCI_B_SPI_transmitData(USCI_B1_BASE, RFM_FIFO); // Send our read command.
 }
 

@@ -41,24 +41,30 @@ char ir_rx_message[17] = "";
 
 void init_ir() {
 	// TX for IR
-	GPIO_setAsPeripheralModuleFunctionOutputPin(
-			IR_TXRX_PORT,
-			IR_TX_PIN
-	);
-	// RX for IR
-	GPIO_setAsPeripheralModuleFunctionInputPin(
-			IR_TXRX_PORT,
-			IR_RX_PIN
-	);
+//	GPIO_setAsPeripheralModuleFunctionOutputPin(
+//			IR_TXRX_PORT,
+//			IR_TX_PIN
+//	);
+//
+//	// RX for IR
+//	GPIO_setAsPeripheralModuleFunctionInputPin(
+//			IR_TXRX_PORT,
+//			IR_RX_PIN
+//	);
+
+	IR_TXRX_PORT_SEL |= IR_TX_PIN + IR_RX_PIN;
+	IR_TXRX_PORT_DIR &= ~IR_RX_PIN;
 
 	// Shutdown (SD) for IR
 //	GPIO_setAsOutputPin(IR_SD_PORT, IR_SD_PIN);// already output
-	GPIO_setOutputLowOnPin(IR_SD_PORT, IR_SD_PIN); // shutdown low = on
+//	GPIO_setOutputLowOnPin(IR_SD_PORT, IR_SD_PIN); // shutdown low = on
+	IR_SD_PORT_OUT &= ~IR_SD_PIN;
 
 	// We'll use SMCLK, which is 8 MHz.
 	// See: http://software-dl.ti.com/msp430/msp430_public_sw/mcu/msp430/MSP430BaudRateConverter/index.html
 
-	USCI_A_UART_disable(IR_USCI_BASE);
+//	USCI_A_UART_disable(IR_USCI_BASE);
+	IR_USCI_CTL |= UCSWRST;
 
 #if BADGE_TARGET
 	// 19200 baud: non-oversampled.
@@ -90,7 +96,7 @@ void init_ir() {
 			USCI_A_UART_LOW_FREQUENCY_BAUDRATE_GENERATION
 	);
 #endif
-	USCI_A_UART_disable(IR_USCI_BASE);
+	IR_USCI_CTL |= UCSWRST;
 
 	IRTCTL = UCIREN + UCIRTXPL2 + UCIRTXPL0;
 	IRRCTL |= UCIRRXPL;
