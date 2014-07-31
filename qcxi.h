@@ -97,6 +97,8 @@ void set_event_occurred(uint8_t id);
 #define TIME_LOOP_HZ 32
 #define TIME_LOOP_SCALER RTC_A_PSEVENTDIVIDER_4
 
+#define ANIM_DELAY RECEIVE_WINDOW_LENGTH_SECONDS * TIME_LOOP_HZ * 1.5
+
 #define BSTAT_GAYDAR 0
 #define BSTAT_PAIR   1
 #define BSTAT_PUPPY  2
@@ -181,7 +183,9 @@ typedef struct {
 	uint8_t to_addr, from_addr, base_id, puppy_flags, clock_authority;
 	Calendar time;
 	uint16_t clock_age_seconds;
-	uint8_t prop_id, prop_time_loops_before_start, prop_from;
+	uint8_t prop_id;
+	uint16_t prop_time_loops_before_start;
+	uint8_t prop_from;
 	uint8_t beacon;
 } qcxipayload;
 extern qcxipayload in_payload, out_payload;

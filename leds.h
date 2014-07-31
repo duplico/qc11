@@ -29,12 +29,14 @@ typedef struct {
 
 typedef struct {
 	uint16_t rows[5];
-	uint8_t len;
+	uint8_t lastframe;
 } fullframe;
 
 extern uint16_t led_values[5];
 extern uint16_t led_zeroes[5];
 extern uint16_t disp_buffer[10];
+
+extern uint8_t led_display_left;
 
 void led_init();
 
