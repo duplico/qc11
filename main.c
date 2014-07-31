@@ -17,15 +17,13 @@
 qcxiconf my_conf;
 
 // Interrupt flags to signal the main thread:
-volatile uint8_t f_new_minute = 0;
-volatile uint8_t f_timer = 0;
 volatile uint8_t f_rfm_rx_done = 0;
 volatile uint8_t f_rfm_tx_done = 0;
 volatile uint8_t f_ir_tx_done = 0;
 volatile uint8_t f_ir_rx_ready = 0;
-uint8_t f_config_clobbered = 0;
 volatile uint8_t f_new_second = 0;
 volatile uint8_t f_alarm = 0;
+
 uint8_t f_paired = 0;
 uint8_t f_unpaired = 0;
 uint8_t f_paired_new_person = 0;
@@ -34,15 +32,11 @@ uint8_t f_animation_done = 0;
 uint8_t f_ir_itp_step = 0;
 uint8_t f_ir_pair_abort = 0;
 
-uint8_t neighbor_badges[BADGES_IN_SYSTEM] = {0};
-
 // Global state:
 uint8_t clock_is_set = 0;
 uint8_t my_clock_authority = 0;
-uint16_t clock_setting_age = 0;
 uint16_t loops_to_rf_beacon = 10 * TIME_LOOP_HZ;
-#define MTS_LEN 255
-char message_to_send[MTS_LEN] = "";
+char pairing_message[20] = "";
 uint8_t my_trick = 0;
 uint16_t known_tricks = 0;
 uint8_t known_trick_count = 0;
@@ -63,14 +57,15 @@ uint8_t am_idle = 1;
 
 uint8_t pair_state = 0;
 
-uint8_t window_position = 0;
-uint8_t badges_seen[BADGES_IN_SYSTEM];
+// Gaydar:
+uint8_t window_position = 0; // Currently only used for restarting radio & skipping windows.
 uint8_t neighbor_count = 0;
 uint8_t neighbor_count_curr = 0;
 uint8_t window_seconds = RECEIVE_WINDOW_LENGTH_SECONDS;
 uint8_t trick_seconds = TRICK_INTERVAL_SECONDS;
 uint8_t target_gaydar_index = 0;
 uint8_t gaydar_index = 0;
+uint8_t neighbor_badges[BADGES_IN_SYSTEM] = {0};
 
 uint8_t my_score = 0;
 
@@ -436,7 +431,7 @@ int main( void )
 				s_event_arrival = BIT7 + in_payload.base_id;
 			}
 
-			if (in_payload.prop_from != 0xFF) {
+			if (in_payload.prop_from != 0xFF && in_payload.prop_from != my_conf.badge_id) {
 				// It's a prop notification.
 				// If we don't currently have a prop scheduled, or if this prop is
 				// more authoritative than our currently scheduled prop, it's time
@@ -446,11 +441,15 @@ int main( void )
 				uint8_t prop_authority = in_payload.prop_from;
 				if (badge_status == BSTAT_PAIR && in_payload.prop_from == ir_partner)
 					prop_authority = 0;
-				if ((!s_propped || prop_authority < s_prop_authority) && in_payload.prop_time_loops_before_start) {
+				if (((!s_propped && !s_prop) || prop_authority < s_prop_authority) && in_payload.prop_time_loops_before_start) {
 					s_propped = 1;
+					s_prop = 0;
 					s_prop_authority = in_payload.prop_from;
 					s_prop_cycles = in_payload.prop_time_loops_before_start;
 					s_prop_id = in_payload.prop_id;
+					out_payload.prop_from = s_prop_authority;
+					out_payload.prop_time_loops_before_start = s_prop_cycles;
+					out_payload.prop_id = s_prop_id;
 				} else if (s_propped) {
 					// If we're already propped, and our current prop has higher authority,
 					// retransmit it.
@@ -462,15 +461,8 @@ int main( void )
 				// It's a beacon (one per cycle).
 				// Increment our beacon count in the current position in our
 				// sliding window.
-				neighbor_count_curr+=1;
 				neighbor_badges[in_payload.from_addr] = RECEIVE_WINDOW;
-
 				set_badge_seen(in_payload.from_addr);
-
-				if (neighbor_count_curr > neighbor_count) {
-					neighbor_count = neighbor_count_curr;
-					set_gaydar_target();
-				}
 			}
 		}
 
@@ -520,13 +512,11 @@ int main( void )
 				}
 			}
 
-			clock_setting_age++;
 			currentTime.Seconds++;
 			if (currentTime.Seconds >= 60) {
 				currentTime = RTC_A_getCalendarTime(RTC_A_BASE);
 			}
 
-			out_payload.clock_age_seconds = clock_setting_age;
 			out_payload.time.Hours = currentTime.Hours;
 			out_payload.time.Minutes = currentTime.Minutes;
 			out_payload.time.Seconds = currentTime.Seconds;
@@ -588,7 +578,6 @@ int main( void )
 					s_need_rf_beacon = 1;
 				}
 				neighbor_count = 0;
-				neighbor_count_curr = 0;
 				for (uint8_t i=0; i<BADGES_IN_SYSTEM; i++) {
 					if (neighbor_badges[i]) {
 						neighbor_count++;
@@ -764,16 +753,25 @@ int main( void )
 					// TODO: do a prop.
 					am_idle = 0;
 					s_prop = 0;
+					out_payload.prop_from = 0xff;
+					out_payload.prop_time_loops_before_start = 0;
 					led_display_left &= ~BIT0;
 					full_animate(prop_uses[s_prop_id], 4);
 				} else if (s_propped && !s_prop_cycles) {
 					// TODO: do a prop effect.
 					am_idle = 0;
 					s_propped = 0;
+					out_payload.prop_from = 0xff;
+					out_payload.prop_time_loops_before_start = 0;
 					led_display_left &= ~BIT0;
 					full_animate(prop_effects[s_prop_id], 4);
 				} else if (f_paired) { // TODO: This might should be pre-emptive?
 					f_paired = 0;
+					s_prop = 0;
+					s_propped = 0;
+					s_prop_cycles = 0;
+					out_payload.prop_from = 0xff;
+					out_payload.prop_time_loops_before_start = 0;
 					pair_state = PAIR_INIT;
 					itps_pattern = 0;
 					badge_status = BSTAT_PAIR;
@@ -817,10 +815,10 @@ int main( void )
 					break;
 				case PAIR_WAVE:
 					am_idle = 0;
-					memset(message_to_send, 0, MTS_LEN);
-					strcat(message_to_send, "Hi ");
-					strcat(message_to_send, ir_rx_handle);
-					led_print_scroll(message_to_send, 2);
+					memset(pairing_message, 0, 20);
+					strcat(pairing_message, "Hi ");
+					strcat(pairing_message, ir_rx_handle);
+					led_print_scroll(pairing_message, 2);
 					pair_state = PAIR_GREETING;
 					break;
 				case PAIR_GREETING:
@@ -946,7 +944,7 @@ void check_config() {
 			// paired_ids, seen_ids, scores, events occurred and attended.
 		}
 		// TODO: set self to seen/paired, I guess.
-		new_conf.badge_id = 102;
+		new_conf.badge_id = 91;
 		// new_conf.datetime is a DONTCARE because the clock's damn well not
 		// going to be set anyway, and we have no idea what time it is,
 		// and this section should (c) never be reached.
@@ -995,18 +993,12 @@ void check_config() {
 	strcpy(&(ir_pair_payload[0]), my_conf.handle);
 	strcpy(&(ir_pair_payload[11]), my_conf.message);
 
-//	uint8_t to_addr, from_addr, base_id, puppy_flags, clock_authority,
-//			seconds, minutes, hours, day, month;
-//	uint16_t year, clock_age_seconds;
-//	uint8_t prop_id, prop_time_loops_before_start, prop_from;
-
 	out_payload.to_addr = RFM_BROADCAST;
 	out_payload.from_addr = my_conf.badge_id;
 	out_payload.base_id = 0xFF; // TODO: unless I'm a base
 	out_payload.puppy_flags = 0;
 	out_payload.clock_authority = 0xFF; // UNSET
 //	memcpy(&out_payload.time, &currentTime, sizeof out_payload.time); // I think I don't care about this.
-	out_payload.clock_age_seconds = 0;
 	out_payload.prop_id = 0;
 	out_payload.prop_time_loops_before_start = 0;
 	out_payload.prop_from = 0xFF;
@@ -1026,7 +1018,6 @@ void update_clock() {
 	{
 		memcpy(&currentTime, &in_payload.time, sizeof (Calendar));
 		clock_is_set = 1;
-		clock_setting_age = 0;
 		my_clock_authority = in_payload.clock_authority;
 		out_payload.clock_authority = my_clock_authority;
 		init_alarms();
