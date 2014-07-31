@@ -19,7 +19,7 @@
 #define RECEIVE_WINDOW_LENGTH_SECONDS 10
 #define BUS_BASE_ID 0xEE
 #define TRICK_INTERVAL_SECONDS 6
-#define TRICK_COUNT 14
+#define TRICK_COUNT 13
 
 // Memory organization (same for F5529 and F5308)
 #define INFOA_START 0x001980
