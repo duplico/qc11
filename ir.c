@@ -20,6 +20,8 @@ volatile uint8_t ir_rx_index = 0;
 volatile uint8_t ir_rx_len = 0;
 volatile uint8_t ir_rx_from = 0;
 
+uint8_t ir_pair_role = 0;
+
 volatile uint8_t loops_to_ir_timestep = IR_LOOPS;
 uint8_t ir_timesteps_to_beacon = IR_LOOPS_PER_BEACON;
 
@@ -190,7 +192,7 @@ void ir_proto_setup(uint8_t to_addr, uint8_t opcode, uint8_t seqnum) {
 	uint16_t crc = 0;
 	uint8_t len = 2;
 
-	if (opcode == IR_OP_PAIRACC || opcode == IR_OP_PAIRACK) {
+	if (opcode == IR_OP_ITP) {
 		// this is the one where we send our message...
 		len = 30;
 	}
@@ -249,9 +251,12 @@ inline uint8_t ir_paired() {
 void ir_pair_setstate(uint8_t state) {
 	ir_proto_tto = IR_PROTO_TTO;
 	ir_proto_state = state;
+	if (state == IR_PROTO_LISTEN) {
+		ir_proto_seqnum = 0;
+	}
 }
 
-#define IR_ASSERT_PARTNER if (ir_partner != ir_rx_from) ir_pair_setstate(IR_PROTO_LISTEN);
+#define IR_ASSERT_PARTNER if (ir_partner != ir_rx_from) { ir_pair_setstate(IR_PROTO_LISTEN); break; }
 
 void ir_process_timestep() {
 	if (ir_xmit)
@@ -296,149 +301,79 @@ void ir_process_rx_ready() {
 	}
 	uint8_t seqnum = ir_rx_frame[1];
 
-	switch(ir_proto_state) {
-	case IR_PROTO_LISTEN:
-		if (opcode == IR_OP_BEACON) {
-			// We'll be the client.
-			ir_partner = ir_rx_from;
-			ir_pair_setstate(IR_PROTO_HELLO_C);
-			ir_proto_setup(ir_partner, IR_OP_HELLO, 0);
-			ir_write_global();
-		} else if (opcode == IR_OP_HELLO) {
-			// We'll be the server.
-			ir_partner = ir_rx_from;
-			ir_proto_seqnum = 0;
-			ir_pair_setstate(IR_PROTO_HELLO_S);
-			ir_proto_setup(ir_partner, IR_OP_HELLOACK, 0);
-			ir_write_global();
+	switch(opcode) {
+	case IR_OP_BEACON:
+		if (ir_proto_state != IR_PROTO_LISTEN) {
+			break;
 		}
-		// else do nothing; we don't care about this message.
-		break;
-	case IR_PROTO_HELLO_C:
-		IR_ASSERT_PARTNER
-		if (opcode == IR_OP_HELLOACK) { // as expected
-			ir_pair_setstate(IR_PROTO_ITP_C);
-			ir_proto_seqnum = 0;
-			ir_proto_setup(ir_partner, IR_OP_ITP, 0);
-			ir_write_global();
-		} else {
-			ir_pair_setstate(IR_PROTO_LISTEN);
-		}
-		break;
-	case IR_PROTO_ITP_C:
-		IR_ASSERT_PARTNER
-		// For the SERVER: ir_proto_seqnum is what we are SENDING.
-		if (opcode == IR_OP_PAIRREQ && ir_proto_seqnum == ITPS_TO_PAIR) {
-			ir_pair_setstate(IR_PROTO_PAIRING_C);
-			ir_proto_setup(ir_partner, IR_OP_PAIRACC, 0);
-			ir_write_global();
-			f_ir_itp_step = 1;
-		} else if (opcode == IR_OP_ITP && seqnum == ir_proto_seqnum+1) {
-			ir_proto_seqnum += 2;
-			if (ir_proto_seqnum > ITPS_TO_SHOW_PAIRING)
-				f_ir_itp_step = 1;
-			// Specifically DON'T send anything at this point.
+		ir_pair_role = IR_ROLE_C;
+		ir_partner = ir_rx_from;
+		ir_pair_setstate(IR_PROTO_ITP);
+		ir_proto_seqnum = 0;
+		// prep an ITP; fall through:
+	case IR_OP_ITP:
+		switch(ir_proto_state) {
+		case IR_PROTO_LISTEN:
+			ir_pair_role = IR_ROLE_S;
+			ir_pair_setstate(IR_PROTO_ITP);
+			ir_partner = ir_rx_from;
+			// fall through:
+		case IR_PROTO_ITP: // IR_ROLE_C falls through to here:
+			IR_ASSERT_PARTNER
+			ir_proto_seqnum = seqnum + !ir_pair_role; // +1 for client, +0 for server
 			ir_proto_setup(ir_partner, IR_OP_ITP, ir_proto_seqnum);
-			ir_pair_setstate(IR_PROTO_ITP_C);
-		} else {
-			ir_pair_setstate(IR_PROTO_LISTEN);
-			f_ir_pair_abort = 1;
-		}
-		break;
-	case IR_PROTO_PAIRING_C:
-		IR_ASSERT_PARTNER
-		if (opcode == IR_OP_PAIRACK) {
-			// decide we're paired.
-			set_badge_paired(ir_partner);
-			ir_proto_setup(ir_partner, IR_OP_KEEPALIVE, 0);
-		} else {
-			ir_pair_setstate(IR_PROTO_LISTEN);
-			f_ir_pair_abort = 1;
-		}
-		break;
-	case IR_PROTO_PAIRED_C:
-		if (ir_rx_from != ir_partner) {
-			break; // just ignore messages from others now that we're paired
-		}
-		if (opcode == IR_OP_STILLALIVE) {
-			ir_pair_setstate(IR_PROTO_PAIRED_C);
-		} else { // fault of some kind:
-			ir_pair_setstate(IR_PROTO_LISTEN);
-			f_unpaired = 1;
-		}
-		break;
-	case IR_PROTO_HELLO_S: // can receive either HELLO (resend) or ITP
-		IR_ASSERT_PARTNER
-		if (opcode == IR_OP_HELLO) {
-			// resend HELLOACK
-			ir_proto_setup(ir_partner, IR_OP_HELLOACK, 0);
-			ir_write_global();
-		} else if (opcode == IR_OP_ITP && seqnum==0) {
-			ir_pair_setstate(IR_PROTO_ITP_S);
-			// send ITP(1)
-			ir_proto_setup(ir_partner, IR_OP_ITP, 1);
-			ir_proto_seqnum = 2; // we're expecting 2 as the response.
-			ir_write_global();
-		} else {
-			ir_pair_setstate(IR_PROTO_LISTEN);
-		}
-		break;
-	case IR_PROTO_ITP_S: // can receive either ITP(##) or ITP(16)
-		IR_ASSERT_PARTNER
-		// For the SERVER: ir_proto_seqnum is what we are EXPECTING.
-		if (opcode == IR_OP_ITP && seqnum == ir_proto_seqnum && seqnum == ITPS_TO_PAIR) {
-			// TODO: send PAIRREQ
-			// send our message, etc
-			ir_pair_setstate(IR_PROTO_PAIRING_S);
-			ir_proto_setup(ir_partner, IR_OP_PAIRREQ, 0);
-			f_ir_itp_step = 1;
-			ir_write_global();
-		} else if (opcode == IR_OP_ITP) {
+			ir_pair_setstate(IR_PROTO_ITP);
+
 			if (ir_proto_seqnum > ITPS_TO_SHOW_PAIRING)
 				f_ir_itp_step = 1;
-			ir_proto_setup(ir_partner, IR_OP_ITP, seqnum+1);
-			ir_write_global();
-			if (seqnum == ir_proto_seqnum) {
-				// not resend:
-				ir_proto_seqnum+=2;
-				ir_pair_setstate(IR_PROTO_ITP_S);
-			} else {
-				// resend: no resetting of anything.
+
+			if (ir_pair_role == IR_ROLE_S) {
+				ir_write_global();
+			} else if (ir_proto_seqnum == ITPS_TO_PAIR) { // client is implicit here:
+				// this means we can pair:
+				ir_proto_setup(ir_partner, IR_OP_KEEPALIVE, 0);
+				ir_pair_setstate(IR_PROTO_PAIRED);
+				set_badge_paired(ir_partner);
 			}
-		} else {
-			f_ir_pair_abort = 1;
+
+			// TODO: decide if paired...
+			break;
+		case IR_PROTO_PAIRED:
+			break; // ignore if paired.
+		default:
 			ir_pair_setstate(IR_PROTO_LISTEN);
 		}
 		break;
-	case IR_PROTO_PAIRING_S: // can receive either ITP(16) (resend) or PAIRACC
-		IR_ASSERT_PARTNER
-		if (opcode == IR_OP_PAIRACC) {
-			set_badge_paired(ir_partner);
-			ir_proto_setup(ir_partner, IR_OP_PAIRACK, 0);
-			ir_write_global();
-		} else if (opcode == IR_OP_ITP && seqnum == ITPS_TO_PAIR) {
-			ir_proto_setup(ir_partner, IR_OP_PAIRREQ, 0); // TODO: probably already done.
-			ir_write_global();
-		} else {
-			f_ir_pair_abort = 1;
-			ir_pair_setstate(IR_PROTO_LISTEN);
+
+	case IR_OP_KEEPALIVE:
+		// TODO: also handle this if state = ITP for server:
+		if (ir_pair_role == IR_ROLE_S && ir_rx_from == ir_partner) {
+			switch(ir_proto_state) {
+			case IR_PROTO_ITP:
+				set_badge_paired(ir_partner);
+				// fall through:
+			case IR_PROTO_PAIRED:
+				ir_pair_setstate(IR_PROTO_PAIRED);
+				ir_proto_setup(ir_partner, IR_OP_STILLALIVE, 0);
+				ir_write_global();
+				break;
+			}
 		}
-		break;
-	case IR_PROTO_PAIRED_S: // can receive either PAIRACC (resend) or KEEPALIVE
-		if (ir_rx_from != ir_partner) {
-			break; // just ignore messages from others now that we're paired
+		if (ir_proto_state == IR_PROTO_ITP && ir_pair_role == IR_ROLE_S && ir_rx_from == ir_partner) {
+
 		}
-		if (opcode == IR_OP_PAIRACC) {
-			// resend:
-			ir_proto_setup(ir_partner, IR_OP_PAIRACK, 0);
-			ir_write_global();
-		} else if (opcode == IR_OP_KEEPALIVE) {
-			ir_pair_setstate(IR_PROTO_PAIRED_S);
+		if (ir_proto_state == IR_PROTO_PAIRED && ir_pair_role == IR_ROLE_S && ir_rx_from == ir_partner) {
+			// send a stillalive
 			ir_proto_setup(ir_partner, IR_OP_STILLALIVE, 0);
 			ir_write_global();
-		} else {
-			ir_pair_setstate(IR_PROTO_LISTEN);
-			f_unpaired = 1;
+			ir_pair_setstate(IR_PROTO_PAIRED);
+		}
+		break;
+	case IR_OP_STILLALIVE:
+		if (ir_proto_state == IR_PROTO_PAIRED && ir_pair_role == IR_ROLE_C && ir_rx_from == ir_partner) {
+			// Got a stillalive.
+			ir_proto_setup(ir_partner, IR_OP_KEEPALIVE, 0); // TODO: redundant?
+			ir_pair_setstate(IR_PROTO_PAIRED);
 		}
 		break;
 	}

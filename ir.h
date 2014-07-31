@@ -25,7 +25,14 @@ extern uint8_t ir_partner;
 extern char ir_rx_handle[11];
 extern char ir_rx_message[17];
 
+#define IR_ROLE_C 0
+#define IR_ROLE_S 1
+
 #define IR_PROTO_LISTEN 	0x0
+#define IR_PROTO_ITP		0x01
+#define IR_PROTO_PAIRING	0x02
+#define IR_PROTO_PAIRED		0x03
+
 #define IR_PROTO_HELLO_C 	0x11
 #define IR_PROTO_ITP_C 		0x12
 #define IR_PROTO_PAIRING_C 	0x13
