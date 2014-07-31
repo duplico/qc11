@@ -360,7 +360,8 @@ void led_update_display() {
 uint8_t led_post()
 {
 	//Set latch to low (should be already)
-	GPIO_setOutputLowOnPin(LED_PORT, LED_LATCH);
+//	GPIO_setOutputLowOnPin(LED_PORT, LED_LATCH);
+	P1OUT &= ~LED_LATCH;
 
 	uint16_t test_pattern = 0b1111101010100001;
 	uint16_t test_response = 0;

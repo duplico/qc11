@@ -44,11 +44,12 @@ void init_clocks() {
 	// |  |----P5.2
 	// |__|----P5.3
 	//
-	GPIO_setAsPeripheralModuleFunctionOutputPin(
-			GPIO_PORT_P5,
-			GPIO_PIN2 + GPIO_PIN3 // XT2
-			+ GPIO_PIN4 + GPIO_PIN5 // XT1
-	);
+//	GPIO_setAsPeripheralModuleFunctionOutputPin(
+//			GPIO_PORT_P5,
+//			GPIO_PIN2 + GPIO_PIN3 // XT2
+//			+ GPIO_PIN4 + GPIO_PIN5 // XT1
+//	);
+	P5SEL |= BIT2 + BIT3 + BIT4 + BIT5;
 
 	xt1_status = UCS_LFXT1StartWithTimeout(
 		UCS_XT1_DRIVE0,
