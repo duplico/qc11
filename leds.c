@@ -67,6 +67,8 @@ volatile uint8_t f_time_loop = 0;
 volatile int8_t disp_mode = DISP_MODE_TEXT;
 volatile int8_t disp_mode_target = DISP_MODE_TEXT;
 
+uint8_t gaydar_wave_pos = 0;
+
 void led_init() {
 
 	// Setup LED module pins //////////////////////////////////////////////////
@@ -224,6 +226,44 @@ void draw_text() {
 // NB: Don't call this function when we're in text mode. TODO.
 void animation_timestep() {
 	// Return if we're not animating or if we have to skip a frame:
+	if ((led_display_left & DISPLAY_ANIMATE) && !(led_display_right & DISPLAY_ANIMATE) && led_display_left_sprite == anim_sprite_wave) { // TODO: Make sure the last frame is OK...
+		switch(gaydar_index) {
+		case 1:
+			if (led_display_left_frame % 2) {
+				disp_buffer[2] ^= BIT4;
+				disp_buffer[3] ^= BIT4;
+			}
+			break;
+		case 2:
+			if (led_display_left_frame % 2) {
+				disp_buffer[2] ^= BIT2;
+				disp_buffer[3] ^= BIT2;
+			} else {
+				disp_buffer[2] ^= BIT6;
+				disp_buffer[3] ^= BIT6;
+			}
+			break;
+		case 3:
+			if (led_display_left_frame % 3 == 0) {
+				disp_buffer[0] ^= BIT0 + BIT6;
+				disp_buffer[3] ^= BIT0 + BIT6;
+			} else if (led_display_left_frame % 2) {
+				disp_buffer[0] ^= BIT3;
+				disp_buffer[3] ^= BIT3;
+			}
+			break;
+		case 4:
+			if (led_display_left_frame % 2) {
+				disp_buffer[0] ^= BIT0 + BIT4;
+				disp_buffer[3] ^= BIT0 + BIT4;
+			} else {
+				disp_buffer[0] ^= BIT2 + BIT6;
+				disp_buffer[3] ^= BIT2 + BIT6;
+			}
+		}
+
+	}
+
 	if (!((led_display_left | led_display_right | led_display_full) & DISPLAY_ANIMATE)) {
 		return;
 	} else if (led_display_anim_skip_index) {
@@ -268,9 +308,10 @@ void animation_timestep() {
 		if ((led_display_right_direction >0 && led_display_right_frame == led_display_right_len) || (led_display_right_direction < 0 && led_display_right_frame == 255)) {
 			// end animation
 			led_display_right &= ~DISPLAY_ANIMATE;
-			led_display_right_frame-= led_display_right_direction; // TODO: Is this right?
+			led_display_right_frame-= led_display_right_direction;
 		}
 	}
+
 	if (!((led_display_right | led_display_left | led_display_full | led_display_text) & DISPLAY_ANIMATE))
 		f_animation_done = 1;
 }
