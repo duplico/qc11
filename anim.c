@@ -26,7 +26,7 @@ const spriteframe anim_sprite_prop_dynamite_use[] = {{0b01010000, 0b01010000, 0b
 
 fullframe * prop_uses[] = {
 		anim_full_prop_ball_use,
-//		anim_full_prop_flood_use,
+		anim_full_prop_flood_use,
 //		anim_full_prop_wand_use,
 };
 
@@ -46,7 +46,7 @@ const spriteframe anim_sprite_prop_wand_effect[] = {{0b01010000, 0b01010000, 0b1
 
 fullframe * prop_effects[] = {
 		anim_full_prop_ball_effect,
-//		anim_full_prop_flood_effect,
+		anim_full_prop_flood_effect,
 //		anim_full_prop_rain_effect,
 };
 
