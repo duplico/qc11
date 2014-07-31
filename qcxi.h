@@ -107,6 +107,7 @@ void set_event_occurred(uint8_t id);
 extern uint8_t badge_status;
 extern uint8_t am_idle;
 extern uint8_t clock_is_set;
+extern uint8_t gaydar_index;
 
 // Power-on self test result codes:
 #define POST_XT1F 	0b1

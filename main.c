@@ -944,7 +944,7 @@ void check_config() {
 			// paired_ids, seen_ids, scores, events occurred and attended.
 		}
 		// TODO: set self to seen/paired, I guess.
-		new_conf.badge_id = 91;
+		new_conf.badge_id = 97;
 		// new_conf.datetime is a DONTCARE because the clock's damn well not
 		// going to be set anyway, and we have no idea what time it is,
 		// and this section should (c) never be reached.
