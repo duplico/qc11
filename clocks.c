@@ -282,10 +282,11 @@ void init_alarms() {
 			break;
 		}
 		next_alarm++;
+		// TODO: set_event_occurred(uint8_t id);
 	}
 	if (next_alarm == 7) {
 		// queercon is over.
-		// TODO
+		// TODO: set_event_occurred(uint8_t id)
 		return;
 	}
 }

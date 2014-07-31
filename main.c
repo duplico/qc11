@@ -1,4 +1,4 @@
-#pragma FUNC_ALWAYS_INLINE (UCS_clearAllOscFlagsWithTimeout);
+//#pragma FUNC_ALWAYS_INLINE (UCS_clearAllOscFlagsWithTimeout);
 
 #include "qcxi.h"
 #include <string.h>
@@ -118,6 +118,20 @@ void set_badge_seen(uint8_t id) {
 		FLASH_write16(&new_config_word, &(my_conf.met_ids[badge_frame]), 1);
 		FLASH_lockInfoA();
 	} // otherwise, nothing to do.
+}
+
+void set_event_attended(uint8_t id) {
+	uint8_t new_event_attended = my_conf.events_attended & ~(1 << id);
+	FLASH_unlockInfoA();// TODO
+	FLASH_write8(&new_event_attended, &my_conf.events_attended, 1);
+	FLASH_lockInfoA();
+}
+
+void set_event_occurred(uint8_t id) {
+	uint8_t new_event_occurred = my_conf.events_occurred & ~(1 << id);
+	FLASH_unlockInfoA();// TODO
+	FLASH_write8(&new_event_occurred, &my_conf.events_occurred, 1);
+	FLASH_lockInfoA();
 }
 
 uint8_t paired_badge(uint8_t id) {
@@ -399,6 +413,13 @@ int main( void )
 		 */
 		if (f_rfm_rx_done) {
 			f_rfm_rx_done = 0;
+			if (in_payload.clock_authority != 0xff &&
+					(!clock_is_set ||
+							in_payload.clock_authority < my_clock_authority)) {
+				led_print_scroll("clock", 1);
+				update_clock();
+			}
+
 			if (in_payload.puppy_flags) {
 				// Puppy-related
 			} else if (in_payload.base_id == BUS_BASE_ID) {
@@ -406,10 +427,14 @@ int main( void )
 				// Bus
 				// TODO: can set s_on_bus
 			}
-			else if (in_payload.base_id != 0xFF) {
+			else if (in_payload.base_id <= 7) {
 				// Base station, may need to check in.
 				// TODO: can set s_event_arrival
+				// base_id = event_id, should be 0..7
+				set_event_attended(in_payload.base_id);
+				s_event_arrival = BIT7 + in_payload.base_id;
 			}
+
 			if (in_payload.prop_from != 0xFF) {
 				// It's a prop notification.
 				// If we don't currently have a prop scheduled, or if this prop is
@@ -448,14 +473,38 @@ int main( void )
 					set_gaydar_target();
 				}
 			}
-
-			if (in_payload.clock_authority != 0xff &&
-					(!clock_is_set ||
-							in_payload.clock_authority < my_clock_authority)) {
-				led_print_scroll("clock", 1);
-				update_clock();
-			}
 		}
+
+
+
+		static uint8_t event_id = 0;
+		/*
+		 * Calendar interrupts:
+		 *
+		 * * Event alert raised (interrupt flag)
+		 *
+		 * s_event_alert = 0,
+		 *
+		 */
+		if (f_alarm) { // needs to be before f_new_second?
+			event_id = f_alarm & 0b0111;
+			if (f_alarm & ALARM_START_LIGHT) {
+				light_blink = 128 + event_id;
+			}
+			if (f_alarm & ALARM_STOP_LIGHT) {
+				// TODO: Set event occurred
+				light_blink = 0;
+				s_update_rainbow;
+			}
+			if (f_alarm & ALARM_DISP_MSG) {
+				s_event_alert = 1;
+			}
+			if (!(f_alarm & ALARM_NO_REINIT)) {
+				init_alarms();
+			}
+			f_alarm = 0;
+		}
+
 
 		if (f_new_second) {
 			f_new_second = 0;
@@ -599,35 +648,6 @@ int main( void )
 			}
 		}
 
-		static uint8_t event_id = 0;
-		/*
-		 * Calendar interrupts:
-		 *
-		 * * Event alert raised (interrupt flag)
-		 *
-		 * s_event_alert = 0,
-		 *
-		 */
-		if (f_alarm) {
-			event_id = f_alarm & 0b0111;
-			if (f_alarm & ALARM_START_LIGHT) {
-				// TODO: setup a light blink for light number event_id.
-				light_blink = 128 + event_id;
-			}
-			if (f_alarm & ALARM_STOP_LIGHT) {
-				// TODO: stop the blinking if applicable.
-				light_blink = 0;
-			}
-			if (f_alarm & ALARM_DISP_MSG) {
-				// TODO: move this to a signal handler later:
-				s_event_alert = 1;
-			}
-			if (!(f_alarm & ALARM_NO_REINIT)) {
-				init_alarms();
-			}
-			f_alarm = 0;
-		}
-
 		/*
 		 * Animation related activities:
 		 *
@@ -721,6 +741,12 @@ int main( void )
 			} else {
 				rainbow_lights |= (my_score & 0b11111);
 			}
+
+			if (!light_blink) {
+				// set according to events attended...
+				rainbow_lights |= (((uint16_t) ~my_conf.events_attended & 0b00011111) & ~light_blink) << 5;
+			}
+
 			led_set_rainbow(rainbow_lights);
 		}
 
@@ -749,10 +775,15 @@ int main( void )
 					left_sprite_animate(anim_sprite_wave, 4);
 					gaydar_index++;
 				} else if (target_gaydar_index < gaydar_index) {
-					am_idle = 1;
+					am_idle = 0;
 					gaydar_index--;
 					right_sprite_animate(gaydar[gaydar_index], 4, 0, -1, gaydar_index!=0);
 					left_sprite_animate(anim_sprite_wave, 4);
+				} else if (s_event_arrival) {
+					// TODO: do something
+					am_idle = 1; // TODO
+					s_event_arrival = 0;
+					s_update_rainbow = 1;
 				}
 				break;
 			case BSTAT_PAIR:

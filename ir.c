@@ -52,7 +52,7 @@ void init_ir() {
 	);
 
 	// Shutdown (SD) for IR
-	GPIO_setAsOutputPin(IR_SD_PORT, IR_SD_PIN);
+//	GPIO_setAsOutputPin(IR_SD_PORT, IR_SD_PIN);// already output
 	GPIO_setOutputLowOnPin(IR_SD_PORT, IR_SD_PIN); // shutdown low = on
 
 	// We'll use SMCLK, which is 8 MHz.

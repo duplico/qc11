@@ -46,24 +46,27 @@ void init_radio() {
 
 	// DIO0 (interrupt pin):
 //	GPIO_setAsInputPin(GPIO_PORT_P2, GPIO_PIN0);
+	P2DIR &= ~BIT0;
 	P2SEL &= ~BIT0;
 
-	// RESET:
-	GPIO_setAsOutputPin(GPIO_PORT_P6, GPIO_PIN0);
-
 	//P3.5,4,0 option select
-	GPIO_setAsPeripheralModuleFunctionInputPin(
-		GPIO_PORT_P4,
-		GPIO_PIN2
-	);
+//	GPIO_setAsPeripheralModuleFunctionInputPin(
+//		GPIO_PORT_P4,
+//		GPIO_PIN2
+//	);
+	P4SEL |= BIT2;
 
-	GPIO_setAsPeripheralModuleFunctionOutputPin(
-			GPIO_PORT_P4,
-			GPIO_PIN1 + GPIO_PIN3
-	);
+//	GPIO_setAsPeripheralModuleFunctionOutputPin(
+//			GPIO_PORT_P4,
+//			GPIO_PIN1 + GPIO_PIN3
+//	);
+	P4SEL |= GPIO_PIN1 + GPIO_PIN3;
 
-	GPIO_setAsOutputPin(RFM_NSS_PORT, RFM_NSS_PIN);
-	GPIO_setOutputHighOnPin(RFM_NSS_PORT, RFM_NSS_PIN); // NSS is active low.
+//	GPIO_setAsOutputPin(RFM_NSS_PORT, RFM_NSS_PIN);
+	RFM_NSS_PORT_DIR |= RFM_NSS_PIN;
+
+//	GPIO_setOutputHighOnPin(RFM_NSS_PORT, RFM_NSS_PIN); // NSS is active low.
+	RFM_NSS_PORT_OUT |= RFM_NSS_PIN;
 
 	// SPI to RFM /////////////////////////////////////////////////////////////
 	//
@@ -87,16 +90,19 @@ void init_radio() {
 		return;
 
 	//Enable SPI module
-	USCI_B_SPI_enable(USCI_B1_BASE);
+//	USCI_B_SPI_enable(USCI_B1_BASE);
+	UCB1CTL1 &= ~UCSWRST;
 
 	// Radio reboot procedure:
 	//  hold RESET high for > 100 us
 	//  pull RESET low, wait 5 ms
 	//  module is ready
 
-	GPIO_setOutputHighOnPin(GPIO_PORT_P6, GPIO_PIN0);
+//	GPIO_setOutputHighOnPin(GPIO_PORT_P6, GPIO_PIN0);
+	P6OUT |= BIT0;
 	delay(1);
-	GPIO_setOutputLowOnPin(GPIO_PORT_P6, GPIO_PIN0);
+//	GPIO_setOutputLowOnPin(GPIO_PORT_P6, GPIO_PIN0);
+	P6OUT &= ~BIT0;
 	delay(10);
 
 	//Enable Receive interrupt

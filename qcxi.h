@@ -43,6 +43,8 @@
 
 	// Radio:
 	#define RFM_NSS_PORT GPIO_PORT_P4
+	#define RFM_NSS_PORT_DIR P4DIR
+	#define RFM_NSS_PORT_OUT P4OUT
 	#define RFM_NSS_PIN GPIO_PIN7
 
 #else
@@ -63,13 +65,15 @@
 
 	// Radio:
 	#define RFM_NSS_PORT GPIO_PORT_P3
+	#define RFM_NSS_PORT_DIR P3DIR
+	#define RFM_NSS_PORT_OUT P3OUT
 	#define RFM_NSS_PIN GPIO_PIN7
 
 #endif
 
 // Useful defines:
 #define BIT15 0x8000
-#define WRITE_IF(port, pin, val) if (val) GPIO_setOutputHighOnPin(port, pin); else GPIO_setOutputLowOnPin(port, pin)
+#define DATA_IF(val) if (val) P1OUT |= BIT5; else P1OUT &= ~BIT5;
 #define GPIO_pulse(port, pin) do { GPIO_setOutputHighOnPin(port, pin); GPIO_setOutputLowOnPin(port, pin); } while (0)
 
 // The delay function, which we don't really want to use much, please.
@@ -78,6 +82,7 @@ void delay(unsigned int);
 uint8_t paired_badge(uint8_t);
 void set_badge_paired(uint8_t);
 uint8_t have_trick(uint8_t);
+void set_event_occurred(uint8_t id);
 
 // For setting up our time-based loop:
 // 128 Hz / 4 = 32 Hz
