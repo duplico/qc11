@@ -13,9 +13,10 @@
 #include "anim.h"
 #include "main.h"
 
-qcxiconf my_conf;
 #pragma DATA_SECTION (my_conf, ".infoA");
+#pragma DATA_SECTION (backup_conf, ".infoB");
 
+qcxiconf my_conf;
 qcxiconf backup_conf = {
 		{0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff},
 		{0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff},
@@ -27,7 +28,6 @@ qcxiconf backup_conf = {
 		"",
 		0x13AC
 };
-#pragma DATA_SECTION (backup_conf, ".infoB");
 
 
 // Interrupt flags to signal the main thread:
