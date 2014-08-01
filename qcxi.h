@@ -157,7 +157,7 @@ typedef struct {
 	uint8_t message[17];
 	uint16_t crc;
 } qcxiconf;
-extern qcxiconf my_conf;
+extern const qcxiconf my_conf;
 
 extern volatile Calendar currentTime;
 
