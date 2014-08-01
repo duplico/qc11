@@ -1,0 +1,1 @@
+const spriteframe anim_sprite_bus_parked[] = {{0b00001100, 0b01101101, 0b01010011, 0b01011111, 0b01111111, 128},};
