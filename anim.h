@@ -18,4 +18,9 @@ extern spriteframe * gaydar[];
 extern fullframe *prop_effects[];
 extern fullframe *prop_uses[];
 
+extern spriteframe * prop_uses_sprites[];
+extern spriteframe * prop_effects_sprites[];
+
+extern fullframe * prop_11[];
+
 #endif /* ANIM_H_ */

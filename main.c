@@ -737,7 +737,12 @@ int main( void )
 					out_payload.prop_from = 0xff;
 					out_payload.prop_time_loops_before_start = 0;
 					led_display_left &= ~BIT0;
-					full_animate(prop_uses[s_prop_id], 4);
+					if (s_prop_id >= 3) { // TODO
+						left_sprite_animate(prop_uses_sprites[s_prop_id-3], 4);
+						full_animate(prop_11[s_prop_id], 4);
+					} else {
+						full_animate(prop_uses[s_prop_id], 4);
+					}
 				} else if (s_propped && !s_prop_cycles) {
 					// TODO: do a prop effect.
 					am_idle = 0;
@@ -745,7 +750,13 @@ int main( void )
 					out_payload.prop_from = 0xff;
 					out_payload.prop_time_loops_before_start = 0;
 					led_display_left &= ~BIT0;
-					full_animate(prop_effects[s_prop_id], 4);
+					if (s_prop_id >= 3) { // TODO
+						left_sprite_animate(prop_uses_sprites[s_prop_id-3], 4);
+						left_sprite_animate(prop_effects_sprites[s_prop_id-3], 4);
+						full_animate(prop_11[s_prop_id], 4);
+					} else {
+						full_animate(prop_effects[s_prop_id], 4);
+					}
 				} else if (f_paired) { // TODO: This might should be pre-emptive?
 					f_paired = 0;
 					s_prop = 0;
