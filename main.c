@@ -22,8 +22,8 @@ const qcxiconf backup_conf = {
 		{0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff},
 		{0xffff, 0xffff, 0xffff, 0xffff},
 		0xff, 0xff,
-		101,
 		{0, 0, 0, 4, 7, 8, 2014},
+		101,
 		"",
 		"",
 		0x13AC
@@ -118,17 +118,6 @@ uint8_t s_prop_id = 0,
 
 uint8_t itps_pattern = 0;
 
-// NB: flash must be open for writing at this time.
-void flash_crc_infoa() {
-	uint8_t crc = 0;
-	CRC_setSeed(CRC_BASE, 0xBEEF);
-	for (uint8_t i=0; i<sizeof(qcxiconf) - 2; i++) {
-		CRC_set8BitData(CRC_BASE, ((uint8_t *) &my_conf)[i]);
-	}
-	crc = CRC_getResult(CRC_BASE); // TODO...
-	FLASH_write16(&crc, &my_conf.crc, 1);
-}
-
 // Scores:
 uint8_t my_score = 0;
 
@@ -158,9 +147,8 @@ void set_score(uint8_t id) {
 	if (!(~(my_conf.scores[score_frame]) & score_bit)) {
 		// haven't seen it, so we need to set its 1 to a 0.
 		uint16_t new_config_word = my_conf.scores[score_frame] & ~(score_bit);
-		FLASH_unlockInfoA();// TODO
+		FLASH_unlockInfoA();
 		FLASH_write16(&new_config_word, &(my_conf.scores[score_frame]), 1);
-		flash_crc_infoa();
 		FLASH_lockInfoA();
 		s_new_score = 1;
 	}
@@ -201,26 +189,23 @@ void set_badge_seen(uint8_t id) {
 	if (!(~(my_conf.met_ids[badge_frame]) & badge_bit)) {
 		// haven't seen it, so we need to set its 1 to a 0.
 		uint16_t new_config_word = my_conf.met_ids[badge_frame] & ~(badge_bit);
-		FLASH_unlockInfoA();// TODO
+		FLASH_unlockInfoA();
 		FLASH_write16(&new_config_word, &(my_conf.met_ids[badge_frame]), 1);
-		flash_crc_infoa();
 		FLASH_lockInfoA();
 	} // otherwise, nothing to do.
 }
 
 void set_event_attended(uint8_t id) {
 	uint8_t new_event_attended = my_conf.events_attended & ~(1 << id);
-	FLASH_unlockInfoA();// TODO
+	FLASH_unlockInfoA();
 	FLASH_write8(&new_event_attended, &my_conf.events_attended, 1);
-	flash_crc_infoa();
 	FLASH_lockInfoA();
 }
 
 void set_event_occurred(uint8_t id) {
 	uint8_t new_event_occurred = my_conf.events_occurred & ~(1 << id);
-	FLASH_unlockInfoA();// TODO
+	FLASH_unlockInfoA();
 	FLASH_write8(&new_event_occurred, &my_conf.events_occurred, 1);
-	flash_crc_infoa();
 	FLASH_lockInfoA();
 }
 
@@ -242,9 +227,8 @@ void set_badge_paired(uint8_t id) {
 		f_paired_new_person = 1;
 		// haven't seen it, so we need to set its 1 to a 0.
 		uint16_t new_config_word = my_conf.paired_ids[badge_frame] & ~(badge_bit);
-		FLASH_unlockInfoA();// TODO
+		FLASH_unlockInfoA();
 		FLASH_write16(&new_config_word, &(my_conf.paired_ids[badge_frame]), 1);
-		flash_crc_infoa();
 		FLASH_lockInfoA();
 
 		if (!have_trick(id % TRICK_COUNT)) {
@@ -977,23 +961,28 @@ uint8_t post() {
 	return post_result;
 }
 
+uint16_t config_crc(qcxiconf conf) {
+	CRC_setSeed(CRC_BASE, 0xBEEF);
+	CRC_set8BitData(CRC_BASE, conf.badge_id);
+	for (uint8_t i=0; i<sizeof(conf.handle); i++) {
+		CRC_set8BitData(CRC_BASE, conf.handle[i]);
+	}
+
+	for (uint8_t i=0; i<sizeof(conf.message); i++) {
+		CRC_set8BitData(CRC_BASE, conf.message[i]);
+	}
+	return CRC_getResult(CRC_BASE);
+}
+
 void check_config() {
 	WDT_A_hold(WDT_A_BASE);
 
-	uint16_t crc = 0;
-	uint8_t* config_bytes = (uint8_t *) &my_conf;
-
-	CRC_setSeed(CRC_BASE, 0xBEEF);
-	for (uint8_t i=0; i<sizeof(qcxiconf) - 2; i++) {
-		CRC_set8BitData(CRC_BASE, config_bytes[i]);
-	}
-	crc = CRC_getResult(CRC_BASE);
+	uint16_t crc = config_crc(my_conf);
 
 	if (crc != my_conf.crc) {
 		// this means we need to load the backup conf:
 		// we ignore the CRC of the backup conf.
-		qcxiconf new_conf = backup_conf;
-		uint8_t* new_config_bytes = (uint8_t *) &new_conf;
+		uint8_t* new_config_bytes = (uint8_t *) &backup_conf;
 
 		// TODO: just need to look and see what this is:
 		FLASH_unlockInfoA();
@@ -1005,7 +994,8 @@ void check_config() {
 
 		FLASH_write8(new_config_bytes, (uint8_t *)INFOA_START, sizeof(qcxiconf) - sizeof my_conf.crc);
 
-		flash_crc_infoa();
+		crc = config_crc(backup_conf);
+		FLASH_write16(&crc, &my_conf.crc, 1);
 
 		FLASH_lockInfoA();
 	}

@@ -151,8 +151,8 @@ typedef struct {
 	uint16_t scores[4];
 	uint8_t events_occurred;
 	uint8_t events_attended;
-	uint8_t badge_id;
 	Calendar datetime;
+	uint8_t badge_id;
 	uint8_t handle[11];
 	uint8_t message[17];
 	uint16_t crc;
