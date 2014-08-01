@@ -485,7 +485,7 @@ int main( void )
 			if (f_alarm & ALARM_STOP_LIGHT) {
 				// TODO: Set event occurred
 				light_blink = 0;
-				s_update_rainbow;
+				s_update_rainbow = 1;
 			}
 			if (f_alarm & ALARM_DISP_MSG) {
 				s_event_alert = 1;
