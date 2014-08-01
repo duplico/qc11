@@ -177,9 +177,13 @@ void init_radio() {
 	write_single_register(0x3b, RFM_AUTOMODE_RX);
 	volatile uint8_t ret = 0;
 
-	GPIO_enableInterrupt(GPIO_PORT_P2, GPIO_PIN0);
-	GPIO_interruptEdgeSelect(GPIO_PORT_P2, GPIO_PIN0, GPIO_LOW_TO_HIGH_TRANSITION);
-	GPIO_clearInterruptFlag(GPIO_PORT_P2, GPIO_PIN0);
+//	GPIO_enableInterrupt(GPIO_PORT_P2, GPIO_PIN0);
+	P2IE |= GPIO_PIN0;
+//	GPIO_interruptEdgeSelect(GPIO_PORT_P2, GPIO_PIN0, GPIO_LOW_TO_HIGH_TRANSITION);
+	P2IES &= ~GPIO_PIN0;
+//	GPIO_clearInterruptFlag(GPIO_PORT_P2, GPIO_PIN0);
+	P2IFG &= ~GPIO_PIN0;
+
 	ret = read_single_register_sync(0x01);
 
 }
@@ -499,5 +503,6 @@ __interrupt void radio_interrupt_0(void) {
 	} else { // rx
 		radio_recv_start();
 	}
-	GPIO_clearInterruptFlag(GPIO_PORT_P2, GPIO_PIN0); // TODO?
+//	GPIO_clearInterruptFlag(GPIO_PORT_P2, GPIO_PIN0); // TODO?
+	P2IFG &= ~GPIO_PIN0; // Is this needed?
 }
