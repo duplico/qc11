@@ -225,8 +225,8 @@ void draw_text() {
 
 // NB: Don't call this function when we're in text mode. TODO.
 void animation_timestep() {
-	// Return if we're not animating or if we have to skip a frame:
-	if ((led_display_left & DISPLAY_ANIMATE) && !(led_display_right & DISPLAY_ANIMATE) && led_display_left_sprite == anim_sprite_wave) { // TODO: Make sure the last frame is OK...
+	// If we're waving, procedurally control the waving/jumping of the little Pats:
+	if ((led_display_left & DISPLAY_ANIMATE) && !(led_display_right & DISPLAY_ANIMATE) && led_display_left_sprite == anim_sprite_wave) {
 		switch(gaydar_index) {
 		case 1:
 			if (led_display_left_frame % 2) {
@@ -264,12 +264,14 @@ void animation_timestep() {
 
 	}
 
+	// Return if we're not animating or if we have to skip a frame:
 	if (!((led_display_left | led_display_right | led_display_full) & DISPLAY_ANIMATE)) {
 		return;
 	} else if (led_display_anim_skip_index) {
 		led_display_anim_skip_index--; // If we're not animating, this is DONTCARE because it's set when animations start.
 		return;
 	}
+
 	led_display_anim_skip_index = led_display_anim_skip;
 	// end animation if done:
 	if (led_display_full & DISPLAY_ANIMATE) {

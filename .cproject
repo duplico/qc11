@@ -24,8 +24,8 @@
 								<listOptionValue builtIn="false" value="LINKER_COMMAND_FILE=lnk_msp430f5308.cmd"/>
 								<listOptionValue builtIn="false" value="RUNTIME_SUPPORT_LIBRARY=libc.a"/>
 								<listOptionValue builtIn="false" value="OUTPUT_TYPE=executable"/>
-								<listOptionValue builtIn="false" value="ADDITIONAL_FLAGS__LINKER=--cinit_compression"/>
-								<listOptionValue builtIn="false" value="ADDITIONAL_FLAGS__COMPILER=--cinit_compression"/>
+								<listOptionValue builtIn="false" value="ADDITIONAL_FLAGS__LINKER=--cinit_compression=lzss"/>
+								<listOptionValue builtIn="false" value="ADDITIONAL_FLAGS__COMPILER="/>
 							</option>
 							<option id="com.ti.ccstudio.buildDefinitions.core.OPT_CODEGEN_VERSION.1630575696" name="Compiler version" superClass="com.ti.ccstudio.buildDefinitions.core.OPT_CODEGEN_VERSION" value="4.3.1" valueType="string"/>
 							<targetPlatform id="com.ti.ccstudio.buildDefinitions.MSP430_4.3.exe.targetPlatformDebug.1584218263" name="Platform" superClass="com.ti.ccstudio.buildDefinitions.MSP430_4.3.exe.targetPlatformDebug"/>
