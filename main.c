@@ -161,7 +161,7 @@ void set_badge_paired(uint8_t id) {
 
 	} // otherwise, nothing to do.
 	f_paired = 1;
-	ir_pair_setstate(ir_proto_state+1);
+	ir_pair_setstate(IR_PROTO_PAIRED);
 }
 
 uint8_t have_trick(uint8_t trick_id) {
@@ -636,9 +636,9 @@ int main( void )
 			// (ITPS_TO_PAIR-ITPS_TO_SHOW_PAIRING) / 5: ITPS per light
 			// i < (ir_proto_seqnum-ITPS_TO_SHOW_PAIRING) / ((ITPS_TO_PAIR-ITPS_TO_SHOW_PAIRING) / 5)
 
-			if (ir_proto_state == IR_PROTO_ITP_C || ir_proto_state == IR_PROTO_ITP_S) {
+			if (ir_proto_state == IR_PROTO_ITP) {
 				itps_pattern = 0;
-				for (uint8_t i=0; i< (ir_proto_seqnum-ITPS_TO_SHOW_PAIRING) / ((ITPS_TO_PAIR - ITPS_TO_SHOW_PAIRING) / 5); i++) {
+				for (uint8_t i=0; i <= (ir_proto_seqnum - ITPS_TO_SHOW_PAIRING) / ((ITPS_TO_PAIR - ITPS_TO_SHOW_PAIRING) / 5); i++) {
 					itps_pattern |= (1 << i);
 				}
 				s_update_rainbow = 1;
@@ -697,7 +697,6 @@ int main( void )
 			out_payload.beacon = 1;
 			if (!clock_is_set)
 				out_payload.clock_authority = 0xff;
-
 			radio_send_sync();
 			s_need_rf_beacon = 0;
 		} else if (s_rf_retransmit && rfm_reg_state == RFM_REG_IDLE) {
@@ -705,7 +704,6 @@ int main( void )
 
 			if (!clock_is_set)
 				out_payload.clock_authority = 0xff;
-
 			radio_send_sync();
 			s_rf_retransmit = 0;
 		}
@@ -721,23 +719,6 @@ int main( void )
 		}
 
 #if BADGE_TARGET
-		// Background:
-		if (s_update_rainbow) {
-			s_update_rainbow = 0;
-			rainbow_lights &= 0b1111111111100000;
-			if (itps_pattern) {
-				rainbow_lights |= itps_pattern;
-			} else {
-				rainbow_lights |= (my_score & 0b11111);
-			}
-
-			if (!light_blink) {
-				// set according to events attended...
-				rainbow_lights |= (((uint16_t) ~my_conf.events_attended & 0b00011111) & ~light_blink) << 5;
-			}
-
-			led_set_rainbow(rainbow_lights);
-		}
 
 		// Pre-emptive:
 		if (s_event_alert) {
@@ -774,6 +755,7 @@ int main( void )
 					out_payload.prop_time_loops_before_start = 0;
 					pair_state = PAIR_INIT;
 					itps_pattern = 0;
+					s_update_rainbow = 1;
 					badge_status = BSTAT_PAIR;
 					am_idle = 0;
 					gaydar_index = 0;
@@ -804,6 +786,7 @@ int main( void )
 					badge_status = BSTAT_GAYDAR;
 					am_idle = 0;
 					right_sprite_animate(anim_sprite_walkin, 2, 1, -1, 0);
+					left_sprite_animate(anim_sprite_wave, 2);
 					break;
 				}
 				switch(pair_state) {
@@ -858,6 +841,24 @@ int main( void )
 				s_trick = 0; // this needs to be after the above statement. Duh.
 			}
 
+		}
+
+		// Background:
+		if (s_update_rainbow) {
+			s_update_rainbow = 0;
+			rainbow_lights &= 0b1111111111100000;
+			if (itps_pattern) {
+				rainbow_lights |= itps_pattern;
+			} else {
+				rainbow_lights |= (my_score & 0b11111);
+			}
+
+			if (!light_blink) {
+				// set according to events attended...
+				rainbow_lights |= (((uint16_t) ~my_conf.events_attended & 0b00011111) & ~light_blink) << 5;
+			}
+
+			led_set_rainbow(rainbow_lights);
 		}
 #endif
 

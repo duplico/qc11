@@ -30,17 +30,7 @@ extern char ir_rx_message[17];
 
 #define IR_PROTO_LISTEN 	0x0
 #define IR_PROTO_ITP		0x01
-#define IR_PROTO_PAIRING	0x02
-#define IR_PROTO_PAIRED		0x03
-
-#define IR_PROTO_HELLO_C 	0x11
-#define IR_PROTO_ITP_C 		0x12
-#define IR_PROTO_PAIRING_C 	0x13
-#define IR_PROTO_PAIRED_C 	0x14
-#define IR_PROTO_HELLO_S 	0x21
-#define IR_PROTO_ITP_S 		0x22
-#define IR_PROTO_PAIRING_S 	0x23
-#define IR_PROTO_PAIRED_S 	0x24
+#define IR_PROTO_PAIRED		0x02
 
 #define IR_OP_BEACON 	 100
 #define IR_OP_HELLO 	 101

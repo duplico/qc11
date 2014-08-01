@@ -245,15 +245,17 @@ uint8_t ir_partner = 0;
 uint8_t ir_proto_seqnum = 0;
 
 inline uint8_t ir_paired() {
-	return (ir_proto_state & 0b1111) == 4;
+//	return (ir_proto_state & 0b1111) == 4;
+	return ir_proto_state == IR_PROTO_PAIRED;
 }
 
 void ir_pair_setstate(uint8_t state) {
 	ir_proto_tto = IR_PROTO_TTO;
-	ir_proto_state = state;
-	if (state == IR_PROTO_LISTEN) {
+	if (state == IR_PROTO_LISTEN && ir_proto_state == IR_PROTO_ITP) {
+		f_ir_pair_abort = 1;
 		ir_proto_seqnum = 0;
 	}
+	ir_proto_state = state;
 }
 
 #define IR_ASSERT_PARTNER if (ir_partner != ir_rx_from) { ir_pair_setstate(IR_PROTO_LISTEN); break; }
@@ -330,7 +332,6 @@ void ir_process_rx_ready() {
 			} else if (ir_proto_seqnum == ITPS_TO_PAIR) { // client is implicit here:
 				// this means we can pair:
 				ir_proto_setup(ir_partner, IR_OP_KEEPALIVE, 0);
-				ir_pair_setstate(IR_PROTO_PAIRED);
 				set_badge_paired(ir_partner);
 			}
 			break;
@@ -342,7 +343,6 @@ void ir_process_rx_ready() {
 		break;
 
 	case IR_OP_KEEPALIVE:
-		// TODO: also handle this if state = ITP for server:
 		if (ir_pair_role == IR_ROLE_S && ir_rx_from == ir_partner) {
 			switch(ir_proto_state) {
 			case IR_PROTO_ITP:

@@ -141,7 +141,7 @@ extern volatile uint8_t loops_to_ir_timestep;
 #define IR_PROTO_TTO IR_LOOPS * IR_SECONDS_TO_TIMEOUT
 
 #define SECONDS_TO_PAIR 5
-#define ITPS_TO_PAIR IR_LOOPS_PER_SEC * SECONDS_TO_PAIR
+#define ITPS_TO_PAIR IR_LOOPS_PER_SEC * SECONDS_TO_PAIR / 2
 #define ITPS_TO_SHOW_PAIRING ITPS_TO_PAIR / 2
 
 // Persistent configuration:
