@@ -181,13 +181,14 @@ extern uint8_t f_ir_itp_step;
 extern uint8_t f_ir_pair_abort;
 
 typedef struct {
-	uint8_t to_addr, from_addr, base_id, puppy_flags, clock_authority;
+	uint8_t to_addr, from_addr, base_id, clock_authority;
+	uint8_t prop_from;
 	Calendar time;
 	uint8_t prop_id;
 	uint16_t prop_time_loops_before_start;
-	uint8_t prop_from;
 	uint8_t beacon;
 } qcxipayload;
+
 extern qcxipayload in_payload, out_payload;
 
 // Extra features for the Launchpad version - serial and LED chains:

@@ -13,8 +13,22 @@
 #include "anim.h"
 #include "main.h"
 
-#pragma DATA_SECTION (my_conf, ".infoA");
 qcxiconf my_conf;
+#pragma DATA_SECTION (my_conf, ".infoA");
+
+qcxiconf backup_conf = {
+		{0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff},
+		{0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff},
+		{0xffff, 0xffff, 0xffff, 0xffff},
+		0xff, 0xff,
+		101,
+		{0, 0, 0, 4, 7, 8, 2014},
+		"",
+		"",
+		0x13AC
+};
+#pragma DATA_SECTION (backup_conf, ".infoB");
+
 
 // Interrupt flags to signal the main thread:
 volatile uint8_t f_rfm_rx_done = 0;
@@ -40,7 +54,11 @@ char pairing_message[20] = "";
 uint8_t my_trick = 0;
 uint16_t known_tricks = 0;
 uint8_t known_trick_count = 0;
-qcxipayload in_payload, out_payload;
+qcxipayload in_payload;
+
+qcxipayload out_payload = {
+		RFM_BROADCAST, 0xff, 0xff, 0xff, 0xff, 0};
+
 uint16_t rainbow_lights = 0;
 uint8_t light_blink = 0;
 
@@ -343,7 +361,6 @@ int main( void )
 			s_new_trick = 0,
 			s_new_score = 0,
 			s_new_prop = 0,
-			s_unpair = 0, // f_unpair
 			s_trick = 0,
 			s_prop = 0,
 			s_get_puppy = 0,
@@ -412,13 +429,11 @@ int main( void )
 					(!clock_is_set ||
 							in_payload.clock_authority < my_clock_authority)) {
 				am_idle = 0;
-				led_print_scroll("clock", 1);
+				led_print_scroll("clock", 1); // TODO
 				update_clock();
 			}
 
-			if (in_payload.puppy_flags) {
-				// Puppy-related
-			} else if (in_payload.base_id == BUS_BASE_ID) {
+			if (in_payload.base_id == BUS_BASE_ID) {
 				s_on_bus = RECEIVE_WINDOW;
 				// Bus
 				// TODO: can set s_on_bus
@@ -439,8 +454,6 @@ int main( void )
 				// If we're paired, and this is from the person
 				// we're paired with, it's the most authoritative prop possible.
 				uint8_t prop_authority = in_payload.prop_from;
-				if (badge_status == BSTAT_PAIR && in_payload.prop_from == ir_partner)
-					prop_authority = 0;
 				if (((!s_propped && !s_prop) || prop_authority < s_prop_authority) && in_payload.prop_time_loops_before_start) {
 					s_propped = 1;
 					s_prop = 0;
@@ -737,12 +750,7 @@ int main( void )
 					out_payload.prop_from = 0xff;
 					out_payload.prop_time_loops_before_start = 0;
 					led_display_left &= ~BIT0;
-					if (s_prop_id >= 3) { // TODO
-						left_sprite_animate(prop_uses_sprites[s_prop_id-3], 4);
-						full_animate(prop_11[s_prop_id], 4);
-					} else {
-						full_animate(prop_uses[s_prop_id], 4);
-					}
+					full_animate(prop_uses[s_prop_id], 4);
 				} else if (s_propped && !s_prop_cycles) {
 					// TODO: do a prop effect.
 					am_idle = 0;
@@ -750,13 +758,7 @@ int main( void )
 					out_payload.prop_from = 0xff;
 					out_payload.prop_time_loops_before_start = 0;
 					led_display_left &= ~BIT0;
-					if (s_prop_id >= 3) { // TODO
-						left_sprite_animate(prop_uses_sprites[s_prop_id-3], 4);
-						left_sprite_animate(prop_effects_sprites[s_prop_id-3], 4);
-						full_animate(prop_11[s_prop_id], 4);
-					} else {
-						full_animate(prop_effects[s_prop_id], 4);
-					}
+					full_animate(prop_effects[s_prop_id], 4);
 				} else if (f_paired) { // TODO: This might should be pre-emptive?
 					f_paired = 0;
 					s_prop = 0;
@@ -851,7 +853,6 @@ int main( void )
 				left_sprite_animate((spriteframe *)tricks[s_trick-1], 4);
 				s_trick = 0; // this needs to be after the above statement. Duh.
 			}
-
 		}
 
 		// Background:
@@ -941,35 +942,23 @@ void check_config() {
 	uint8_t* config_bytes = (uint8_t *) &my_conf;
 
 	CRC_setSeed(CRC_BASE, 0xBEEF);
-
 	for (uint8_t i=0; i<sizeof(qcxiconf) - 2; i++) {
 		CRC_set8BitData(CRC_BASE, config_bytes[i]);
 	}
-
 	crc = CRC_getResult(CRC_BASE);
 
-	if (crc != my_conf.crc || 1) { // TODO!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		qcxiconf new_conf;
+	if (crc != my_conf.crc) {
+		// this means we need to load the backup conf:
+		// we ignore the CRC of the backup conf.
+		qcxiconf new_conf = backup_conf;
 		uint8_t* new_config_bytes = (uint8_t *) &new_conf;
-		for (uint8_t i=0; i<50; i++) {
-			new_config_bytes[i] = 0xff;
-			// paired_ids, seen_ids, scores, events occurred and attended.
-		}
-		// TODO: set self to seen/paired, I guess.
-		new_conf.badge_id = 97;
-		// new_conf.datetime is a DONTCARE because the clock's damn well not
-		// going to be set anyway, and we have no idea what time it is,
-		// and this section should (c) never be reached.
-		strcpy((char *) new_conf.handle, "person");
-		strcpy((char *) new_conf.message, "Hi new person.");
 
+		// TODO: just need to look and see what this is:
 		CRC_setSeed(CRC_BASE, 0xBEEF);
-
 		for (uint8_t i=0; i<sizeof(qcxiconf) - 2; i++) {
 			CRC_set8BitData(CRC_BASE, new_config_bytes[i]);
 		}
-
-		new_conf.crc = CRC_getResult(CRC_BASE);
+		crc = CRC_getResult(CRC_BASE); // TODO...
 
 		FLASH_unlockInfoA();
 		uint8_t flash_status = 0;
@@ -978,7 +967,8 @@ void check_config() {
 			flash_status = FLASH_eraseCheck((uint8_t *)INFOA_START, 128);
 		} while (flash_status == STATUS_FAIL);
 
-		FLASH_write8(new_config_bytes, (uint8_t *)INFOA_START, sizeof(qcxiconf));
+		FLASH_write8(new_config_bytes, (uint8_t *)INFOA_START, sizeof(qcxiconf) - sizeof my_conf.crc);
+		FLASH_write16(&crc, &my_conf.crc, 1);
 		FLASH_lockInfoA();
 	}
 
@@ -998,23 +988,10 @@ void check_config() {
 		}
 	}
 
-	// Time:
-	memcpy(&currentTime, &my_conf.datetime, sizeof (Calendar));
-
 	// Setup our IR pairing payload:
 	strcpy(&(ir_pair_payload[0]), my_conf.handle);
 	strcpy(&(ir_pair_payload[11]), my_conf.message);
-
-	out_payload.to_addr = RFM_BROADCAST;
 	out_payload.from_addr = my_conf.badge_id;
-	out_payload.base_id = 0xFF; // TODO: unless I'm a base
-	out_payload.puppy_flags = 0;
-	out_payload.clock_authority = 0xFF; // UNSET
-//	memcpy(&out_payload.time, &currentTime, sizeof out_payload.time); // I think I don't care about this.
-	out_payload.prop_id = 0;
-	out_payload.prop_time_loops_before_start = 0;
-	out_payload.prop_from = 0xFF;
-	out_payload.beacon = 0;
 
 	// TODO: the opposite of WDT_A_hold(WDT_A_BASE);
 	// probably.
