@@ -223,7 +223,7 @@ void draw_text() {
 	}
 }
 
-// NB: Don't call this function when we're in text mode. TODO.
+// NB: Don't call this function when we're in text mode.
 void animation_timestep() {
 	// If we're waving, procedurally control the waving/jumping of the little Pats:
 	if ((led_display_left & DISPLAY_ANIMATE) && !(led_display_right & DISPLAY_ANIMATE) && led_display_left_sprite == anim_sprite_wave) {
@@ -315,7 +315,7 @@ void animation_timestep() {
 	}
 
 	if (!((led_display_right | led_display_left | led_display_full | led_display_text) & DISPLAY_ANIMATE))
-		f_animation_done = 1;
+		f_animation_done = 1; // TODO: we want to set am_idle any time the LEFT ANIMATION IS DONE.
 }
 
 void text_timestep() {

@@ -54,6 +54,7 @@ char pairing_message[20] = "";
 uint8_t my_trick = 0;
 uint16_t known_tricks = 0;
 uint8_t known_trick_count = 0;
+uint8_t known_props = 0;
 qcxipayload in_payload;
 
 qcxipayload out_payload = {
@@ -78,20 +79,93 @@ uint8_t pair_state = 0;
 // Gaydar:
 uint8_t window_position = 0; // Currently only used for restarting radio & skipping windows.
 uint8_t neighbor_count = 0;
-uint8_t neighbor_count_curr = 0;
 uint8_t window_seconds = RECEIVE_WINDOW_LENGTH_SECONDS;
 uint8_t trick_seconds = TRICK_INTERVAL_SECONDS;
 uint8_t target_gaydar_index = 0;
 uint8_t gaydar_index = 0;
 uint8_t neighbor_badges[BADGES_IN_SYSTEM] = {0};
 
-uint8_t my_score = 0;
-
 #if !BADGE_TARGET
 volatile uint8_t f_ser_rx = 0;
 #endif
 
 char time[6] = "00:00";
+
+// Main thread signals:
+
+uint16_t s_prop_cycles = 0,
+		 s_prop_animation_length = 0;
+
+uint8_t s_prop_id = 0,
+		s_prop_authority = 0,
+		s_propped = 0,
+		s_event_arrival = 0,
+		s_on_bus = 0,
+		s_off_bus = 0,
+		s_event_alert = 0,
+		s_need_rf_beacon = 0,
+		s_rf_retransmit = 0,
+		s_pair = 0, // f_pair
+		s_new_pair = 0,
+		s_new_trick = 0,
+		s_new_score = 0,
+		s_new_prop = 0,
+		s_trick = 0,
+		s_prop = 0,
+		s_get_puppy = 0,
+		s_lose_puppy = 0,
+		s_update_rainbow = 0;
+
+uint8_t itps_pattern = 0;
+
+// NB: flash must be open for writing at this time.
+void flash_crc_infoa() {
+	uint8_t crc = 0;
+	CRC_setSeed(CRC_BASE, 0xBEEF);
+	for (uint8_t i=0; i<sizeof(qcxiconf) - 2; i++) {
+		CRC_set8BitData(CRC_BASE, ((uint8_t *) &my_conf)[i]);
+	}
+	crc = CRC_getResult(CRC_BASE); // TODO...
+	FLASH_write16(&crc, &my_conf.crc, 1);
+}
+
+// Scores:
+uint8_t my_score = 0;
+
+void set_my_score_from_config() {
+	my_score = 0;
+	// Count the bits set in score:
+	uint16_t v = 0;
+	for (uint8_t i=0; i<4; i++) {
+		v = ~my_conf.scores[i];
+		for (;v;my_score++) {
+			v &= v - 1;
+		}
+	}
+
+	known_props = 0;
+	known_props += (my_score>=3);
+	known_props += (my_score>=6);
+	known_props += (my_score>=11);
+	known_props += (my_score>=17);
+	known_props += (my_score>=24);
+	known_props += (my_score>=31);
+}
+
+void set_score(uint8_t id) {
+	uint8_t score_frame = id / 16;
+	uint8_t score_bit = 1 << (id % 16);
+	if (!(~(my_conf.scores[score_frame]) & score_bit)) {
+		// haven't seen it, so we need to set its 1 to a 0.
+		uint16_t new_config_word = my_conf.scores[score_frame] & ~(score_bit);
+		FLASH_unlockInfoA();// TODO
+		FLASH_write16(&new_config_word, &(my_conf.scores[score_frame]), 1);
+		flash_crc_infoa();
+		FLASH_lockInfoA();
+		s_new_score = 1;
+	}
+	set_my_score_from_config();
+}
 
 void init_power() {
 #if BADGE_TARGET
@@ -129,6 +203,7 @@ void set_badge_seen(uint8_t id) {
 		uint16_t new_config_word = my_conf.met_ids[badge_frame] & ~(badge_bit);
 		FLASH_unlockInfoA();// TODO
 		FLASH_write16(&new_config_word, &(my_conf.met_ids[badge_frame]), 1);
+		flash_crc_infoa();
 		FLASH_lockInfoA();
 	} // otherwise, nothing to do.
 }
@@ -137,6 +212,7 @@ void set_event_attended(uint8_t id) {
 	uint8_t new_event_attended = my_conf.events_attended & ~(1 << id);
 	FLASH_unlockInfoA();// TODO
 	FLASH_write8(&new_event_attended, &my_conf.events_attended, 1);
+	flash_crc_infoa();
 	FLASH_lockInfoA();
 }
 
@@ -144,6 +220,7 @@ void set_event_occurred(uint8_t id) {
 	uint8_t new_event_occurred = my_conf.events_occurred & ~(1 << id);
 	FLASH_unlockInfoA();// TODO
 	FLASH_write8(&new_event_occurred, &my_conf.events_occurred, 1);
+	flash_crc_infoa();
 	FLASH_lockInfoA();
 }
 
@@ -167,6 +244,7 @@ void set_badge_paired(uint8_t id) {
 		uint16_t new_config_word = my_conf.paired_ids[badge_frame] & ~(badge_bit);
 		FLASH_unlockInfoA();// TODO
 		FLASH_write16(&new_config_word, &(my_conf.paired_ids[badge_frame]), 1);
+		flash_crc_infoa();
 		FLASH_lockInfoA();
 
 		if (!have_trick(id % TRICK_COUNT)) {
@@ -202,7 +280,7 @@ void set_gaydar_target() {
  * Here are the things that can be flagged:
  *
  * Time based:
- * * TODO: Event alert raised (interrupt flag)
+ * * Event alert raised (interrupt flag)
  * * DONE It's been long enough that we can do a trick (set flag from time loop)
  * ** TODO  (maybe the trick is a prop)
  * * DONE Time to beacon the radio (set flag from time loop)
@@ -210,12 +288,10 @@ void set_gaydar_target() {
  *
  * From the radio:
  * * DONE Receive a beacon (at some point, we need to decide if it means we:)
- * ** TODO adjust neighbor count
+ * ** adjust neighbor count
  * ** TODO are near a base station (arrive event)
  * ** DONE should schedule a prop
- * ** TODO get the puppy
  * ** DONE set our clock
- * ** TODO confirms we should give up the puppy
  *
  * From the IR
  * * TODO Docking with base station
@@ -344,32 +420,6 @@ int main( void )
 	delay(750);
 #endif
 
-	static uint8_t s_prop_id = 0,
-				   s_prop_authority = 0,
-				   s_propped = 0;
-	uint16_t s_prop_cycles;
-
-	// Signals within the main thread:
-	uint8_t s_event_arrival = 0,
-			s_on_bus = 0,
-			s_off_bus = 0,
-			s_event_alert = 0,
-			s_need_rf_beacon = 0,
-			s_rf_retransmit = 0,
-			s_pair = 0, // f_pair
-			s_new_pair = 0,
-			s_new_trick = 0,
-			s_new_score = 0,
-			s_new_prop = 0,
-			s_trick = 0,
-			s_prop = 0,
-			s_get_puppy = 0,
-			s_lose_puppy = 0,
-			s_update_rainbow = 0;
-
-	uint16_t s_prop_animation_length = 0;
-	uint8_t itps_pattern = 0;
-
 	// Main sequence:
 	while (1) {
 
@@ -440,7 +490,6 @@ int main( void )
 			}
 			else if (in_payload.base_id <= 7) {
 				// Base station, may need to check in.
-				// TODO: can set s_event_arrival
 				// base_id = event_id, should be 0..7
 				set_event_attended(in_payload.base_id);
 				s_event_arrival = BIT7 + in_payload.base_id;
@@ -543,19 +592,47 @@ int main( void )
 				if (rand() % 3) {
 					// wave
 					s_trick = TRICK_COUNT+1;
-				} else if (!s_prop && !s_propped && neighbor_count) { // && !(rand() % 4)) { // TODO
+				} else if (!s_prop && !s_propped && neighbor_count && known_props) { // && !(rand() % 4)) { // TODO
 					// prop
-					// TODO
+					// TODO:
 					s_prop = 1;
 					s_prop_authority = my_conf.badge_id;
-					s_prop_id = 0; // TODO: for now.
+
+					s_prop_id = rand() % known_props; // TODO: for now. later maybe have a prob. dist.
+
+					// We need to convert from generated-prop-id to actual-prop-id. This is because
+					//  some of them are full-width and some of them are sprites. Yay!
+					// We'll need to SEND the "effect" version of the id, and we'll keep the "use"
+					//  version for ourselves.
+
+					// Happily, for effects, 0 and 1 are sprites; and the rest are full, in order.
+					// So we can keep it the same, and we'll just subtract 2 at the other end if
+					// it's a full one.
+					out_payload.prop_id = s_prop_id;
+
+
+					// For ourselves, #0 can stay 0 (it's full[0])
+					// but #4 will need to become 1 (it's full[1]).
+					// therefore, #1 will be 2 (so we can just do full[#-2])
+					// #2 will be #4, #4 will be #4, and #5 will be #5
+					// Then 1 will need to be 2 (prop 1 is sprite).
+					if (s_prop_id == 4) {
+						s_prop_id = 1;
+					} else if (s_prop_id != 5 && s_prop_id > 0) {
+						s_prop_id+=1;
+					}
 					s_prop_animation_length = 0;
-					while(!(prop_uses[s_prop_id][s_prop_animation_length++].lastframe & BIT7));
-					s_prop_animation_length *= 4; // TODO: this should be configured...
-					// s_prop_cycles = SOME_DELAY + ANIM_LENGTH
+
+					if (s_prop_id < 2) { // 0, 4 are full:
+						while(!(prop_uses[s_prop_id][s_prop_animation_length++].lastframe & BIT7));
+					} else { // the rest are sprites:
+						while(!(prop_uses_sprites[s_prop_id-2][s_prop_animation_length++].lastframe & BIT7));
+					}
+
+					s_prop_animation_length *= 4; // TODO: this should be configured...?
+
 					s_prop_cycles = ANIM_DELAY + s_prop_animation_length;
 					out_payload.prop_from = my_conf.badge_id;
-					out_payload.prop_id = s_prop_id;
 					out_payload.prop_time_loops_before_start = s_prop_cycles;
 					s_rf_retransmit = 1;
 					// Then we're testing whether s_prop_cycles == s_prop_animation_length
@@ -598,14 +675,13 @@ int main( void )
 					}
 				}
 
-				// TODO: mess with s_on_bus and s_off_bus here.
 				window_position = (window_position + 1) % RECEIVE_WINDOW;
 				if (!window_position) {
 					skip_window = rand() % RECEIVE_WINDOW;
 				}
 				// If we're rolling over the window and have no neighbors,
-				// try a radio reboot, in case that can gin up some better
-				// performance for some reason.
+				// try a radio reboot, in case that can gin up some neighbors
+				// for some reason.
 				if (!window_position && neighbor_count == 0) {
 					init_radio();
 				}
@@ -613,20 +689,6 @@ int main( void )
 			}
 		}
 
-		/*
-		 * We just got a time loop interrupt, which happens roughly
-		 * TIME_LOOP_HZ times per second.
-		 *
-		 *  * Time loop based activities:
-		 * * It's been long enough that we can do a trick (set flag from time loop)
-		 * **  (maybe the trick is a prop)
-		 * * Draw a frame of an animation
-		 * * Time-step the IR
-		 *
-	     * s_trick = 0,
-		 * s_prop = 0;
-		 *
-		 */
 		if (f_time_loop) {
 			f_time_loop = 0;
 #if BADGE_TARGET
@@ -665,45 +727,6 @@ int main( void )
 				out_payload.prop_time_loops_before_start = s_prop_cycles;
 			}
 		}
-
-		/*
-		 * Animation related activities:
-		 *
-		 * * Set clock (pre-empts)
-		 * * Arrived at event (animation, don't wait for previous to finish)
-		 * * Event alert (animation, wait for idle)
-		 * * Pair begins (animation and behavior pre-empts, don't wait to finish)
-		 * * New pairing person (wait for idle)
-		 * * New trick learned (wait for idle)
-		 * * Score earned (wait for idle)
-		 * * Prop earned (wait for idle)
-		 * * Pair expires (wait for idle)
-		 * * Get/lose puppy (wait for idle)
-		 * * Get propped (from radio beacon)
-		 * * Do a trick or prop (idle only)
-		 */
-
-		// Time to handle signals.
-
-//		s_prop = 0,
-//		s_propped = 0;
-//		s_event_arrival = 0,
-//		s_on_bus = 0,
-//		s_off_bus = 0,
-//		s_event_alert = 0,
-//		s_need_rf_beacon = 0,
-//		s_rf_retransmit = 0,
-//		s_pair = 0, // f_pair
-//		s_new_pair = 0,
-//		s_new_trick = 0,
-//		s_new_score = 0,
-//		s_new_prop = 0,
-//		s_unpair = 0, // f_unpair
-//		s_trick = 0,
-//		s_prop_animation_length = 0,
-//		s_get_puppy = 0,
-//		s_lose_puppy = 0,
-//		s_update_rainbow = 0;
 
 		// This is background:
 		if (s_need_rf_beacon && rfm_reg_state == RFM_REG_IDLE  && !(read_single_register_sync(0x27) & (BIT1+BIT0))) {
@@ -744,21 +767,32 @@ int main( void )
 			switch(badge_status) {
 			case BSTAT_GAYDAR:
 				if (s_prop && s_prop_cycles <= s_prop_animation_length) {
-					// TODO: do a prop.
+					// Do a prop use:
 					am_idle = 0;
 					s_prop = 0;
 					out_payload.prop_from = 0xff;
 					out_payload.prop_time_loops_before_start = 0;
-					led_display_left &= ~BIT0;
-					full_animate(prop_uses[s_prop_id], 4);
+					 // 0,1 uses are full; the rest are sprites:
+					if (s_prop_id <= 1) {
+						led_display_left &= ~BIT0;
+						full_animate(prop_uses[s_prop_id], 4);
+					} else {
+						left_sprite_animate(prop_uses_sprites[s_prop_id-2], 4);
+					}
 				} else if (s_propped && !s_prop_cycles) {
-					// TODO: do a prop effect.
+					// Do a prop effect:
 					am_idle = 0;
 					s_propped = 0;
 					out_payload.prop_from = 0xff;
 					out_payload.prop_time_loops_before_start = 0;
-					led_display_left &= ~BIT0;
-					full_animate(prop_effects[s_prop_id], 4);
+
+					if (s_prop_id <= 1) { // 0, 1 are sprites:
+						left_sprite_animate(prop_effects_sprites[s_prop_id], 4);
+					} else { // the rest are full:
+						led_display_left &= ~BIT0;
+						full_animate(prop_effects[s_prop_id-2], 4);
+					}
+
 				} else if (f_paired) { // TODO: This might should be pre-emptive?
 					f_paired = 0;
 					s_prop = 0;
@@ -820,7 +854,6 @@ int main( void )
 				case PAIR_GREETING:
 					if (!ir_rx_message[0]) {
 						pair_state = PAIR_IDLE;
-						// TODO: send IR ready message?
 					} else {
 						am_idle = 0;
 						led_print_scroll(ir_rx_message, 2);
@@ -830,8 +863,31 @@ int main( void )
 					break;
 				case PAIR_MESSAGE:
 					pair_state = PAIR_IDLE;
-					// TODO: send IR ready message?
 					break;
+				}
+			} // end switch(badge_status)
+		}
+
+		// Any status, if we have no more idle-status-change processing to do:
+		if (am_idle) {
+			if (s_new_score) {
+				am_idle = 0;
+				led_print_scroll("Score!", 1); // TODO: if time, add custom messages.
+				s_new_score = 0;
+				s_update_rainbow = 1; // TODO: if time, count up from 0 to the new score.
+				// TODO: if time, make the full score person have an ongoing score animation.
+			}
+			if (s_trick) {
+				uint16_t trick_len = 0;
+				while (!(tricks[s_trick-1][trick_len++].lastframe & BIT7));
+				trick_len *= 4; // TODO.
+				if (!(s_propped || s_prop) ||
+						(s_propped && trick_len+1 < s_prop_cycles) ||
+						(trick_len+1 < s_prop_cycles - s_prop_animation_length))
+				{
+					am_idle = 0;
+					left_sprite_animate((spriteframe *)tricks[s_trick-1], 4);
+					s_trick = 0; // this needs to be after the above statement. Duh.
 				}
 			}
 		}
@@ -839,20 +895,6 @@ int main( void )
 		if(f_ir_pair_abort) {
 			f_ir_pair_abort = 0;
 			itps_pattern = 0;
-		}
-
-		if (am_idle && s_trick) {
-			uint16_t trick_len = 0;
-			while (!(tricks[s_trick-1][trick_len++].lastframe & BIT7));
-			trick_len *= 4; // TODO.
-			if (!(s_propped || s_prop) ||
-				(s_propped && trick_len < s_prop_cycles) ||
-				(trick_len < s_prop_cycles - s_prop_animation_length))
-			{
-				am_idle = 0;
-				left_sprite_animate((spriteframe *)tricks[s_trick-1], 4);
-				s_trick = 0; // this needs to be after the above statement. Duh.
-			}
 		}
 
 		// Background:
@@ -954,12 +996,6 @@ void check_config() {
 		uint8_t* new_config_bytes = (uint8_t *) &new_conf;
 
 		// TODO: just need to look and see what this is:
-		CRC_setSeed(CRC_BASE, 0xBEEF);
-		for (uint8_t i=0; i<sizeof(qcxiconf) - 2; i++) {
-			CRC_set8BitData(CRC_BASE, new_config_bytes[i]);
-		}
-		crc = CRC_getResult(CRC_BASE); // TODO...
-
 		FLASH_unlockInfoA();
 		uint8_t flash_status = 0;
 		do {
@@ -968,7 +1004,9 @@ void check_config() {
 		} while (flash_status == STATUS_FAIL);
 
 		FLASH_write8(new_config_bytes, (uint8_t *)INFOA_START, sizeof(qcxiconf) - sizeof my_conf.crc);
-		FLASH_write16(&crc, &my_conf.crc, 1);
+
+		flash_crc_infoa();
+
 		FLASH_lockInfoA();
 	}
 
@@ -987,6 +1025,8 @@ void check_config() {
 			}
 		}
 	}
+	set_my_score_from_config();
+	s_new_score = 0;
 
 	// Setup our IR pairing payload:
 	strcpy(&(ir_pair_payload[0]), my_conf.handle);
