@@ -12,6 +12,9 @@
 
 #pragma DATA_SECTION (anim_full_prop_wand_use, ".infoC");
 #pragma DATA_SECTION (anim_sprite_prop_dynamite_use, ".infoD");
+#pragma DATA_SECTION(prop_effects_sprites, ".infoC");
+#pragma DATA_SECTION(prop_uses_sprites, ".infoC");
+#pragma DATA_SECTION(prop_uses, ".infoC");
 
 // prop use:
 // 3:
@@ -70,6 +73,7 @@ spriteframe * gaydar[] = {
 		anim_sprite_crowd_2_to_3,
 		anim_sprite_crowd_3_to_4
 };
+
 spriteframe * tricks[] = {
 		anim_sprite_trick_armdance,
 		anim_sprite_trick_ballet,
@@ -87,22 +91,24 @@ spriteframe * tricks[] = {
 		anim_sprite_wave
 };
 
-fullframe * prop_uses[] = {
+const fullframe * prop_uses[] = {
 		anim_full_prop_ball_use, // #0
 		anim_full_prop_wand_use, // #4
 };
-spriteframe * prop_uses_sprites[] = {
+
+const spriteframe * prop_uses_sprites[] = {
 		anim_sprite_prop_stick_use, // #1
 		anim_sprite_prop_earthquake_use, // #2
 		anim_sprite_prop_sword_use, // #3
 		anim_sprite_prop_dynamite_use, // #5
 };
+
 fullframe * prop_effects[] = {
 		anim_full_prop_ball_effect, // #0
 		anim_full_prop_rain_effect, // #1
 };
 
-spriteframe * prop_effects_sprites[] = {
+const spriteframe * prop_effects_sprites[] = {
 		anim_sprite_prop_earthquake_effect, //#2
 		anim_sprite_prop_sword_effect, //#3
 		anim_sprite_prop_wand_effect, //#4

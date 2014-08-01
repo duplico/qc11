@@ -179,7 +179,7 @@ void init_clocks() {
 // light: yes/no
 
 
-#pragma DATA_SECTION (alarms, ".infoB");
+#pragma DATA_SECTION (alarms, ".infoD");
 /*
  * NB:
  *    The order of these items in this array MUST be chronological.
