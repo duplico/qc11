@@ -9,10 +9,10 @@
 #define ANIM_H_
 #include "leds.h"
 
-extern spriteframe anim_sprite_wave[];
-extern spriteframe anim_sprite_walkin[];
+extern const spriteframe anim_sprite_wave[];
+extern const spriteframe anim_sprite_walkin[];
 extern spriteframe * tricks[];
-extern spriteframe stand[];
+extern const spriteframe stand[];
 extern spriteframe * gaydar[];
 
 extern fullframe *prop_effects[];
