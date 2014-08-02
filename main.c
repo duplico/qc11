@@ -171,8 +171,8 @@ void set_score(uint8_t id) {
 		s_count_score_cycles = COUNT_SCORE_CYCLES;
 		shown_score = 0;
 		s_count_score = 1;
+		set_my_score_from_config();
 	}
-	set_my_score_from_config();
 }
 
 void init_power() {
@@ -583,7 +583,7 @@ int main( void )
 				}
 			}
 
-			if (my_score >= 32 || (!s_count_score && !(rand() % 60))) {
+			if (my_score >= 32 || (!s_count_score && !(rand() % 15))) {
 				s_count_score_cycles = COUNT_SCORE_CYCLES;
 				shown_score = 0;
 				s_count_score = 1;
@@ -1068,7 +1068,6 @@ void check_config() {
 }
 
 void update_clock() {
-
 	if (memcmp(&currentTime.Minutes,
 				&in_payload.time.Minutes,
 				sizeof currentTime - sizeof currentTime.Seconds) ||
