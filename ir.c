@@ -181,6 +181,9 @@ void ir_write_global() {
 	ir_xmit = 1;
 	ir_xmit_index = 0;
 	USCI_A_UART_transmitData(IR_USCI_BASE, ir_tx_frame[0]);
+	if (ir_proto_state == IR_PROTO_PAIRED && ir_proto_seqnum) {
+		ir_proto_seqnum = 0;
+	}
 }
 
 // Single byte, encapsulated in our IR datagram:
@@ -349,8 +352,11 @@ void ir_process_rx_ready() {
 				set_badge_paired(ir_partner);
 				// fall through:
 			case IR_PROTO_PAIRED:
+				if (seqnum) {
+					f_paired_trick = seqnum;
+				}
 				ir_pair_setstate(IR_PROTO_PAIRED);
-				ir_proto_setup(ir_partner, IR_OP_STILLALIVE, 0);
+				ir_proto_setup(ir_partner, IR_OP_STILLALIVE, ir_proto_seqnum);
 				ir_write_global();
 				break;
 			}
@@ -359,7 +365,10 @@ void ir_process_rx_ready() {
 	case IR_OP_STILLALIVE:
 		if (ir_proto_state == IR_PROTO_PAIRED && ir_pair_role == IR_ROLE_C && ir_rx_from == ir_partner) {
 			// Got a stillalive.
-			ir_proto_setup(ir_partner, IR_OP_KEEPALIVE, 0); // TODO: redundant?
+			ir_proto_setup(ir_partner, IR_OP_KEEPALIVE, ir_proto_seqnum); // TODO: redundant?
+			if (seqnum) {
+				f_paired_trick = seqnum;
+			}
 			ir_pair_setstate(IR_PROTO_PAIRED);
 		}
 		break;
