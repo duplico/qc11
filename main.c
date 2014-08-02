@@ -26,7 +26,7 @@ const qcxiconf backup_conf = {
 		101,
 		"",
 		"",
-		0x13AC
+		0xffff
 };
 
 
