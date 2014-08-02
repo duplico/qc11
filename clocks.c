@@ -222,6 +222,9 @@ void init_alarms() {
 		if (light_length)
 			offsets[7] = light_length + 30;
 		for (uint8_t offset_index = 0; offset_index < 8; offset_index++) {
+			if (!light_length && offset_index == 7) {
+				continue;
+			}
 			min = (offsets[offset_index] + 30) % 60;
 			hour = (alarms[next_alarm].hour + 23 + ((offsets[offset_index]+30)/60)) % 24;
 			day = alarms[next_alarm].day + (alarms[next_alarm].hour + ((offsets[offset_index]+30)/60)) / 24;
