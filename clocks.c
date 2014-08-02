@@ -296,10 +296,10 @@ void init_alarms() {
 void init_rtc() {
 	//Starting Time for Calendar: // TODO:
 	currentTime.Seconds    = 40;
-	currentTime.Minutes    = 59;
-	currentTime.Hours      = 17;
+	currentTime.Minutes    = 53;
+	currentTime.Hours      = 20;
 	currentTime.DayOfWeek  = 6;
-	currentTime.DayOfMonth = 8;
+	currentTime.DayOfMonth = 9;
 	currentTime.Month      = 8;
 	currentTime.Year       = 2014;
 
