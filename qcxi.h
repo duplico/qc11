@@ -144,6 +144,8 @@ extern volatile uint8_t loops_to_ir_timestep;
 #define ITPS_TO_PAIR IR_LOOPS_PER_SEC * SECONDS_TO_PAIR / 2
 #define ITPS_TO_SHOW_PAIRING ITPS_TO_PAIR / 2
 
+#define PROP_FRAMESKIP 3
+
 // Persistent configuration:
 typedef struct {
 	uint16_t paired_ids[10];

@@ -17,10 +17,22 @@
 #pragma DATA_SECTION (backup_conf, ".infoB");
 
 const qcxiconf my_conf;
+//const qcxiconf backup_conf = {
+//		{0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff},
+//		{0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff},
+//		{0xffff, 0xffff, 0xffff, 0xffff},
+//		0xff, 0xff,
+//		{0, 0, 0, 4, 7, 8, 2014},
+//		101,
+//		"",
+//		"",
+//		0xffff
+//}; // TODO
+
 const qcxiconf backup_conf = {
-		{0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff},
-		{0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff},
-		{0xffff, 0xffff, 0xffff, 0xffff},
+		{0x00, 0x00, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff},
+		{0x00, 0x00, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff},
+		{0x00, 0xffff, 0xffff, 0xffff},
 		0xff, 0xff,
 		{0, 0, 0, 4, 7, 8, 2014},
 		101,
@@ -193,6 +205,10 @@ void set_badge_seen(uint8_t id) {
 		FLASH_write16(&new_config_word, &(my_conf.met_ids[badge_frame]), 1);
 		FLASH_lockInfoA();
 	} // otherwise, nothing to do.
+}
+
+uint8_t event_attended(uint8_t id) {
+	return ~my_conf.events_attended & (1 << id);
 }
 
 void set_event_attended(uint8_t id) {
@@ -468,12 +484,12 @@ int main( void )
 				update_clock();
 			}
 
-			if (in_payload.base_id == BUS_BASE_ID) {
+			if (in_payload.base_id == BUS_BASE_ID && in_payload.from_addr == 0xff) {
 				s_on_bus = RECEIVE_WINDOW;
 				// Bus
 				// TODO: can set s_on_bus
 			}
-			else if (in_payload.base_id <= 7) {
+			else if (in_payload.base_id < 7 && in_payload.from_addr == 0xff) {
 				// Base station, may need to check in.
 				// base_id = event_id, should be 0..7
 				set_event_attended(in_payload.base_id);
@@ -504,7 +520,7 @@ int main( void )
 				}
 			}
 
-			if (in_payload.beacon) {
+			if (in_payload.beacon && in_payload.from_addr != 0xff) {
 				// It's a beacon (one per cycle).
 				// Increment our beacon count in the current position in our
 				// sliding window.
@@ -524,7 +540,7 @@ int main( void )
 		 */
 		if (f_alarm) { // needs to be before f_new_second?
 			event_id = f_alarm & 0b0111;
-			if (f_alarm & ALARM_START_LIGHT) {
+			if (f_alarm & ALARM_START_LIGHT && !event_attended(event_id)) {
 				light_blink = 128 + event_id;
 			}
 			if (f_alarm & ALARM_STOP_LIGHT) {
@@ -562,15 +578,14 @@ int main( void )
 			currentTime.Seconds++;
 			if (currentTime.Seconds >= 60) {
 				currentTime = RTC_A_getCalendarTime(RTC_A_BASE);
+				out_payload.time.Hours = currentTime.Hours;
+				out_payload.time.Minutes = currentTime.Minutes;
+				out_payload.time.DayOfMonth = currentTime.DayOfMonth;
+				out_payload.time.DayOfWeek = currentTime.DayOfWeek;
+				out_payload.time.Month = currentTime.Month;
+				out_payload.time.Year = currentTime.Year;
 			}
-
-			out_payload.time.Hours = currentTime.Hours;
-			out_payload.time.Minutes = currentTime.Minutes;
 			out_payload.time.Seconds = currentTime.Seconds;
-			out_payload.time.DayOfMonth = currentTime.DayOfMonth;
-			out_payload.time.DayOfWeek = currentTime.DayOfWeek;
-			out_payload.time.Month = currentTime.Month;
-			out_payload.time.Year = currentTime.Year;
 
 			if (!trick_seconds) {
 				trick_seconds = TRICK_INTERVAL_SECONDS-1 + (rand()%3);
@@ -590,11 +605,10 @@ int main( void )
 					// We'll need to SEND the "effect" version of the id, and we'll keep the "use"
 					//  version for ourselves.
 
-					// Happily, for effects, 0 and 1 are sprites; and the rest are full, in order.
+					// Happily, for effects, 0 and 1 are FULL; and the rest are SPRITES, in order.
 					// So we can keep it the same, and we'll just subtract 2 at the other end if
 					// it's a full one.
 					out_payload.prop_id = s_prop_id;
-
 
 					// For ourselves, #0 can stay 0 (it's full[0])
 					// but #4 will need to become 1 (it's full[1]).
@@ -606,15 +620,16 @@ int main( void )
 					} else if (s_prop_id != 5 && s_prop_id > 0) {
 						s_prop_id+=1;
 					}
+
 					s_prop_animation_length = 0;
 
-					if (s_prop_id < 2) { // 0, 4 are full:
+					if (s_prop_id < 2) {
 						while(!(prop_uses[s_prop_id][s_prop_animation_length++].lastframe & BIT7));
 					} else { // the rest are sprites:
 						while(!(prop_uses_sprites[s_prop_id-2][s_prop_animation_length++].lastframe & BIT7));
 					}
 
-					s_prop_animation_length *= 4; // TODO: this should be configured...?
+					s_prop_animation_length *= PROP_FRAMESKIP;
 
 					s_prop_cycles = ANIM_DELAY + s_prop_animation_length;
 					out_payload.prop_from = my_conf.badge_id;
@@ -755,9 +770,9 @@ int main( void )
 					 // 0,1 uses are full; the rest are sprites:
 					if (s_prop_id <= 1) {
 						led_display_left &= ~BIT0;
-						full_animate(prop_uses[s_prop_id], 4);
+						full_animate(prop_uses[s_prop_id], PROP_FRAMESKIP);
 					} else {
-						left_sprite_animate(prop_uses_sprites[s_prop_id-2], 4);
+						left_sprite_animate(prop_uses_sprites[s_prop_id-2], PROP_FRAMESKIP);
 					}
 				} else if (s_propped && !s_prop_cycles) {
 					// Do a prop effect:
@@ -766,11 +781,12 @@ int main( void )
 					out_payload.prop_from = 0xff;
 					out_payload.prop_time_loops_before_start = 0;
 
-					if (s_prop_id <= 1) { // 0, 1 are sprites:
-						left_sprite_animate(prop_effects_sprites[s_prop_id], 4);
+					if (s_prop_id <= 1) { // 0, 1 are full:
+						if (s_prop_id != 1)
+							led_display_left &= ~BIT0;
+						full_animate(prop_effects[s_prop_id], PROP_FRAMESKIP);
 					} else { // the rest are full:
-						led_display_left &= ~BIT0;
-						full_animate(prop_effects[s_prop_id-2], 4);
+						left_sprite_animate(prop_effects_sprites[s_prop_id-2], PROP_FRAMESKIP);
 					}
 
 				} else if (f_paired) { // TODO: This might should be pre-emptive?
@@ -889,7 +905,8 @@ int main( void )
 
 			if (!light_blink) {
 				// set according to events attended...
-				rainbow_lights |= (((uint16_t) ~my_conf.events_attended & 0b00011111) & ~light_blink) << 5;
+				uint8_t reverse_events = ((my_conf.events_attended * 0x0802LU & 0x22110LU) | (my_conf.events_attended * 0x8020LU & 0x88440LU)) * 0x10101LU >> 16;
+				rainbow_lights |= ((uint16_t) ~reverse_events & 0b11111000) << 2;
 			}
 
 			led_set_rainbow(rainbow_lights);

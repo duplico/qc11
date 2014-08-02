@@ -188,15 +188,18 @@ void init_clocks() {
  *    are NOT chronological. This is so I can play a little trick to make
  *    the ID of an event correspond with the ID of its respective light (if
  *    it gets one).
+ *
+ *    These are set to an HOUR before the event, because we add 30 minutes to
+ *    that to get the first alarm time.
  */
 const alarm_time alarms[] = {
-		{8, 16, 1, 120, 0}, // Friday mixer at iBar
-		{8, 22, 5, 225, 1}, // Now: Friday pool party at Palms
-		{9, 16, 2, 120, 0}, // Now: Saturday mixer at iBar
-		{9, 21, 6, 0, 2}, // Now: Saturday party at Piranha
-		{10, 0, 7, 0, 3}, // Now: Saturday karaoke
-		{10, 16, 3, 120, 0}, // Now: Sunday mixer at iBar
-		{10, 21, 4, 225, 0}, // Now: Sunday after-party
+		{8, 15, 1, 120, 0}, // Friday mixer at iBar
+		{8, 21, 5, 225, 1}, // Now: Friday pool party at Palms
+		{9, 15, 2, 120, 0}, // Now: Saturday mixer at iBar
+		{9, 20, 6, 0, 2}, // Now: Saturday party at Piranha
+		{9, 23, 7, 0, 3}, // Now: Saturday karaoke
+		{10, 15, 3, 120, 0}, // Now: Sunday mixer at iBar
+		{10, 20, 4, 225, 0}, // Now: Sunday after-party
 };
 
 uint8_t offsets[] = {0, 15, 20, 25, 30, 45, 60, 0};
@@ -226,7 +229,7 @@ void init_alarms() {
 				continue;
 			}
 			min = (offsets[offset_index] + 30) % 60;
-			hour = (alarms[next_alarm].hour + 23 + ((offsets[offset_index]+30)/60)) % 24;
+			hour = (alarms[next_alarm].hour + ((offsets[offset_index]+30)/60)) % 24;
 			day = alarms[next_alarm].day + (alarms[next_alarm].hour + ((offsets[offset_index]+30)/60)) / 24;
 
 			// If current alarm is in the past or less than a minute away, go to next.
@@ -297,14 +300,16 @@ void init_alarms() {
 }
 
 void init_rtc() {
-	//Starting Time for Calendar: // TODO:
+	//Starting Time for Calendar:
 	currentTime.Seconds    = 40;
 	currentTime.Minutes    = 58;
-	currentTime.Hours      = 15;
+	currentTime.Hours      = 17;
 	currentTime.DayOfWeek  = 6;
 	currentTime.DayOfMonth = 10;
 	currentTime.Month      = 8;
 	currentTime.Year       = 2014;
+
+	// TODO: set clock by events attended/occurred
 
 	clock_is_set = 1; // TODO: remove.
 
