@@ -201,7 +201,7 @@ const alarm_time alarms[] = {
 
 uint8_t offsets[] = {0, 15, 20, 25, 30, 45, 60, 0};
 
-char alarm_msg[32] = "";
+char alarm_msg[40] = "";
 
 void init_alarms() {
 	if (!clock_is_set)
@@ -229,14 +229,14 @@ void init_alarms() {
 			// If current alarm is in the past or less than a minute away, go to next.
 			if (day < currentTime.DayOfMonth ||
 			 (day == currentTime.DayOfMonth && hour < currentTime.Hours) ||
-			 (day == currentTime.DayOfMonth && hour == currentTime.Hours && min < currentTime.Minutes)) { // TODO: re-add the +1
+			 (day == currentTime.DayOfMonth && hour == currentTime.Hours && min <= currentTime.Minutes+1)) {
 				continue;
 			}
 
 			next_event_flag = alarms[next_alarm].event_id;
 
 			// index != 6 => message
-			if (next_alarm != 6 && offset_index == 4) {
+			if (next_alarm != 6 && offset_index >= 4) {
 				// now
 				next_event_flag |= ALARM_NOW_MSG+ALARM_DISP_MSG;
 			} else if (next_alarm != 6) {
@@ -296,10 +296,10 @@ void init_alarms() {
 void init_rtc() {
 	//Starting Time for Calendar: // TODO:
 	currentTime.Seconds    = 40;
-	currentTime.Minutes    = 53;
-	currentTime.Hours      = 20;
+	currentTime.Minutes    = 58;
+	currentTime.Hours      = 15;
 	currentTime.DayOfWeek  = 6;
-	currentTime.DayOfMonth = 9;
+	currentTime.DayOfMonth = 10;
 	currentTime.Month      = 8;
 	currentTime.Year       = 2014;
 

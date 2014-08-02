@@ -51,6 +51,7 @@ uint8_t clock_is_set = 0;
 uint8_t my_clock_authority = 0;
 uint16_t loops_to_rf_beacon = 10 * TIME_LOOP_HZ;
 char pairing_message[20] = "";
+char event_message[40] = "";
 uint8_t my_trick = 0;
 uint16_t known_tricks = 0;
 uint8_t known_trick_count = 0;
@@ -102,7 +103,6 @@ uint8_t s_prop_id = 0,
 		s_event_arrival = 0,
 		s_on_bus = 0,
 		s_off_bus = 0,
-		s_event_alert = 0,
 		s_need_rf_beacon = 0,
 		s_rf_retransmit = 0,
 		s_pair = 0, // f_pair
@@ -520,8 +520,6 @@ int main( void )
 		 *
 		 * * Event alert raised (interrupt flag)
 		 *
-		 * s_event_alert = 0,
-		 *
 		 */
 		if (f_alarm) { // needs to be before f_new_second?
 			event_id = f_alarm & 0b0111;
@@ -534,7 +532,9 @@ int main( void )
 				s_update_rainbow = 1;
 			}
 			if (f_alarm & ALARM_DISP_MSG) {
-				s_event_alert = 1;
+				strcpy(event_message, alarm_msg);
+				led_print_scroll(event_message, 1);
+				am_idle = 0;
 			}
 			if (!(f_alarm & ALARM_NO_REINIT)) {
 				init_alarms();
@@ -741,11 +741,6 @@ int main( void )
 #if BADGE_TARGET
 
 		// Pre-emptive:
-		if (s_event_alert) {
-			s_event_alert = 0;
-			led_print_scroll(alarm_msg, 1);
-			am_idle = 0;
-		}
 
 		if (am_idle) { // Can do another action now.
 			switch(badge_status) {
@@ -979,7 +974,7 @@ void check_config() {
 
 	uint16_t crc = config_crc(my_conf);
 
-	if (crc != my_conf.crc) {
+	if (crc != my_conf.crc || 1) { // TODO!!!!!!!!!!!!!1
 		// this means we need to load the backup conf:
 		// we ignore the CRC of the backup conf.
 		uint8_t* new_config_bytes = (uint8_t *) &backup_conf;
