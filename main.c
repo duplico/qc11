@@ -132,6 +132,11 @@ uint8_t itps_pattern = 0;
 
 // Scores:
 uint8_t my_score = 0;
+uint8_t shown_score = 0;
+uint8_t s_count_score = 0;
+#define COUNT_SCORE_CYCLES 4
+uint8_t s_count_score_cycles = 0;
+
 
 void set_my_score_from_config() {
 	my_score = 0;
@@ -163,6 +168,9 @@ void set_score(uint8_t id) {
 		FLASH_write16(&new_config_word, &(my_conf.scores[score_frame]), 1);
 		FLASH_lockInfoA();
 		s_new_score = 1;
+		s_count_score_cycles = COUNT_SCORE_CYCLES;
+		shown_score = 0;
+		s_count_score = 1;
 	}
 	set_my_score_from_config();
 }
@@ -282,7 +290,7 @@ void set_gaydar_target() {
  * Time based:
  * * Event alert raised (interrupt flag)
  * * DONE It's been long enough that we can do a trick (set flag from time loop)
- * ** TODO  (maybe the trick is a prop)
+ * ** DONE  (maybe the trick is a prop)
  * * DONE Time to beacon the radio (set flag from time loop)
  * * DONE Time to beacon the IR (set flag from time loop)
  *
@@ -575,6 +583,12 @@ int main( void )
 				}
 			}
 
+			if (my_score >= 32 || (!s_count_score && !(rand() % 60))) {
+				s_count_score_cycles = COUNT_SCORE_CYCLES;
+				shown_score = 0;
+				s_count_score = 1;
+			}
+
 			currentTime.Seconds++;
 			if (currentTime.Seconds >= 60) {
 				currentTime = RTC_A_getCalendarTime(RTC_A_BASE);
@@ -720,7 +734,18 @@ int main( void )
 			} else if (itps_pattern) {
 				itps_pattern = 0;
 				s_update_rainbow = 1;
+			} else if (s_count_score && !s_count_score_cycles) {
+				s_count_score_cycles = COUNT_SCORE_CYCLES;
+				if (shown_score == my_score || shown_score == 32)
+					s_count_score = 0;
+				else {
+					shown_score++;
+					s_update_rainbow = 1;
+				}
+			} else if (s_count_score) {
+				s_count_score_cycles--;
 			}
+
 
 			if (s_prop_cycles) {
 				s_prop_cycles--;
@@ -899,6 +924,8 @@ int main( void )
 			rainbow_lights &= 0b1111111111100000;
 			if (itps_pattern) {
 				rainbow_lights |= itps_pattern;
+			} else if (s_count_score) {
+				rainbow_lights |= (shown_score & 0b11111);
 			} else {
 				rainbow_lights |= (my_score & 0b11111);
 			}
