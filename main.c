@@ -32,7 +32,7 @@ const qcxiconf my_conf;
 const qcxiconf backup_conf = {
 		{0x00, 0x00, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff},
 		{0x00, 0x00, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff},
-		{0x00, 0xffff, 0xffff, 0xffff},
+		{0x0000, 0x0000, 0xffff, 0xffff},
 		0xff, 0xff,
 		{0, 0, 0, 4, 7, 8, 2014},
 		101,
@@ -57,6 +57,7 @@ uint8_t f_paired_new_trick = 0;
 uint8_t f_animation_done = 0;
 uint8_t f_ir_itp_step = 0;
 uint8_t f_ir_pair_abort = 0;
+uint8_t f_paired_trick = 0;
 
 // Global state:
 uint8_t clock_is_set = 0;
@@ -149,6 +150,10 @@ void set_my_score_from_config() {
 		}
 	}
 
+	s_count_score_cycles = COUNT_SCORE_CYCLES;
+	shown_score = 0;
+	s_count_score = 1;
+
 	known_props = 0;
 	known_props += (my_score>=3);
 	known_props += (my_score>=6);
@@ -168,9 +173,6 @@ void set_score(uint8_t id) {
 		FLASH_write16(&new_config_word, &(my_conf.scores[score_frame]), 1);
 		FLASH_lockInfoA();
 		s_new_score = 1;
-		s_count_score_cycles = COUNT_SCORE_CYCLES;
-		shown_score = 0;
-		s_count_score = 1;
 		set_my_score_from_config();
 	}
 }
@@ -265,6 +267,7 @@ void set_badge_paired(uint8_t id) {
 
 	} // otherwise, nothing to do.
 	f_paired = 1;
+	ir_proto_seqnum = 0;
 	ir_pair_setstate(IR_PROTO_PAIRED);
 }
 
@@ -583,8 +586,8 @@ int main( void )
 				}
 			}
 
-			if (my_score >= 32 || (!s_count_score && !(rand() % 15))) {
-				s_count_score_cycles = COUNT_SCORE_CYCLES;
+			if (!s_count_score && !(rand() % 15)) {
+				s_count_score_cycles = (my_score > 31) ? 1 : COUNT_SCORE_CYCLES;
 				shown_score = 0;
 				s_count_score = 1;
 			}
@@ -675,6 +678,10 @@ int main( void )
 				trick_seconds--;
 			}
 
+			if (s_trick && pair_state == PAIR_IDLE) {
+				ir_proto_seqnum = s_trick;
+			}
+
 			window_seconds--;
 			if (!window_seconds) {
 				window_seconds = RECEIVE_WINDOW_LENGTH_SECONDS;
@@ -735,8 +742,8 @@ int main( void )
 				itps_pattern = 0;
 				s_update_rainbow = 1;
 			} else if (s_count_score && !s_count_score_cycles) {
-				s_count_score_cycles = COUNT_SCORE_CYCLES;
-				if (shown_score == my_score || shown_score == 32)
+				s_count_score_cycles = (my_score > 31) ? 1 : COUNT_SCORE_CYCLES;;
+				if (shown_score == my_score || shown_score == 31)
 					s_count_score = 0;
 				else {
 					shown_score++;
@@ -918,6 +925,11 @@ int main( void )
 			itps_pattern = 0;
 		}
 
+		if (pair_state == PAIR_IDLE && f_paired_trick) {
+			right_sprite_animate((spriteframe *)tricks[f_paired_trick-1], 4, 1, 1, 1);
+			f_paired_trick = 0;
+		}
+
 		// Background:
 		if (s_update_rainbow) {
 			s_update_rainbow = 0;
@@ -927,7 +939,11 @@ int main( void )
 			} else if (s_count_score) {
 				rainbow_lights |= (shown_score & 0b11111);
 			} else {
-				rainbow_lights |= (my_score & 0b11111);
+				if (my_score >= 31) {
+					rainbow_lights |= 0b11111;
+				} else {
+					rainbow_lights |= (my_score & 0b11111);
+				}
 			}
 
 			if (!light_blink) {

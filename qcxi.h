@@ -19,7 +19,7 @@
 #define RECEIVE_WINDOW_LENGTH_SECONDS 10
 #define BUS_BASE_ID 0xEE
 #define TRICK_INTERVAL_SECONDS 6
-#define TRICK_COUNT 13
+#define TRICK_COUNT 11
 
 // Memory organization (same for F5529 and F5308)
 #define INFOA_START 0x001980
@@ -181,6 +181,7 @@ extern uint8_t f_paired_new_person;
 extern uint8_t f_paired_new_trick;
 extern uint8_t f_ir_itp_step;
 extern uint8_t f_ir_pair_abort;
+extern uint8_t f_paired_trick;
 
 typedef struct {
 	uint8_t to_addr, from_addr, base_id, clock_authority;
