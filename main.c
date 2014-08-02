@@ -405,6 +405,7 @@ int main( void )
 #endif
 
 	// Main sequence:
+	f_rfm_rx_done = 0;
 	while (1) {
 
 #if !BADGE_TARGET
