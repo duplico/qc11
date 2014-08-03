@@ -33,7 +33,7 @@ const qcxiconf backup_conf = {
 		{0x00, 0x00, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff},
 		{0x000f, 0xffff, 0xffff, 0xffff},
 		0xff, 0xff,
-		103,
+		102,
 		"",
 		"",
 		0xffff
@@ -266,6 +266,7 @@ void set_badge_paired(uint8_t id) {
 	f_paired = 1;
 	ir_proto_seqnum = 0;
 	ir_pair_setstate(IR_PROTO_PAIRED);
+
 }
 
 uint8_t have_trick(uint8_t trick_id) {
