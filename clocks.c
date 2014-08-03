@@ -311,7 +311,7 @@ void init_rtc() {
 
 	// TODO: set clock by events attended/occurred
 
-	clock_is_set = 1; // TODO: remove.
+//	clock_is_set = 1; // TODO: remove.
 
 	//Initialize Calendar Mode of RTC
 	RTC_A_calendarInit(RTC_A_BASE,
