@@ -28,6 +28,7 @@ const qcxiconf my_conf;
 //		0xffff
 //}; // TODO
 
+#if BADGE_TARGET
 const qcxiconf backup_conf = {
 		{0x00, 0x00, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff},
 		{0x00, 0x00, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff},
@@ -38,6 +39,18 @@ const qcxiconf backup_conf = {
 		"",
 		0xffff
 };
+#else
+const qcxiconf backup_conf = {
+		{0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff},
+		{0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff},
+		{0xffff, 0xffff, 0xffff, 0xffff},
+		0xff, 0xff,
+		0xff,
+		"",
+		"",
+		0xffff
+};
+#endif
 
 // Interrupt flags to signal the main thread:
 volatile uint8_t f_rfm_rx_done = 0;
@@ -436,7 +449,7 @@ int main( void )
 #if !BADGE_TARGET
 		// New serial message?
 		if (f_ser_rx) {
-//			ser_print((uint8_t *) ser_buffer_rx);
+			ser_print((uint8_t *) ser_buffer_rx);
 			f_ser_rx = 0;
 		}
 #endif
@@ -457,12 +470,14 @@ int main( void )
 
 		if (f_ir_pair_abort) {
 			f_ir_pair_abort = 0;
+#if BADGE_TARGET
 			if (itps_pattern) {
 				s_count_score_cycles = (my_score > 31) ? 1 : COUNT_SCORE_CYCLES;
 				shown_score = 0;
 				s_count_score = 1;
 			}
 			itps_pattern = 0;
+#endif
 		}
 
 		/*
@@ -494,10 +509,9 @@ int main( void )
 					(!clock_is_set ||
 							in_payload.clock_authority < my_clock_authority)) {
 				am_idle = 0;
-				led_print_scroll("clock", 1); // TODO
 				update_clock();
 			}
-
+#if BADGE_TARGET
 			if (in_payload.base_id == BUS_BASE_ID && in_payload.from_addr == 0xff) {
 				s_on_bus = RECEIVE_WINDOW;
 				// Bus
@@ -506,8 +520,10 @@ int main( void )
 			else if (in_payload.base_id < 7 && in_payload.from_addr == 0xff) {
 				// Base station, may need to check in.
 				// base_id = event_id, should be 0..7
-				set_event_attended(in_payload.base_id);
-				s_event_arrival = BIT7 + in_payload.base_id;
+				if (!event_attended(in_payload.base_id)) {
+					set_event_attended(in_payload.base_id);
+					s_event_arrival = BIT7 + in_payload.base_id;
+				}
 			}
 
 			if (in_payload.prop_from != 0xFF && in_payload.prop_from != my_conf.badge_id) {
@@ -541,10 +557,9 @@ int main( void )
 				neighbor_badges[in_payload.from_addr] = RECEIVE_WINDOW;
 				set_badge_seen(in_payload.from_addr);
 			}
+#endif
 		}
-
-
-
+#if BADGE_TARGET
 		static uint8_t event_id = 0;
 		/*
 		 * Calendar interrupts:
@@ -572,11 +587,11 @@ int main( void )
 			}
 			f_alarm = 0;
 		}
-
+#endif
 
 		if (f_new_second) {
 			f_new_second = 0;
-
+#if BADGE_TARGET
 			// BIT7 of events_occurred is !defcon_over:
 			if (BIT7 & my_conf.events_occurred) {
 				if (light_blink) {
@@ -594,6 +609,7 @@ int main( void )
 				shown_score = 0;
 				s_count_score = 1;
 			}
+#endif
 
 			currentTime.Seconds++;
 			if (currentTime.Seconds >= 60) {
@@ -606,7 +622,7 @@ int main( void )
 				out_payload.time.Year = currentTime.Year;
 			}
 			out_payload.time.Seconds = currentTime.Seconds;
-
+#if BADGE_TARGET
 			if (!trick_seconds) {
 				trick_seconds = TRICK_INTERVAL_SECONDS-1 + (rand()%3);
 				if (rand() % 3) {
@@ -684,6 +700,7 @@ int main( void )
 			if (s_trick && pair_state == PAIR_IDLE) {
 				ir_proto_seqnum = s_trick;
 			}
+#endif
 
 			window_seconds--;
 			if (!window_seconds) {
@@ -731,6 +748,7 @@ int main( void )
 				ir_process_timestep();
 			}
 
+#if BADGE_TARGET
 			// number of ITPs to display data for: (ITPS_TO_PAIR-ITPS_TO_SHOW_PAIRING)
 			// (ITPS_TO_PAIR-ITPS_TO_SHOW_PAIRING) / 5: ITPS per light
 			// i < (ir_proto_seqnum-ITPS_TO_SHOW_PAIRING) / ((ITPS_TO_PAIR-ITPS_TO_SHOW_PAIRING) / 5)
@@ -761,13 +779,23 @@ int main( void )
 				s_prop_cycles--;
 				out_payload.prop_time_loops_before_start = s_prop_cycles;
 			}
+#endif
 		}
 
 		// This is background:
 		if (s_need_rf_beacon && rfm_reg_state == RFM_REG_IDLE  && !(read_single_register_sync(0x27) & (BIT1+BIT0))) {
+#if BADGE_TARGET
 			out_payload.beacon = 1;
+#else
+			out_payload.beacon = 0;
+			out_payload.base_id = 3;
+#endif
 			if (!clock_is_set)
 				out_payload.clock_authority = 0xff;
+#if !BADGE_TARGET
+			else
+				out_payload.clock_authority = 0;
+#endif
 			radio_send_sync();
 			s_need_rf_beacon = 0;
 		} else if (s_rf_retransmit && rfm_reg_state == RFM_REG_IDLE) {
@@ -775,6 +803,10 @@ int main( void )
 
 			if (!clock_is_set)
 				out_payload.clock_authority = 0xff;
+#if !BADGE_TARGET
+			else
+				out_payload.clock_authority = 0;
+#endif
 			radio_send_sync();
 			s_rf_retransmit = 0;
 		}
@@ -933,6 +965,8 @@ int main( void )
 		if (s_update_rainbow) {
 			s_update_rainbow = 0;
 			rainbow_lights &= 0b1111111111100000;
+			if (clock_is_set)
+				rainbow_lights &= ~BIT9;
 			if (itps_pattern) {
 				rainbow_lights |= itps_pattern;
 			} else if (s_count_score) {
@@ -946,6 +980,7 @@ int main( void )
 			}
 
 			if (!light_blink) {
+				rainbow_lights &= 0b1111111000000000;
 				// set according to events attended...
 				uint8_t reverse_events = ((my_conf.events_attended * 0x0802LU & 0x22110LU) | (my_conf.events_attended * 0x8020LU & 0x88440LU)) * 0x10101LU >> 16;
 				rainbow_lights |= ((uint16_t) ~reverse_events & 0b11111000) << 2;
@@ -1034,7 +1069,7 @@ void check_config() {
 
 	uint16_t crc = config_crc(my_conf);
 
-	if (crc != my_conf.crc || 1) { // TODO!!!!!!!!!!!!!1
+	if (crc != my_conf.crc) { // || 1) { // TODO!!!!!!!!!!!!!1
 		// this means we need to load the backup conf:
 		// we ignore the CRC of the backup conf.
 		uint8_t* new_config_bytes = (uint8_t *) &backup_conf;
@@ -1092,7 +1127,7 @@ void update_clock() {
 		memcpy(&currentTime, &in_payload.time, sizeof (Calendar));
 		clock_is_set = 1;
 		my_clock_authority = in_payload.clock_authority;
-		out_payload.clock_authority = my_clock_authority;
+		out_payload.clock_authority = 1;
 		if (!out_payload.clock_authority)
 			out_payload.clock_authority = 1;
 		init_alarms();

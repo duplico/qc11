@@ -6,7 +6,6 @@
  */
 
 #include "ir.h"
-#include "leds.h"
 #include "qcxi.h"
 
 #include "driverlib.h"
@@ -61,7 +60,12 @@ void init_ir() {
 	// Shutdown (SD) for IR
 //	GPIO_setAsOutputPin(IR_SD_PORT, IR_SD_PIN);// already output
 //	GPIO_setOutputLowOnPin(IR_SD_PORT, IR_SD_PIN); // shutdown low = on
+#if BADGE_TARGET
 	IR_SD_PORT_OUT &= ~IR_SD_PIN;
+#else
+	GPIO_setAsOutputPin(IR_SD_PORT, IR_SD_PIN);// already output
+	GPIO_setOutputLowOnPin(IR_SD_PORT, IR_SD_PIN); // shutdown low = on
+#endif
 
 	// We'll use SMCLK, which is 8 MHz.
 	// See: http://software-dl.ti.com/msp430/msp430_public_sw/mcu/msp430/MSP430BaudRateConverter/index.html
