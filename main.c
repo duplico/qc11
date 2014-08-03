@@ -123,9 +123,6 @@ uint16_t s_prop_cycles = 0,
 uint8_t s_prop_id = 0,
 		s_prop_authority = 0,
 		s_propped = 0,
-		s_event_arrival = 0,
-		s_on_bus = 0,
-		s_off_bus = 0,
 		s_need_rf_beacon = 0,
 		s_rf_retransmit = 0,
 		s_pair = 0, // f_pair
@@ -135,8 +132,6 @@ uint8_t s_prop_id = 0,
 		s_new_prop = 0,
 		s_trick = 0,
 		s_prop = 0,
-		s_get_puppy = 0,
-		s_lose_puppy = 0,
 		s_update_rainbow = 0;
 
 uint8_t itps_pattern = 0;
@@ -148,6 +143,21 @@ uint8_t s_count_score = 0;
 #define COUNT_SCORE_CYCLES 4
 uint8_t s_count_score_cycles = 0;
 
+void set_known_tricks() {
+	known_tricks = 1 << my_trick;
+	known_trick_count = 1;
+
+	for (uint8_t trick_id = 0; trick_id < TRICK_COUNT; trick_id++) {
+		if (trick_id == my_trick) continue;
+		for (uint8_t badge_id = trick_id; badge_id < BADGES_IN_SYSTEM; badge_id+=TRICK_COUNT) {
+			if (paired_badge(badge_id) && !(known_tricks & 1<<(trick_id))) {
+				known_tricks |= 1 << trick_id;
+				known_trick_count++;
+				break;
+			}
+		}
+	}
+}
 
 void set_my_score_from_config() {
 	my_score = 0;
@@ -173,12 +183,15 @@ void set_my_score_from_config() {
 	known_props += (my_score>=31);
 }
 
-void set_score(uint8_t id) {
+void set_score(uint8_t id, uint8_t value) {
 	uint8_t score_frame = id / 16;
-	uint8_t score_bit = 1 << (id % 16);
-	if (!(~(my_conf.scores[score_frame]) & score_bit)) {
+	uint16_t score_bits = 0;
+	while (value--) {
+		score_bits |= 1 << (id+value % 16);
+	}
+	if (!(~(my_conf.scores[score_frame]) & score_bits)) {
 		// haven't seen it, so we need to set its 1 to a 0.
-		uint16_t new_config_word = my_conf.scores[score_frame] & ~(score_bit);
+		uint16_t new_config_word = my_conf.scores[score_frame] & ~(score_bits);
 		FLASH_unlockInfoA();
 		FLASH_write16(&new_config_word, &(my_conf.scores[score_frame]), 1);
 		FLASH_lockInfoA();
@@ -265,6 +278,16 @@ void set_badge_paired(uint8_t id) {
 
 	// See if this is a new pair.
 	if (id != 0xff && !(~(my_conf.paired_ids[badge_frame]) & badge_bit)) {
+
+		if (id < 12) {
+			set_score(id, 1); // seen each uber
+			// all zeroes means all seen:
+			if (!(~my_conf.scores[0] & 0b111111111111)) {
+				set_score(12, 3); // seen all ubers
+			}
+		}
+		set_score(16, 1); // first pair
+
 		f_paired_new_person = 1;
 		// haven't seen it, so we need to set its 1 to a 0.
 		uint16_t new_config_word = my_conf.paired_ids[badge_frame] & ~(badge_bit);
@@ -272,13 +295,8 @@ void set_badge_paired(uint8_t id) {
 		FLASH_write16(&new_config_word, &(my_conf.paired_ids[badge_frame]), 1);
 		FLASH_lockInfoA();
 
-		if (!have_trick(id % TRICK_COUNT)) {
-			// new trick
-			f_paired_new_trick = (id % TRICK_COUNT);
-			known_trick_count++;
-			known_tricks |= (1 << f_paired_new_trick);
-			f_paired_new_trick++; // because this flag is trick_id+1
-		}
+		// TODO: if space: f_paired_new_trick
+		set_known_tricks();
 
 	} // otherwise, nothing to do.
 	if (id != 0xff) {
@@ -520,15 +538,40 @@ int main( void )
 			}
 #if BADGE_TARGET
 			if (in_payload.base_id == BUS_BASE_ID && in_payload.from_addr == 0xff) {
-				// Bus
-				// TODO: Score.
+				set_score(33, 1); // bus
 			}
 			else if (in_payload.base_id < 7 && in_payload.from_addr == 0xff) {
 				// Base station, may need to check in.
 				// base_id = event_id, should be 0..7
 				if (!event_attended(in_payload.base_id)) {
 					set_event_attended(in_payload.base_id);
-					s_event_arrival = BIT7 + in_payload.base_id;
+					switch(in_payload.base_id) {
+					case 0:
+						set_score(19, 3); // thursday party
+						break;
+					case 1:
+						set_score(22, 2); // friday mixer
+						break;
+					case 2:
+						set_score(26, 1); // saturday mixer
+						break;
+					case 4:
+						set_score(27, 5); // sunday after party
+						break;
+					case 5:
+						set_score(24, 2); // pool party
+						break;
+					}
+				}
+				if (clock_is_set) {
+					// Check to see if we're at a base before "NOW"
+					if (next_event_flag & 0b0111 == in_payload.base_id && next_event_flag & ALARM_NOW_MSG) {
+						// early!
+						set_score(35, 2); // early to party
+					} else if (next_event_flag & 0b0111 != in_payload.base_id) {
+						// Basically, we're at a base after the light turns off:
+						set_score(54, 3); // late at party
+					}
 				}
 			}
 
@@ -560,6 +603,7 @@ int main( void )
 				// It's a beacon (one per cycle).
 				// Increment our beacon count in the current position in our
 				// sliding window.
+				set_score(15, 1); // first radio
 				neighbor_badges[in_payload.from_addr] = RECEIVE_WINDOW;
 				set_badge_seen(in_payload.from_addr);
 			}
@@ -644,13 +688,13 @@ int main( void )
 				} else if (rand() % 3) {
 					// wave
 					s_trick = TRICK_COUNT+1;
-				} else if (!s_prop && !s_propped && neighbor_count && known_props) { // && !(rand() % 4)) { // TODO
+				} else if (badge_status == BSTAT_GAYDAR && !s_prop && !s_propped && neighbor_count && known_props && rand() % 2) { // TODO
 					// prop
 					// TODO:
 					s_prop = 1;
 					s_prop_authority = my_conf.badge_id;
 
-					s_prop_id = rand() % known_props; // TODO: for now. later maybe have a prob. dist.
+					s_prop_id = rand() % known_props;
 
 					// We need to convert from generated-prop-id to actual-prop-id. This is because
 					//  some of them are full-width and some of them are sprites. Yay!
@@ -713,9 +757,6 @@ int main( void )
 				trick_seconds--;
 			}
 
-			if (s_trick && pair_state == PAIR_IDLE) {
-				ir_proto_seqnum = s_trick;
-			}
 #endif
 
 			window_seconds--;
@@ -731,7 +772,6 @@ int main( void )
 						neighbor_badges[i]--;
 					}
 				}
-
 				window_position = (window_position + 1) % RECEIVE_WINDOW;
 				if (!window_position) {
 					skip_window = rand() % RECEIVE_WINDOW;
@@ -897,9 +937,6 @@ int main( void )
 					gaydar_index--;
 					right_sprite_animate(gaydar[gaydar_index], 4, 0, -1, gaydar_index!=0);
 					left_sprite_animate(anim_sprite_wave, 4);
-				} else if (s_event_arrival) {
-					// TODO: score.
-					s_event_arrival = 0;
 				}
 				break;
 			case BSTAT_PAIR:
@@ -949,7 +986,7 @@ int main( void )
 		if (am_idle) {
 			if (s_new_score) {
 				am_idle = 0;
-				led_print_scroll("Score!", 1); // TODO: if time, add custom messages.
+				led_print_scroll("Score!", 0);
 				s_new_score = 0;
 				s_update_rainbow = 1;
 			}
@@ -962,6 +999,10 @@ int main( void )
 						(trick_len+TIME_LOOP_HZ < s_prop_cycles - s_prop_animation_length))
 				{
 					am_idle = 0;
+
+					if (pair_state == PAIR_IDLE) {
+						ir_proto_seqnum = s_trick;
+					}
 					left_sprite_animate((spriteframe *)tricks[s_trick-1], 4);
 					s_trick = 0; // this needs to be after the above statement. Duh.
 				}
@@ -1025,9 +1066,6 @@ uint8_t post() {
 
 	led_set_rainbow(0b1111111111);
 
-	if (led_post() == STATUS_FAIL) {
-		post_result |= POST_SHIFTF;
-	}
 	// LED test pattern
 	memset(disp_buffer, 0xff, sizeof disp_buffer);
 	led_update_display();
@@ -1106,19 +1144,8 @@ void check_config() {
 
 	// Decide which tricks we know:
 	my_trick = my_conf.badge_id % TRICK_COUNT;
-	known_tricks = 1 << my_trick;
-	known_trick_count = 1;
+	set_known_tricks();
 
-	for (uint8_t trick_id = 0; trick_id < TRICK_COUNT; trick_id++) {
-		if (trick_id == my_trick) continue;
-		for (uint8_t badge_id = trick_id; badge_id < BADGES_IN_SYSTEM; badge_id+=TRICK_COUNT) {
-			if (paired_badge(badge_id) && !(known_tricks & 1<<(trick_id))) {
-				known_tricks |= 1 << trick_id;
-				known_trick_count++;
-				break;
-			}
-		}
-	}
 	set_my_score_from_config();
 	s_new_score = 0;
 
@@ -1144,6 +1171,7 @@ void update_clock() {
 		if (!out_payload.clock_authority)
 			out_payload.clock_authority = 1;
 		init_alarms();
+		set_score(48, 1); // clock setting
 	}
 }
 
@@ -1153,16 +1181,4 @@ void delay(uint16_t ms)
     {
         __delay_cycles(MCLK_DESIRED_FREQUENCY_IN_KHZ);
     }
-}
-
-#pragma vector=UNMI_VECTOR
-__interrupt void NMI_ISR(void)
-{
-	static uint16_t status;
-	do {
-		// If it still can't clear the oscillator fault flags after the timeout,
-		// trap and wait here.
-		// TODO: We now should not be able to reach this point.
-		status = UCS_clearAllOscFlagsWithTimeout(1000);
-	} while (status != 0);
 }

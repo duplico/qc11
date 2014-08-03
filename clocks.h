@@ -51,6 +51,7 @@ void init_rtc();
 void init_watchdog();
 
 extern char alarm_msg[];
+extern uint8_t next_event_flag;
 
 typedef struct {
 	uint8_t day;

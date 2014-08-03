@@ -53,7 +53,6 @@ void led_enable(uint16_t);
 void led_disable( void );
 uint8_t led_post();
 void led_anim_init();
-inline void led_toggle( void );
 void begin_sprite_animation(spriteframe*, uint8_t);
 
 void stickman_wave();

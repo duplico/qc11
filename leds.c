@@ -430,26 +430,6 @@ void led_update_display() {
 
 }
 
-uint8_t led_post()
-{
-	//Set latch to low (should be already)
-//	GPIO_setOutputLowOnPin(LED_PORT, LED_LATCH);
-	P1OUT &= ~LED_LATCH;
-
-	uint16_t test_pattern = 0b1111101010100001;
-	uint16_t test_response = 0;
-	for (uint8_t j=0; j<6; j++) { // Fill all the registers with the test pattern.
-		test_response = 0;
-		for (uint8_t i = 0; i < 16; i++)  {
-			test_response |= (P1IN & GPIO_PIN6)? 1 << i : 0;
-			DATA_IF(test_pattern & (1 << i));
-//			GPIO_pulse(LED_PORT, LED_CLOCK);
-			P1OUT |= BIT4; P1OUT &= ~BIT4;
-		}
-	}
-	return test_response == test_pattern;
-}
-
 void led_enable(uint16_t duty_cycle) {
 //	GPIO_setAsPeripheralModuleFunctionOutputPin(LED_PORT, LED_BLANK);
 	P1SEL |= LED_BLANK;
@@ -532,9 +512,4 @@ void led_disable( void )
 //	);
 	P1SEL &= ~BIT3;
 	P1OUT |= BIT3;
-}
-
-inline void led_toggle( void ) {
-//	GPIO_toggleOutputOnPin(LED_PORT, LED_BLANK);
-	P1OUT ^= BIT3;
 }
