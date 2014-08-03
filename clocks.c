@@ -208,8 +208,6 @@ uint8_t offsets[] = {0, 15, 20, 25, 30, 45, 60, 0};
 char alarm_msg[40] = "";
 
 void init_alarms() {
-	if (!clock_is_set)
-		return;
 
 	currentTime = RTC_A_getCalendarTime(RTC_A_BASE);
 
@@ -290,29 +288,40 @@ void init_alarms() {
 
 			break;
 		}
+		if (next_alarm != 4 && clock_is_set)
+			set_event_occurred(alarms[next_alarm].event_id);
 		next_alarm++;
 		// TODO: set_event_occurred(uint8_t id);
 	}
 	if (next_alarm == 7) {
 		// queercon is over.
-		// TODO: set_event_occurred(uint8_t id)
+		set_event_occurred(7);
 		return;
 	}
 }
 
 void init_rtc() {
 	//Starting Time for Calendar:
-	currentTime.Seconds    = 40;
-	currentTime.Minutes    = 28;
-	currentTime.Hours      = 15;
-	currentTime.DayOfWeek  = 6;
-	currentTime.DayOfMonth = 8;
+	currentTime.Seconds    = 0;
+	currentTime.Minutes    = 0;
+	currentTime.Hours      = 20;
+	currentTime.DayOfWeek  = 0; // we don't use this.
+	currentTime.DayOfMonth = 7;
 	currentTime.Month      = 8;
 	currentTime.Year       = 2014;
 
-	// TODO: set clock by events attended/occurred
-
-	clock_is_set = 1; // TODO: remove.
+	// Setting our interim clock (the one that helps us figure out if the
+	// con is over, if nothing else)
+	// looking one per day...
+	if (~my_conf.events_occurred & BIT7) { // after defcon...
+		currentTime.DayOfMonth = 11; // monday
+	} else if (~my_conf.events_occurred & BIT3) {
+		currentTime.DayOfMonth = 10; // sunday
+	} else if (~my_conf.events_occurred & BIT2) { // saturday mixer
+		currentTime.DayOfMonth = 9; // saturday
+	} else if (~my_conf.events_occurred & BIT1) { // Friday mixer
+		currentTime.DayOfMonth = 8; // friday
+	}
 
 	//Initialize Calendar Mode of RTC
 	RTC_A_calendarInit(RTC_A_BASE,
