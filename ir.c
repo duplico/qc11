@@ -276,6 +276,10 @@ void ir_process_timestep() {
 			ir_timesteps_to_beacon--;
 		}
 		break;
+	case IR_PROTO_PAIRED:
+		if (ir_pair_role == IR_ROLE_C) {
+			ir_proto_setup(ir_partner, IR_OP_KEEPALIVE, ir_proto_seqnum); // TODO: redundant?
+		}
 	default:
 		if (ir_proto_tto--) {
 			// re-send, don't time out
@@ -365,7 +369,6 @@ void ir_process_rx_ready() {
 	case IR_OP_STILLALIVE:
 		if (ir_proto_state == IR_PROTO_PAIRED && ir_pair_role == IR_ROLE_C && ir_rx_from == ir_partner) {
 			// Got a stillalive.
-			ir_proto_setup(ir_partner, IR_OP_KEEPALIVE, ir_proto_seqnum); // TODO: redundant?
 			if (seqnum) {
 				f_paired_trick = seqnum;
 			}
