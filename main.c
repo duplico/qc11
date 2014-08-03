@@ -680,7 +680,7 @@ int main( void )
 			}
 			out_payload.time.Seconds = currentTime.Seconds;
 #if BADGE_TARGET
-			if (!trick_seconds) {
+			if (!trick_seconds && !itps_pattern) {
 				trick_seconds = TRICK_INTERVAL_SECONDS-1 + (rand()%3);
 				if (f_paired_new_trick) {
 					s_trick = f_paired_new_trick;
@@ -1150,8 +1150,8 @@ void check_config() {
 	s_new_score = 0;
 
 	// Setup our IR pairing payload:
-	strcpy(&(ir_pair_payload[0]), my_conf.handle);
-	strcpy(&(ir_pair_payload[11]), my_conf.message);
+	memcpy(&(ir_pair_payload[0]), my_conf.handle), 11);
+	memcpy(&(ir_pair_payload[11]), my_conf.message), 17);
 	out_payload.from_addr = my_conf.badge_id;
 
 }
