@@ -270,8 +270,6 @@ void ir_pair_setstate(uint8_t state) {
 	ir_proto_state = state;
 }
 
-#define IR_ASSERT_PARTNER if (ir_partner != ir_rx_from) { ir_pair_setstate(IR_PROTO_LISTEN); break; }
-
 void ir_process_timestep() {
 	if (ir_xmit)
 		return;
@@ -317,6 +315,11 @@ void ir_process_rx_ready() {
 	}
 	uint8_t seqnum = ir_rx_frame[1];
 
+	if (ir_proto_state == IR_PROTO_ITP && ir_rx_from != ir_partner) {
+		ir_pair_setstate(IR_PROTO_LISTEN);
+		return;
+	}
+
 	switch(opcode) {
 	case IR_OP_BEACON:
 		if (ir_proto_state != IR_PROTO_LISTEN) {
@@ -335,24 +338,19 @@ void ir_process_rx_ready() {
 			ir_partner = ir_rx_from;
 			// fall through:
 		case IR_PROTO_ITP: // IR_ROLE_C falls through to here:
-			IR_ASSERT_PARTNER
 			ir_proto_seqnum = seqnum + !ir_pair_role; // +1 for client, +0 for server
 			ir_proto_setup(ir_partner, IR_OP_ITP, ir_proto_seqnum);
 			ir_pair_setstate(IR_PROTO_ITP);
 
-			if (ir_proto_seqnum > ITPS_TO_SHOW_PAIRING) {
-				f_ir_itp_step = 1;
-			}
-
-			if (ir_proto_seqnum == ITPS_TO_PAIR) {
-				strcpy(ir_rx_handle, (char *) &(ir_rx_frame[2]));
-				strcpy(ir_rx_message, (char *) &(ir_rx_frame[2+11]));
+			if (ir_proto_seqnum == ITPS_TO_SHOW_PAIRING) {
+				memcpy(ir_rx_handle, (char *) &(ir_rx_frame[2]), 11);
+				memcpy(ir_rx_message, (char *) &(ir_rx_frame[2+11]), 17);
 			}
 
 			if (ir_pair_role == IR_ROLE_S) {
 				ir_write_global();
 			} else if (ir_proto_seqnum == ITPS_TO_PAIR) { // client is implicit here:
-				// this means we can pair:
+				// this means we can pair: ( we just sent the last ITP )
 				ir_proto_setup(ir_partner, IR_OP_KEEPALIVE, 0);
 				set_badge_paired(ir_partner);
 			}
@@ -472,6 +470,10 @@ __interrupt void ir_isr(void)
 			ir_rx_index++;
 			if (ir_rx_index == ir_rx_len) { // Received len bytes (ir frames):
 				ir_rx_state++;
+			}
+			if (ir_rx_index >= MAX_IR_LEN+3) {
+				ir_rx_state = 0;
+				ir_rx_len = 0;
 			}
 			break;
 		case 6: // Payload received, waiting for CRC
