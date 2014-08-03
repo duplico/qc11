@@ -232,7 +232,8 @@ uint8_t event_attended(uint8_t id) {
 }
 
 void set_event_attended(uint8_t id) {
-	// TODO: add if?
+	// No if event_attended() is needed here because this is only called once,
+	//  and that call is wrapped in an if.
 	if (light_blink == 128 + id) {
 		light_blink = 0;
 		s_update_rainbow = 1;
@@ -244,7 +245,8 @@ void set_event_attended(uint8_t id) {
 }
 
 void set_event_occurred(uint8_t id) {
-	// TODO: add if?
+	if (~my_conf.events_occurred & (1 << id))
+		return;
 	uint8_t new_event_occurred = my_conf.events_occurred & ~(1 << id);
 	FLASH_unlockInfoA();
 	FLASH_write8(&new_event_occurred, &my_conf.events_occurred, 1);
@@ -321,7 +323,7 @@ void set_gaydar_target() {
  * ** DONE set our clock
  *
  * From the IR
- * * TODO Docking with base station - don't REALLY dock...
+ * * DONE Docking with base station - don't REALLY dock...
  * * DONE Pairing
  * ** DONE possibly new person
  * *** DONE possibly new person with a new trick
@@ -518,9 +520,8 @@ int main( void )
 			}
 #if BADGE_TARGET
 			if (in_payload.base_id == BUS_BASE_ID && in_payload.from_addr == 0xff) {
-				s_on_bus = RECEIVE_WINDOW;
 				// Bus
-				// TODO: can set s_on_bus
+				// TODO: Score.
 			}
 			else if (in_payload.base_id < 7 && in_payload.from_addr == 0xff) {
 				// Base station, may need to check in.
@@ -883,7 +884,6 @@ int main( void )
 					am_idle = 0;
 					gaydar_index = 0;
 					right_sprite_animate(anim_sprite_walkin, 2, 1, 1, 1);
-				} else if (s_on_bus) {
 				} else if (target_gaydar_index > gaydar_index) {
 					am_idle = 0;
 					right_sprite_animate(gaydar[gaydar_index], 4, 0, 1, 1);
@@ -895,10 +895,8 @@ int main( void )
 					right_sprite_animate(gaydar[gaydar_index], 4, 0, -1, gaydar_index!=0);
 					left_sprite_animate(anim_sprite_wave, 4);
 				} else if (s_event_arrival) {
-					// TODO: do something
-//					am_idle = 1; // TODO
+					// TODO: score.
 					s_event_arrival = 0;
-					s_update_rainbow = 1;
 				}
 				break;
 			case BSTAT_PAIR:
@@ -1080,12 +1078,11 @@ void check_config() {
 
 	uint16_t crc = config_crc(my_conf);
 
-	if (crc != my_conf.crc || 1) { // TODO!!!!!!!!!!!!!1
+	if (crc != my_conf.crc) { // TODO!!!!!!!!!!!!!1
 		// this means we need to load the backup conf:
 		// we ignore the CRC of the backup conf.
 		uint8_t* new_config_bytes = (uint8_t *) &backup_conf;
 
-		// TODO: just need to look and see what this is:
 		FLASH_unlockInfoA();
 		uint8_t flash_status = 0;
 		do {
@@ -1124,8 +1121,6 @@ void check_config() {
 	strcpy(&(ir_pair_payload[11]), my_conf.message);
 	out_payload.from_addr = my_conf.badge_id;
 
-	// TODO: the opposite of WDT_A_hold(WDT_A_BASE);
-	// probably.
 }
 
 void update_clock() {

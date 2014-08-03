@@ -295,7 +295,7 @@ void animation_timestep() {
 		// end animation if done::
 		if (led_display_left_sprite == stand && led_display_left_frame == led_display_left_len) {
 			led_display_left &= ~DISPLAY_ANIMATE;
-			led_display_left_frame--; // TODO: Is this right?
+			led_display_left_frame--;
 		} else if (led_display_left_frame == led_display_left_len) {
 			left_sprite_animate(stand, led_display_anim_skip);
 		}
@@ -338,7 +338,6 @@ void text_timestep() {
 	led_display_text_skip_index = led_display_text_skip;
 
 	if (led_display_text_character == led_display_text_len && led_display_text_cursor == 14) {
-		// done animating. TODO: go back to anim
 		led_display_text &= ~DISPLAY_ANIMATE;
 		if (!((led_display_right | led_display_left | led_display_full | led_display_text) & DISPLAY_ANIMATE))
 			f_animation_done = 1;
@@ -513,7 +512,7 @@ void led_timestep() {
 		} else if (disp_mode_target == DISP_MODE_ANIM && led_display_bottom > 0) {
 			led_display_bottom--;
 		} else if (disp_mode_target == DISP_MODE_ANIM) {
-			led_display_bottom = 0; // TODO?
+			led_display_bottom = 0;
 			disp_mode = disp_mode_target;
 		}
 	} else {
@@ -522,7 +521,6 @@ void led_timestep() {
 		animation_timestep();
 		text_timestep();
 	}
-	// TODO: Maybe only do this if we know something is changing?
 	led_update_display();
 }
 

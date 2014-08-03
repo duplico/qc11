@@ -103,7 +103,7 @@ void init_clocks() {
 			DCO_FLLREF_RATIO			   // 8 MHz / 32KHz
 	);
 	UCS_clockSignalInit(UCS_MCLK, UCS_DCOCLKDIV_SELECT,
-			UCS_CLOCK_DIVIDER_8); // TODO
+			UCS_CLOCK_DIVIDER_8);
 #else
 
 	// Init XT2:
@@ -174,12 +174,6 @@ void init_clocks() {
 // MSB
 
 
-// TODO: refactor alarms so that we can procedurally generate the reminders.
-// event has a time;
-// reminder: yes/no
-// light: yes/no
-
-
 #pragma DATA_SECTION (alarms, ".infoD");
 /*
  * NB:
@@ -220,7 +214,7 @@ void init_alarms() {
 	memset(alarm_msg, 0, 32);
 
 	while (!done && next_alarm < 7) {
-		uint8_t light_length = alarms[next_alarm].light_length; // TODO: should be minutes
+		uint8_t light_length = alarms[next_alarm].light_length;
 		if (light_length)
 			offsets[7] = light_length + 30;
 		for (uint8_t offset_index = 0; offset_index < 8; offset_index++) {
@@ -291,7 +285,6 @@ void init_alarms() {
 		if (next_alarm != 4 && clock_is_set)
 			set_event_occurred(alarms[next_alarm].event_id);
 		next_alarm++;
-		// TODO: set_event_occurred(uint8_t id);
 	}
 	if (next_alarm == 7) {
 		// queercon is over.
@@ -354,12 +347,12 @@ void RTC_A_ISR(void)
 {
 	switch (__even_in_range(RTCIV, 16)) {
 	case 0: break;  //No interrupts
-	case 2:         //RTCRDYIFG // TODO: make sure this is on
+	case 2:         //RTCRDYIFG
 		f_new_second = 1;
 		__bic_SR_register_on_exit(LPM3_bits);
 		break;
 	case 4:         //RTCEVIFG
-		//Interrupts every minute // TODO: make sure this is on if we need it
+		//Interrupts every minute // We don't use this.
 		__bic_SR_register_on_exit(LPM3_bits);
 		break;
 	case 6:         //RTCAIFG

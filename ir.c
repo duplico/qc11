@@ -287,7 +287,7 @@ void ir_process_timestep() {
 		break;
 	case IR_PROTO_PAIRED:
 		if (ir_pair_role == IR_ROLE_C) {
-			ir_proto_setup(ir_partner, IR_OP_KEEPALIVE, ir_proto_seqnum); // TODO: redundant?
+			ir_proto_setup(ir_partner, IR_OP_KEEPALIVE, ir_proto_seqnum);
 		}
 	default:
 		if (ir_proto_tto--) {
