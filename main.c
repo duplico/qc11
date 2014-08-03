@@ -748,9 +748,8 @@ int main( void )
 #if BADGE_TARGET
 			// number of ITPs to display data for: (ITPS_TO_PAIR-ITPS_TO_SHOW_PAIRING)
 			// (ITPS_TO_PAIR-ITPS_TO_SHOW_PAIRING) / 5: ITPS per light
-			// i < (ir_proto_seqnum-ITPS_TO_SHOW_PAIRING) / ((ITPS_TO_PAIR-ITPS_TO_SHOW_PAIRING) / 5)
 
-			if (ir_proto_state == IR_PROTO_ITP) {
+			if (ir_proto_state == IR_PROTO_ITP && ir_proto_seqnum > ITPS_TO_SHOW_PAIRING) {
 				itps_pattern = 0;
 				for (uint8_t i=0; i <= (ir_proto_seqnum - ITPS_TO_SHOW_PAIRING) / ((ITPS_TO_PAIR - ITPS_TO_SHOW_PAIRING) / 5); i++) {
 					itps_pattern |= (1 << i);
@@ -882,7 +881,7 @@ int main( void )
 					left_sprite_animate(anim_sprite_wave, 4);
 				} else if (s_event_arrival) {
 					// TODO: do something
-					am_idle = 1; // TODO
+//					am_idle = 1; // TODO
 					s_event_arrival = 0;
 					s_update_rainbow = 1;
 				}
@@ -977,7 +976,7 @@ int main( void )
 			}
 
 			if (!light_blink) {
-				rainbow_lights &= 0b1111111000000000;
+				rainbow_lights &= 0b1111111000011111;
 				// set according to events attended...
 				uint8_t reverse_events = ((my_conf.events_attended * 0x0802LU & 0x22110LU) | (my_conf.events_attended * 0x8020LU & 0x88440LU)) * 0x10101LU >> 16;
 				rainbow_lights |= ((uint16_t) ~reverse_events & 0b11111000) << 2;
