@@ -35,8 +35,8 @@ const qcxiconf backup_conf = {
 		{0x000f, 0xffff, 0xffff, 0xffff},
 		0xff, 0xff,
 		102,
-		"",
-		"",
+		"George",
+		"0xDECAFBAD!",
 		0xffff
 };
 #else
@@ -252,9 +252,6 @@ uint8_t paired_badge(uint8_t id) {
 }
 
 void set_badge_paired(uint8_t id) {
-	strcpy(ir_rx_handle, (char *) &(ir_rx_frame[2]));
-	strcpy(ir_rx_message, (char *) &(ir_rx_frame[2+11]));
-
 	uint8_t badge_frame = id / 16;
 	uint8_t badge_bit = 1 << (id % 16);
 
@@ -1069,7 +1066,7 @@ void check_config() {
 
 	uint16_t crc = config_crc(my_conf);
 
-	if (crc != my_conf.crc) { // || 1) { // TODO!!!!!!!!!!!!!1
+	if (crc != my_conf.crc || 1) { // TODO!!!!!!!!!!!!!1
 		// this means we need to load the backup conf:
 		// we ignore the CRC of the backup conf.
 		uint8_t* new_config_bytes = (uint8_t *) &backup_conf;

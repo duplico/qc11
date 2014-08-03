@@ -207,7 +207,7 @@ void ir_proto_setup(uint8_t to_addr, uint8_t opcode, uint8_t seqnum) {
 	} else if (opcode == IR_OP_KEEPALIVE || opcode == IR_OP_STILLALIVE) {
 		memcpy(&(ir_tx_frame[7]), my_conf.paired_ids, 28); // paired_ids and scores
 		ir_tx_frame[35] = my_conf.events_attended;
-		len = 29;
+		len = 31;
 	}
 
 	// Packet header:
@@ -340,8 +340,14 @@ void ir_process_rx_ready() {
 			ir_proto_setup(ir_partner, IR_OP_ITP, ir_proto_seqnum);
 			ir_pair_setstate(IR_PROTO_ITP);
 
-			if (ir_proto_seqnum > ITPS_TO_SHOW_PAIRING)
+			if (ir_proto_seqnum > ITPS_TO_SHOW_PAIRING) {
 				f_ir_itp_step = 1;
+			}
+
+			if (ir_proto_seqnum == ITPS_TO_PAIR) {
+				strcpy(ir_rx_handle, (char *) &(ir_rx_frame[2]));
+				strcpy(ir_rx_message, (char *) &(ir_rx_frame[2+11]));
+			}
 
 			if (ir_pair_role == IR_ROLE_S) {
 				ir_write_global();
