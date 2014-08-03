@@ -35,7 +35,7 @@ const qcxiconf backup_conf = {
 		{0x0000, 0x0000, 0xffff, 0xffff},
 		0xff, 0xff,
 		{0, 0, 0, 4, 7, 8, 2014},
-		101,
+		103,
 		"",
 		"",
 		0xffff
@@ -1094,6 +1094,8 @@ void update_clock() {
 		clock_is_set = 1;
 		my_clock_authority = in_payload.clock_authority;
 		out_payload.clock_authority = my_clock_authority;
+		if (!out_payload.clock_authority)
+			out_payload.clock_authority = 1;
 		init_alarms();
 	}
 }
