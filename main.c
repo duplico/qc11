@@ -34,7 +34,7 @@ const qcxiconf backup_conf = {
 		{0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff},
 		{0xffff, 0xffff, 0xffff, 0xffff},
 		0xff, 0xff,
-		0xae,
+		0x55,
 		"George",
 		"0xDECAFBAD!",
 		0xffff
@@ -273,7 +273,8 @@ void set_badge_paired(uint8_t id) {
 		}
 
 	} // otherwise, nothing to do.
-	f_paired = 1;
+	if (id != 0xff) {
+		f_paired = 1;
 	ir_proto_seqnum = 0;
 	ir_pair_setstate(IR_PROTO_PAIRED);
 
@@ -308,12 +309,12 @@ void set_gaydar_target() {
  * From the radio:
  * * DONE Receive a beacon (at some point, we need to decide if it means we:)
  * ** adjust neighbor count
- * ** TODO are near a base station (arrive event)
+ * ** DONE Are near a base station (arrive event)
  * ** DONE should schedule a prop
  * ** DONE set our clock
  *
  * From the IR
- * * TODO Docking with base station
+ * * TODO Docking with base station - don't REALLY dock...
  * * DONE Pairing
  * ** DONE possibly new person
  * *** DONE possibly new person with a new trick
