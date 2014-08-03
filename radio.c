@@ -71,23 +71,44 @@ void init_radio() {
 	// SPI to RFM /////////////////////////////////////////////////////////////
 	//
 	// Initialize the SPI for talking to the radio
-
+#if !BADGE_TARGET
 	returnValue = USCI_B_SPI_masterInit(
 		USCI_B1_BASE,
 		USCI_B_SPI_CLOCKSOURCE_SMCLK, // selectClockSource
-#if BADGE_TARGET
-		8000000,
-#else
 		UCS_getSMCLK(),
-#endif
 		SPICLK,
 		USCI_B_SPI_MSB_FIRST,
 		USCI_B_SPI_PHASE_DATA_CAPTURED_ONFIRST_CHANGED_ON_NEXT,
 		USCI_B_SPI_CLOCKPOLARITY_INACTIVITY_LOW
 	);
+#else
 
-	if (STATUS_FAIL == returnValue) // TODO: flag
-		return;
+	//Disable the USCI Module
+	UCB1CTL1 |= UCSWRST;
+
+	UCB1CTL0 &= ~(UCCKPH + UCCKPL + UC7BIT + UCMSB + UCMST + UCMODE_3 + UCSYNC);
+
+	UCB1CTL1 &= ~(UCSSEL_3);
+
+	UCB1CTL1 |= USCI_B_SPI_CLOCKSOURCE_SMCLK;
+
+	UCB1BRW = 1;
+
+	/*
+	 * Configure as SPI master mode.
+	 * Clock phase select, polarity, msb
+	 * UCMST = Master mode
+	 * UCSYNC = Synchronous mode
+	 * UCMODE_0 = 3-pin SPI
+	 */
+
+	UCB1CTL0 |= (USCI_B_SPI_MSB_FIRST +
+				 USCI_B_SPI_PHASE_DATA_CAPTURED_ONFIRST_CHANGED_ON_NEXT +
+				 USCI_B_SPI_CLOCKPOLARITY_INACTIVITY_LOW +
+				 UCMST +
+				 UCSYNC +
+				 UCMODE_0);
+#endif
 
 	//Enable SPI module
 //	USCI_B_SPI_enable(USCI_B1_BASE);

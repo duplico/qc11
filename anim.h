@@ -10,7 +10,7 @@
 #include "leds.h"
 
 extern const spriteframe anim_sprite_wave[];
-extern const spriteframe anim_sprite_walkin[];
+extern spriteframe anim_sprite_walkin[];
 extern spriteframe * tricks[];
 extern const spriteframe stand[];
 extern spriteframe * gaydar[];
