@@ -459,6 +459,11 @@ int main( void )
 
 		if (f_ir_pair_abort) {
 			f_ir_pair_abort = 0;
+			if (itps_pattern) {
+				s_count_score_cycles = (my_score > 31) ? 1 : COUNT_SCORE_CYCLES;
+				shown_score = 0;
+				s_count_score = 1;
+			}
 			itps_pattern = 0;
 		}
 
@@ -920,13 +925,8 @@ int main( void )
 			}
 		}
 
-		if(f_ir_pair_abort) {
-			f_ir_pair_abort = 0;
-			itps_pattern = 0;
-		}
-
 		if (pair_state == PAIR_IDLE && f_paired_trick) {
-			right_sprite_animate((spriteframe *)tricks[f_paired_trick-1], 4, 1, 1, 1);
+			right_sprite_animate((spriteframe *)tricks[f_paired_trick-1], 4, 1, 1, 0xff);
 			f_paired_trick = 0;
 		}
 

@@ -307,10 +307,18 @@ void animation_timestep() {
 			led_display_right_frame+= led_display_right_direction;
 			led_display_right_dup = led_display_right_sprite[led_display_right_frame].lastframe & ~BIT7;
 		}
+
 		if ((led_display_right_direction >0 && led_display_right_frame == led_display_right_len) || (led_display_right_direction < 0 && led_display_right_frame == 255)) {
 			// end animation
-			led_display_right &= ~DISPLAY_ANIMATE;
-			led_display_right_frame-= led_display_right_direction;
+			if (led_display_right == 0xff) {
+				led_display_right_frame = 0;
+				led_display_right = DISPLAY_ON + DISPLAY_MIRROR_BIT;
+				led_display_right_sprite = stand;
+				led_display_right_len = 1;
+			} else {
+				led_display_right &= ~DISPLAY_ANIMATE;
+				led_display_right_frame-= led_display_right_direction;
+			}
 		}
 	}
 
