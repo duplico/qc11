@@ -591,7 +591,7 @@ int main( void )
 				}
 			}
 
-			if (!s_count_score && !(rand() % 15)) {
+			if (!s_count_score && !(rand() % 30)) {
 				s_count_score_cycles = (my_score > 31) ? 1 : COUNT_SCORE_CYCLES;
 				shown_score = 0;
 				s_count_score = 1;
@@ -915,8 +915,8 @@ int main( void )
 				while (!(tricks[s_trick-1][trick_len++].lastframe & BIT7));
 				trick_len *= 4; // TODO.
 				if (!(s_propped || s_prop) ||
-						(s_propped && trick_len+1 < s_prop_cycles) ||
-						(trick_len+1 < s_prop_cycles - s_prop_animation_length))
+						(s_propped && trick_len+TIME_LOOP_HZ < s_prop_cycles) ||
+						(trick_len+TIME_LOOP_HZ < s_prop_cycles - s_prop_animation_length))
 				{
 					am_idle = 0;
 					left_sprite_animate((spriteframe *)tricks[s_trick-1], 4);
