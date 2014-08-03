@@ -37,6 +37,7 @@ extern uint16_t led_zeroes[5];
 extern uint16_t disp_buffer[10];
 
 extern uint8_t led_display_left;
+extern uint8_t led_display_text;
 
 void led_init();
 

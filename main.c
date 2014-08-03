@@ -275,6 +275,7 @@ void set_badge_paired(uint8_t id) {
 	} // otherwise, nothing to do.
 	if (id != 0xff) {
 		f_paired = 1;
+	}
 	ir_proto_seqnum = 0;
 	ir_pair_setstate(IR_PROTO_PAIRED);
 
@@ -606,6 +607,10 @@ int main( void )
 				s_count_score_cycles = (my_score > 31) ? 1 : COUNT_SCORE_CYCLES;
 				shown_score = 0;
 				s_count_score = 1;
+				if (BIT7 & ~my_conf.events_occurred && my_conf.handle[0] && !led_display_text) { // defcon is over:
+					am_idle = 0;
+					led_print_scroll(my_conf.handle);
+				}
 			}
 #endif
 
