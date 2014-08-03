@@ -155,11 +155,12 @@ void init_clocks() {
 	// Enable global oscillator fault flag
 	SFR_clearInterrupt(SFR_OSCILLATOR_FAULT_INTERRUPT);
 	SFR_enableInterrupt(SFR_OSCILLATOR_FAULT_INTERRUPT);
-
-//	volatile uint32_t clockValue;
-//	clockValue = UCS_getMCLK();
-//	clockValue = UCS_getACLK();
-//	clockValue = UCS_getSMCLK();
+#if !BADGE_TARGET
+	volatile uint32_t clockValue;
+	clockValue = UCS_getMCLK();
+	clockValue = UCS_getACLK();
+	clockValue = UCS_getSMCLK();
+#endif
 }
 
 // We should get the following data in a flag to main from the alarm:
@@ -302,16 +303,16 @@ void init_alarms() {
 void init_rtc() {
 	//Starting Time for Calendar:
 	currentTime.Seconds    = 40;
-	currentTime.Minutes    = 58;
-	currentTime.Hours      = 17;
+	currentTime.Minutes    = 28;
+	currentTime.Hours      = 15;
 	currentTime.DayOfWeek  = 6;
-	currentTime.DayOfMonth = 10;
+	currentTime.DayOfMonth = 8;
 	currentTime.Month      = 8;
 	currentTime.Year       = 2014;
 
 	// TODO: set clock by events attended/occurred
 
-//	clock_is_set = 1; // TODO: remove.
+	clock_is_set = 1; // TODO: remove.
 
 	//Initialize Calendar Mode of RTC
 	RTC_A_calendarInit(RTC_A_BASE,
