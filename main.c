@@ -35,7 +35,7 @@ const qcxiconf backup_conf = {
 		{0x0000, 0x0000, 0xffff, 0xffff},
 		0xff, 0xff,
 		{0, 0, 0, 4, 7, 8, 2014},
-		103,
+		104,
 		"",
 		"",
 		0xffff
@@ -811,6 +811,7 @@ int main( void )
 					} else {
 						left_sprite_animate(prop_uses_sprites[s_prop_id-2], PROP_FRAMESKIP);
 					}
+					s_trick = 0;
 				} else if (s_propped && !s_prop_cycles) {
 					// Do a prop effect:
 					am_idle = 0;
@@ -825,6 +826,7 @@ int main( void )
 					} else { // the rest are full:
 						left_sprite_animate(prop_effects_sprites[s_prop_id-2], PROP_FRAMESKIP);
 					}
+					s_trick = 0;
 
 				} else if (f_paired) { // TODO: This might should be pre-emptive?
 					f_paired = 0;
@@ -907,8 +909,7 @@ int main( void )
 				am_idle = 0;
 				led_print_scroll("Score!", 1); // TODO: if time, add custom messages.
 				s_new_score = 0;
-				s_update_rainbow = 1; // TODO: if time, count up from 0 to the new score.
-				// TODO: if time, make the full score person have an ongoing score animation.
+				s_update_rainbow = 1;
 			}
 			if (s_trick) {
 				uint16_t trick_len = 0;
