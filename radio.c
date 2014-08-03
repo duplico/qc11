@@ -136,7 +136,7 @@ void init_radio() {
 	UCB1IE |= (USCI_B_SPI_RECEIVE_INTERRUPT + USCI_B_SPI_TRANSMIT_INTERRUPT);
 
 	rfm_reg_state = RFM_REG_IDLE;
-	mode_sb_sync();
+	mode_sync(RFM_MODE_SB);
 
 	// init radio to recommended "defaults" (seriously, wtf are they
 	//  calling them defaults for if they're not set BY DEFAULT?????
@@ -197,7 +197,7 @@ void init_radio() {
 	// indefinitely.
 
 	// Auto packet mode: RX->SB->RX on receive.
-	mode_rx_sync();
+	mode_sync(RFM_MODE_RX);
 	write_single_register(0x3b, RFM_AUTOMODE_RX);
 	volatile uint8_t ret = 0;
 
@@ -243,28 +243,9 @@ uint8_t read_single_register_sync(uint8_t addr) {
 	return rfm_single_msg;
 }
 
-void mode_rx_async() {
-	write_single_register_async(RFM_OPMODE, 0b00010000);
-}
-
-void mode_rx_sync() {
+void mode_sync(uint8_t mode) {
 	while (rfm_reg_state != RFM_REG_IDLE);
-	mode_rx_async(); // Receive mode.
-	while (rfm_reg_state != RFM_REG_IDLE);
-	uint8_t reg_read;
-	do {
-		reg_read = read_single_register_sync(RFM_IRQ1);
-	}
-	while (!(BIT7 & reg_read));
-}
-
-void mode_sb_async() {
-	write_single_register_async(RFM_OPMODE, 0b00000100);
-}
-
-void mode_sb_sync() {
-	while (rfm_reg_state != RFM_REG_IDLE);
-	mode_sb_async();
+	write_single_register_async(RFM_OPMODE, mode);
 	while (rfm_reg_state != RFM_REG_IDLE);
 	uint8_t reg_read;
 	do {
@@ -278,7 +259,7 @@ uint8_t expected_dio_interrupt = 0;
 void radio_send_sync() {
 	// Wait for, e.g., completion of receiving something.
 	while (rfm_reg_state != RFM_REG_IDLE);
-	mode_sb_sync(); // Enter standby mode.
+	mode_sync(RFM_MODE_SB);
 	// Intermediate mode is TX
 	// Enter condition is FIFO level
 	// Exit condition is PacketSent.
@@ -292,13 +273,12 @@ void radio_send_sync() {
 	RFM_NSS_PORT_OUT &= ~RFM_NSS_PIN;
 	USCI_B_SPI_transmitData(USCI_B1_BASE, RFM_FIFO | 0b10000000); // Send write command.
 	while (rfm_reg_state != RFM_REG_IDLE);
-	mode_rx_async(); // Set the mode so we'll re-enter RX mode once xmit is done.
+	write_single_register_async(RFM_OPMODE, RFM_MODE_RX); // Set the mode so we'll re-enter RX mode once xmit is done.
 }
 
 inline void radio_recv_start() {
 	if (rfm_reg_state != RFM_REG_IDLE) {
-		led_print_scroll("??!!", 1);
-		return; // TODO: flag a fault?
+		return;
 	}
 	rfm_reg_state = RFM_REG_RX_FIFO_CMD;
 //	GPIO_setOutputLowOnPin(RFM_NSS_PORT, RFM_NSS_PIN); // Hold NSS low to begin frame.
@@ -489,7 +469,7 @@ __interrupt void USCI_B1_ISR(void)
 //		GPIO_setOutputHighOnPin(RFM_NSS_PORT, RFM_NSS_PIN); // NSS high to end frame
 		RFM_NSS_PORT_OUT |= RFM_NSS_PIN;
 		rfm_reg_state = RFM_REG_IDLE;
-		mode_rx_async();
+		write_single_register_async(RFM_OPMODE, RFM_MODE_RX);
 	}
 }
 
@@ -502,10 +482,10 @@ __interrupt void radio_interrupt_0(void) {
 		// Auto packet mode: RX->SB->RX on receive.
 		f_rfm_tx_done = 1;
 		expected_dio_interrupt = 0;
-		__bic_SR_register_on_exit(LPM3_bits);
 	} else { // rx
 		radio_recv_start();
 	}
 //	GPIO_clearInterruptFlag(GPIO_PORT_P2, GPIO_PIN0); // TODO?
+	__bic_SR_register_on_exit(LPM3_bits);
 	P2IFG &= ~GPIO_PIN0; // Is this needed?
 }
