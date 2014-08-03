@@ -246,7 +246,7 @@ void set_badge_paired(uint8_t id) {
 	uint8_t badge_bit = 1 << (id % 16);
 
 	// See if this is a new pair.
-	if (!(~(my_conf.paired_ids[badge_frame]) & badge_bit)) {
+	if (id != 0xff && !(~(my_conf.paired_ids[badge_frame]) & badge_bit)) {
 		f_paired_new_person = 1;
 		// haven't seen it, so we need to set its 1 to a 0.
 		uint16_t new_config_word = my_conf.paired_ids[badge_frame] & ~(badge_bit);
