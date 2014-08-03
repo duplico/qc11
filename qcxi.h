@@ -148,12 +148,11 @@ extern volatile uint8_t loops_to_ir_timestep;
 
 // Persistent configuration:
 typedef struct {
-	uint16_t paired_ids[10];
 	uint16_t met_ids[10];
+	uint16_t paired_ids[10];
 	uint16_t scores[4];
 	uint8_t events_occurred;
 	uint8_t events_attended;
-	Calendar datetime;
 	uint8_t badge_id;
 	uint8_t handle[11];
 	uint8_t message[17];

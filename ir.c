@@ -14,7 +14,9 @@
 
 volatile uint8_t received_data = 0;
 
-volatile uint8_t ir_rx_frame[38] = {0};
+#define MAX_IR_LEN 31
+
+volatile uint8_t ir_rx_frame[MAX_IR_LEN+7] = {0};
 volatile uint16_t ir_rx_crc = 0;
 volatile uint8_t ir_rx_index = 0;
 volatile uint8_t ir_rx_len = 0;
@@ -27,7 +29,6 @@ uint8_t ir_timesteps_to_beacon = IR_LOOPS_PER_BEACON;
 
 uint8_t ir_reject_loopback = 0;
 
-#define MAX_IR_LEN 31
 // Protocol: SYNC0, SYNC1, FROM, TO, LEN, DATA, CRC_MSB, CRC_LSB, SYNC2, SYNC3
 // CRC16 of:              |_____|        |.....|
 //  Max length: 31 bytes
