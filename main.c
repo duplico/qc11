@@ -233,6 +233,10 @@ uint8_t event_attended(uint8_t id) {
 
 void set_event_attended(uint8_t id) {
 	// TODO: add if?
+	if (light_blink == 128 + id) {
+		light_blink = 0;
+		s_update_rainbow = 1;
+	}
 	uint8_t new_event_attended = my_conf.events_attended & ~(1 << id);
 	FLASH_unlockInfoA();
 	FLASH_write8(&new_event_attended, &my_conf.events_attended, 1);
@@ -569,13 +573,12 @@ int main( void )
 		 *
 		 */
 		if (f_alarm) { // needs to be before f_new_second?
-			if (clock_is_set) {
-				event_id = f_alarm & 0b0111;
-				if (f_alarm & ALARM_START_LIGHT && !event_attended(event_id)) {
+			event_id = f_alarm & 0b0111;
+			if (clock_is_set  && !event_attended(event_id)) {
+				if (f_alarm & ALARM_START_LIGHT) {
 					light_blink = 128 + event_id;
 				}
 				if (f_alarm & ALARM_STOP_LIGHT) {
-					// TODO: Set event occurred
 					light_blink = 0;
 					s_update_rainbow = 1;
 				}
