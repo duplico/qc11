@@ -12,6 +12,7 @@
 
 #pragma DATA_SECTION (anim_full_prop_wand_use, ".infoC");
 #pragma DATA_SECTION (anim_sprite_prop_dynamite_use, ".infoD");
+#pragma DATA_SECTION (stand, ".infoD");
 
 // prop use:
 // 3:
