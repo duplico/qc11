@@ -298,7 +298,7 @@ void ir_process_timestep() {
 		} else {
 			// time out
 			if (ir_paired()) {
-				f_unpaired = 1;
+				f_unpaired = (ir_partner != 0xff);
 			}
 			ir_pair_setstate(IR_PROTO_LISTEN);
 		}

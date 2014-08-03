@@ -578,8 +578,10 @@ int main( void )
 			}
 			if (f_alarm & ALARM_DISP_MSG) {
 				strcpy(event_message, alarm_msg);
-				led_print_scroll(event_message, 1);
-				am_idle = 0;
+				if (!led_display_text) {
+					led_print_scroll(event_message, 1);
+					am_idle = 0;
+				}
 			}
 			if (!(f_alarm & ALARM_NO_REINIT)) {
 				init_alarms();
@@ -609,7 +611,7 @@ int main( void )
 				s_count_score = 1;
 				if (BIT7 & ~my_conf.events_occurred && my_conf.handle[0] && !led_display_text) { // defcon is over:
 					am_idle = 0;
-					led_print_scroll(my_conf.handle);
+					led_print_scroll(my_conf.handle, 0);
 				}
 			}
 #endif
