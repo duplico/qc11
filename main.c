@@ -1150,8 +1150,8 @@ void check_config() {
 	s_new_score = 0;
 
 	// Setup our IR pairing payload:
-	memcpy(&(ir_pair_payload[0]), my_conf.handle), 11);
-	memcpy(&(ir_pair_payload[11]), my_conf.message), 17);
+	memcpy(&(ir_pair_payload[0]), my_conf.handle, 11);
+	memcpy(&(ir_pair_payload[11]), my_conf.message, 17);
 	out_payload.from_addr = my_conf.badge_id;
 
 }
