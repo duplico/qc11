@@ -232,6 +232,7 @@ uint8_t event_attended(uint8_t id) {
 }
 
 void set_event_attended(uint8_t id) {
+	// TODO: add if?
 	uint8_t new_event_attended = my_conf.events_attended & ~(1 << id);
 	FLASH_unlockInfoA();
 	FLASH_write8(&new_event_attended, &my_conf.events_attended, 1);
@@ -239,6 +240,7 @@ void set_event_attended(uint8_t id) {
 }
 
 void set_event_occurred(uint8_t id) {
+	// TODO: add if?
 	uint8_t new_event_occurred = my_conf.events_occurred & ~(1 << id);
 	FLASH_unlockInfoA();
 	FLASH_write8(&new_event_occurred, &my_conf.events_occurred, 1);
@@ -567,20 +569,22 @@ int main( void )
 		 *
 		 */
 		if (f_alarm) { // needs to be before f_new_second?
-			event_id = f_alarm & 0b0111;
-			if (f_alarm & ALARM_START_LIGHT && !event_attended(event_id)) {
-				light_blink = 128 + event_id;
-			}
-			if (f_alarm & ALARM_STOP_LIGHT) {
-				// TODO: Set event occurred
-				light_blink = 0;
-				s_update_rainbow = 1;
-			}
-			if (f_alarm & ALARM_DISP_MSG) {
-				strcpy(event_message, alarm_msg);
-				if (!led_display_text) {
-					led_print_scroll(event_message, 1);
-					am_idle = 0;
+			if (clock_is_set) {
+				event_id = f_alarm & 0b0111;
+				if (f_alarm & ALARM_START_LIGHT && !event_attended(event_id)) {
+					light_blink = 128 + event_id;
+				}
+				if (f_alarm & ALARM_STOP_LIGHT) {
+					// TODO: Set event occurred
+					light_blink = 0;
+					s_update_rainbow = 1;
+				}
+				if (f_alarm & ALARM_DISP_MSG) {
+					strcpy(event_message, alarm_msg);
+					if (!led_display_text) {
+						led_print_scroll(event_message, 1);
+						am_idle = 0;
+					}
 				}
 			}
 			if (!(f_alarm & ALARM_NO_REINIT)) {
@@ -1122,7 +1126,8 @@ void check_config() {
 }
 
 void update_clock() {
-	if (memcmp(&currentTime.Minutes,
+	if (!clock_is_set ||
+		memcmp(&currentTime.Minutes,
 				&in_payload.time.Minutes,
 				sizeof currentTime - sizeof currentTime.Seconds) ||
 		in_payload.time.Seconds < ((currentTime.Seconds-1) % 60) ||
