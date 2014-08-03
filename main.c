@@ -382,7 +382,7 @@ void set_gaydar_target() {
  */
 
 uint8_t skip_window = 1;
-
+uint8_t seconds_to_tx = 4;
 int main( void )
 {
 	init_watchdog();
@@ -423,7 +423,7 @@ int main( void )
 #if BADGE_TARGET
 	led_set_rainbow(0);
 	led_clear();
-	led_enable(LED_PERIOD/2);
+	led_enable(LED_PERIOD/16);
 #else
 	uint8_t color = 0;
 #endif
@@ -469,6 +469,7 @@ int main( void )
 
 	// Main sequence:
 	f_rfm_rx_done = 0;
+	am_idle = 1;
 	while (1) {
 
 #if !BADGE_TARGET
@@ -479,317 +480,36 @@ int main( void )
 		}
 #endif
 
+		if (f_new_second) {
+			f_new_second = 0;
+			if (!seconds_to_tx--) {
+				s_need_rf_beacon = 1;
+				seconds_to_tx = 4;
+			}
+		}
+
 		if (f_rfm_tx_done) {
 			f_rfm_tx_done = 0;
 			// Back to normal RX automode:
 			write_single_register(0x3b, RFM_AUTOMODE_RX);
 		}
 
-		/*
-		 * Process link-layer IR messages if needed.
-		 */
-		if (f_ir_rx_ready) {
-			f_ir_rx_ready = 0;
-			ir_process_rx_ready();
-		}
-
-		if (f_ir_pair_abort) {
-			f_ir_pair_abort = 0;
-#if BADGE_TARGET
-			if (itps_pattern) {
-				s_count_score_cycles = (my_score > 31) ? 1 : COUNT_SCORE_CYCLES;
-				shown_score = 0;
-				s_count_score = 1;
-			}
-			itps_pattern = 0;
-#endif
-		}
-
-		/*
-		 * Unlike with the IR pairing mechanism, there is very little state
-		 *  in the RF system. So we just need to load up the beacon into a
-		 *  buffer, and decide if we:
-		 *   * adjust neighbor count
-		 *   * are near a base station (arrive event)
-		 *   * should schedule a prop
-		 *   * set our clock
-		 *   * get the puppy
-		 *   * got confirmation we should give up the puppy (this will have
-		 *      some state)
-		 *
-		 *
-		 *  Here we can set:
-		 *   s_event_arrival = 0,
-		 *	 s_on_bus = 0;
-		 *	 s_new_score = 0,
-		 *	 s_new_prop = 0,
-		 *	 s_get_puppy;
-		 *	 s_lose_puppy;
-		 *
-		 *
-		 */
 		if (f_rfm_rx_done) {
+			am_idle = 0;
+			led_print_scroll("rx", 0);
 			f_rfm_rx_done = 0;
-			if (in_payload.clock_authority != 0xff &&
-					(!clock_is_set ||
-							in_payload.clock_authority < my_clock_authority)) {
-				am_idle = 0;
-				update_clock();
-			}
-#if BADGE_TARGET
-			if (in_payload.base_id == BUS_BASE_ID && in_payload.from_addr == 0xff) {
-				set_score(33, 1); // bus
-			}
-			else if (in_payload.base_id < 7 && in_payload.from_addr == 0xff) {
-				// Base station, may need to check in.
-				// base_id = event_id, should be 0..7
-				if (!event_attended(in_payload.base_id)) {
-					set_event_attended(in_payload.base_id);
-					switch(in_payload.base_id) {
-					case 0:
-						set_score(19, 3); // thursday party
-						break;
-					case 1:
-						set_score(22, 2); // friday mixer
-						break;
-					case 2:
-						set_score(26, 1); // saturday mixer
-						break;
-					case 4:
-						set_score(27, 5); // sunday after party
-						break;
-					case 5:
-						set_score(24, 2); // pool party
-						break;
-					}
-				}
-				if (clock_is_set) {
-					// Check to see if we're at a base before "NOW"
-					if (next_event_flag & 0b0111 == in_payload.base_id && next_event_flag & ALARM_NOW_MSG) {
-						// early!
-						set_score(35, 2); // early to party
-					} else if (next_event_flag & 0b0111 != in_payload.base_id) {
-						// Basically, we're at a base after the light turns off:
-						set_score(54, 3); // late at party
-					}
-				}
-			}
-
-			if (in_payload.prop_from != 0xFF && in_payload.prop_from != my_conf.badge_id) {
-				// It's a prop notification.
-				// If we don't currently have a prop scheduled, or if this prop is
-				// more authoritative than our currently scheduled prop, it's time
-				// to do a prop.
-				// If we're paired, and this is from the person
-				// we're paired with, it's the most authoritative prop possible.
-				uint8_t prop_authority = in_payload.prop_from;
-				if (((!s_propped && !s_prop) || prop_authority < s_prop_authority) && in_payload.prop_time_loops_before_start) {
-					s_propped = 1;
-					s_prop = 0;
-					s_prop_authority = in_payload.prop_from;
-					s_prop_cycles = in_payload.prop_time_loops_before_start;
-					s_prop_id = in_payload.prop_id;
-					out_payload.prop_from = s_prop_authority;
-					out_payload.prop_time_loops_before_start = s_prop_cycles;
-					out_payload.prop_id = s_prop_id;
-				} else if (s_propped) {
-					// If we're already propped, and our current prop has higher authority,
-					// retransmit it.
-					s_rf_retransmit = 1;
-				}
-			}
-
-			if (in_payload.beacon && in_payload.from_addr < BADGES_IN_SYSTEM) {
-				// It's a beacon (one per cycle).
-				// Increment our beacon count in the current position in our
-				// sliding window.
-				set_score(15, 1); // first radio
-				neighbor_badges[in_payload.from_addr] = RECEIVE_WINDOW;
-				set_badge_seen(in_payload.from_addr);
-			}
-#endif
-		}
-#if BADGE_TARGET
-		static uint8_t event_id = 0;
-		/*
-		 * Calendar interrupts:
-		 *
-		 * * Event alert raised (interrupt flag)
-		 *
-		 */
-		if (f_alarm) { // needs to be before f_new_second?
-			event_id = f_alarm & 0b0111;
-			if (clock_is_set  && !event_attended(event_id)) {
-				if (f_alarm & ALARM_START_LIGHT) {
-					light_blink = 128 + event_id;
-				}
-				if (f_alarm & ALARM_STOP_LIGHT) {
-					light_blink = 0;
-					s_update_rainbow = 1;
-				}
-				if (f_alarm & ALARM_DISP_MSG) {
-					strcpy(event_message, alarm_msg);
-					if (!led_display_text) {
-						led_print_scroll(event_message, 1);
-						am_idle = 0;
-					}
-				}
-			}
-			if (!(f_alarm & ALARM_NO_REINIT)) {
-				init_alarms();
-			}
-			f_alarm = 0;
-		}
-#endif
-
-		if (f_new_second) {
-			f_new_second = 0;
-#if BADGE_TARGET
-			// BIT7 of events_occurred is !defcon_over:
-			if (BIT7 & my_conf.events_occurred) {
-				if (light_blink) {
-					rainbow_lights ^= 1 << (9-(light_blink & 127));
-					s_update_rainbow = 1;
-				}
-				if (!clock_is_set) {
-					rainbow_lights ^= BIT9;
-					s_update_rainbow = 1;
-				}
-			}
-
-			if (!s_count_score && !(rand() % 30)) {
-				s_count_score_cycles = (my_score > 31) ? 1 : COUNT_SCORE_CYCLES;
-				shown_score = 0;
-				s_count_score = 1;
-				if (BIT7 & ~my_conf.events_occurred && my_conf.handle[0] && !led_display_text) { // defcon is over:
-					am_idle = 0;
-					led_print_scroll(my_conf.handle, 0);
-				}
-			}
-#endif
-
-			currentTime.Seconds++;
-			if (currentTime.Seconds >= 60) {
-				currentTime = RTC_A_getCalendarTime(RTC_A_BASE);
-				out_payload.time.Hours = currentTime.Hours;
-				out_payload.time.Minutes = currentTime.Minutes;
-				out_payload.time.DayOfMonth = currentTime.DayOfMonth;
-				out_payload.time.DayOfWeek = currentTime.DayOfWeek;
-				out_payload.time.Month = currentTime.Month;
-				out_payload.time.Year = currentTime.Year;
-			}
-			out_payload.time.Seconds = currentTime.Seconds;
-#if BADGE_TARGET
-			if (!trick_seconds && !itps_pattern) {
-				trick_seconds = TRICK_INTERVAL_SECONDS-1 + (rand()%3);
-				if (f_paired_new_trick) {
-					s_trick = f_paired_new_trick;
-					f_paired_new_trick = 0;
-				} else if (rand() % 3) {
-					// wave
-					s_trick = TRICK_COUNT+1;
-				} else if (badge_status == BSTAT_GAYDAR && !s_prop && !s_propped && neighbor_count && known_props && rand() % 2) { // TODO
-					// prop
-					// TODO:
-					s_prop = 1;
-					s_prop_authority = my_conf.badge_id;
-
-					s_prop_id = rand() % known_props;
-
-					// We need to convert from generated-prop-id to actual-prop-id. This is because
-					//  some of them are full-width and some of them are sprites. Yay!
-					// We'll need to SEND the "effect" version of the id, and we'll keep the "use"
-					//  version for ourselves.
-
-					// Happily, for effects, 0 and 1 are FULL; and the rest are SPRITES, in order.
-					// So we can keep it the same, and we'll just subtract 2 at the other end if
-					// it's a full one.
-					out_payload.prop_id = s_prop_id;
-
-					// For ourselves, #0 can stay 0 (it's full[0])
-					// but #4 will need to become 1 (it's full[1]).
-					// therefore, #1 will be 2 (so we can just do full[#-2])
-					// #2 will be #4, #4 will be #4, and #5 will be #5
-					// Then 1 will need to be 2 (prop 1 is sprite).
-					if (s_prop_id == 4) {
-						s_prop_id = 1;
-					} else if (s_prop_id != 5 && s_prop_id > 0) {
-						s_prop_id+=1;
-					}
-
-					s_prop_animation_length = 0;
-
-					if (s_prop_id < 2) {
-						while(!(prop_uses[s_prop_id][s_prop_animation_length++].lastframe & BIT7));
-					} else { // the rest are sprites:
-						while(!(prop_uses_sprites[s_prop_id-2][s_prop_animation_length++].lastframe & BIT7));
-					}
-
-					s_prop_animation_length *= PROP_FRAMESKIP;
-
-					s_prop_cycles = ANIM_DELAY + s_prop_animation_length;
-					out_payload.prop_from = my_conf.badge_id;
-					out_payload.prop_time_loops_before_start = s_prop_cycles;
-					s_rf_retransmit = 1;
-					// Then we're testing whether s_prop_cycles == s_prop_animation_length
-				} else {
-					// trick
-					static uint8_t known_trick_to_do;
-					known_trick_to_do = rand() % known_trick_count;
-					// start with the first known trick:
-
-					while (!(known_tricks & 1<<s_trick)) {
-						s_trick++;
-					}
-
-					while (known_trick_to_do) {
-						s_trick++;
-						if (known_tricks & 1<<s_trick) {
-							// if and only if we know the candidate trick, do
-							// we decrement known_trick_to_do.
-							known_trick_to_do--;
-						}
-					}
-					// doing s_trick...
-					s_trick++; // because the s_trick flag is trick_id+1
-				}
-			} else { // if (!sprite_animate && !led_text_scrolling && !s_propped) {
-				trick_seconds--;
-			}
-
-#endif
-
-			window_seconds--;
-			if (!window_seconds) {
-				window_seconds = RECEIVE_WINDOW_LENGTH_SECONDS;
-				if (skip_window != window_position) {
-					s_need_rf_beacon = 1;
-				}
-				neighbor_count = 0;
-				for (uint8_t i=0; i<BADGES_IN_SYSTEM; i++) {
-					if (neighbor_badges[i]) {
-						neighbor_count++;
-						neighbor_badges[i]--;
-					}
-				}
-				window_position = (window_position + 1) % RECEIVE_WINDOW;
-				if (!window_position) {
-					skip_window = rand() % RECEIVE_WINDOW;
-				}
-				// If we're rolling over the window and have no neighbors,
-				// try a radio reboot, in case that can gin up some neighbors
-				// for some reason.
-				if (!window_position && neighbor_count == 0) {
-					init_radio();
-				}
-				set_gaydar_target();
-			}
 		}
 
 		if (f_time_loop) {
 			f_time_loop = 0;
 #if BADGE_TARGET
-			led_timestep();
+			if (!am_idle)
+				led_timestep();
+			else {
+				memset(disp_buffer, 0xff, sizeof disp_buffer);
+				led_set_rainbow(0xffff);
+				led_update_display();
+			}
 #else
 			fillFrameBufferSingleColor(&leds[color], NUMBEROFLEDS, ws_frameBuffer, ENCODING);
 			ws_set_colors_async(NUMBEROFLEDS);
@@ -797,44 +517,6 @@ int main( void )
 			if (color==21) f_animation_done = 1;
 #endif
 
-			if (loops_to_ir_timestep) {
-				loops_to_ir_timestep--;
-			} else {
-				loops_to_ir_timestep = IR_LOOPS;
-				ir_process_timestep();
-			}
-
-#if BADGE_TARGET
-			// number of ITPs to display data for: (ITPS_TO_PAIR-ITPS_TO_SHOW_PAIRING)
-			// (ITPS_TO_PAIR-ITPS_TO_SHOW_PAIRING) / 5: ITPS per light
-
-			if (ir_proto_state == IR_PROTO_ITP && ir_proto_seqnum > ITPS_TO_SHOW_PAIRING) {
-				itps_pattern = 0;
-				for (uint8_t i=0; i <= (ir_proto_seqnum - ITPS_TO_SHOW_PAIRING) / ((ITPS_TO_PAIR - ITPS_TO_SHOW_PAIRING) / 5); i++) {
-					itps_pattern |= (1 << i);
-				}
-				s_update_rainbow = 1;
-			} else if (itps_pattern) {
-				itps_pattern = 0;
-				s_update_rainbow = 1;
-			} else if (s_count_score && !s_count_score_cycles) {
-				s_count_score_cycles = (my_score > 31) ? 1 : COUNT_SCORE_CYCLES;;
-				if (shown_score == my_score || shown_score == 31)
-					s_count_score = 0;
-				else {
-					shown_score++;
-					s_update_rainbow = 1;
-				}
-			} else if (s_count_score) {
-				s_count_score_cycles--;
-			}
-
-
-			if (s_prop_cycles) {
-				s_prop_cycles--;
-				out_payload.prop_time_loops_before_start = s_prop_cycles;
-			}
-#endif
 		}
 
 		// This is background:
@@ -852,202 +534,25 @@ int main( void )
 				out_payload.clock_authority = 0;
 #endif
 			radio_send_sync();
+			am_idle = 0;
+			led_print_scroll("tx", 0);
 			s_need_rf_beacon = 0;
-		} else if (s_rf_retransmit && rfm_reg_state == RFM_REG_IDLE) {
-			out_payload.beacon = 0;
-
-			if (!clock_is_set)
-				out_payload.clock_authority = 0xff;
-#if !BADGE_TARGET
-			else
-				out_payload.clock_authority = 0;
-#endif
-			radio_send_sync();
-			s_rf_retransmit = 0;
 		}
+
 
 		// Is an animation finished?
 		if (f_animation_done) {
 			f_animation_done = 0;
-			led_display_left |= BIT0;
+			led_update_display();
+//			led_display_left |= BIT0;
 			am_idle = 1;
 			#if !BADGE_TARGET
 			color = 0;
 			#endif
 		}
 
-#if BADGE_TARGET
-
-		// Pre-emptive:
-
-		if (am_idle) { // Can do another action now.
-			switch(badge_status) {
-			case BSTAT_GAYDAR:
-				if (s_prop && s_prop_cycles <= s_prop_animation_length) {
-					// Do a prop use:
-					am_idle = 0;
-					s_prop = 0;
-					out_payload.prop_from = 0xff;
-					out_payload.prop_time_loops_before_start = 0;
-					 // 0,1 uses are full; the rest are sprites:
-					if (s_prop_id <= 1) {
-						led_display_left &= ~BIT0;
-						full_animate(prop_uses[s_prop_id], PROP_FRAMESKIP);
-					} else {
-						left_sprite_animate(prop_uses_sprites[s_prop_id-2], PROP_FRAMESKIP);
-					}
-					s_trick = 0;
-				} else if (s_propped && !s_prop_cycles) {
-					// Do a prop effect:
-					am_idle = 0;
-					s_propped = 0;
-					out_payload.prop_from = 0xff;
-					out_payload.prop_time_loops_before_start = 0;
-
-					if (s_prop_id <= 1) { // 0, 1 are full:
-						if (s_prop_id != 1)
-							led_display_left &= ~BIT0;
-						full_animate(prop_effects[s_prop_id], PROP_FRAMESKIP);
-					} else { // the rest are full:
-						left_sprite_animate(prop_effects_sprites[s_prop_id-2], PROP_FRAMESKIP);
-					}
-					s_trick = 0;
-
-				} else if (f_paired) { // TODO: This might should be pre-emptive?
-					f_paired = 0;
-					s_prop = 0;
-					s_propped = 0;
-					s_prop_cycles = 0;
-					out_payload.prop_from = 0xff;
-					out_payload.prop_time_loops_before_start = 0;
-					pair_state = PAIR_INIT;
-					itps_pattern = 0;
-					s_update_rainbow = 1;
-					badge_status = BSTAT_PAIR;
-					am_idle = 0;
-					gaydar_index = 0;
-					right_sprite_animate(anim_sprite_walkin, 2, 1, 1, 1);
-				} else if (target_gaydar_index > gaydar_index) {
-					am_idle = 0;
-					right_sprite_animate(gaydar[gaydar_index], 4, 0, 1, 1);
-					left_sprite_animate(anim_sprite_wave, 4);
-					gaydar_index++;
-				} else if (target_gaydar_index < gaydar_index) {
-					am_idle = 0;
-					gaydar_index--;
-					right_sprite_animate(gaydar[gaydar_index], 4, 0, -1, gaydar_index!=0);
-					left_sprite_animate(anim_sprite_wave, 4);
-				}
-				break;
-			case BSTAT_PAIR:
-				if (f_unpaired) {
-					f_unpaired = 0;
-					itps_pattern = 0;
-					s_update_rainbow = 1;
-					badge_status = BSTAT_GAYDAR;
-					am_idle = 0;
-					right_sprite_animate(anim_sprite_walkin, 2, 1, -1, 0);
-					left_sprite_animate(anim_sprite_wave, 2);
-					break;
-				}
-				switch(pair_state) {
-				case PAIR_INIT: // Pat just walked on
-					am_idle = 0;
-					pair_state = PAIR_WAVE;
-					right_sprite_animate(anim_sprite_wave, 5, 1, 1, 1);
-					left_sprite_animate(anim_sprite_wave, 5);
-					break;
-				case PAIR_WAVE:
-					am_idle = 0;
-					memset(pairing_message, 0, 20);
-					strcat(pairing_message, "Hi ");
-					strcat(pairing_message, ir_rx_handle);
-					led_print_scroll(pairing_message, 1);
-					pair_state = PAIR_GREETING;
-					break;
-				case PAIR_GREETING:
-					if (!ir_rx_message[0]) {
-						pair_state = PAIR_IDLE;
-					} else {
-						am_idle = 0;
-						led_print_scroll(ir_rx_message, 1);
-						pair_state = PAIR_MESSAGE;
-						break;
-					}
-					break;
-				case PAIR_MESSAGE:
-					pair_state = PAIR_IDLE;
-					break;
-				}
-			} // end switch(badge_status)
-		}
-
-		// Any status, if we have no more idle-status-change processing to do:
-		if (am_idle) {
-			if (s_new_score) {
-				am_idle = 0;
-				led_print_scroll("Score!", 0);
-				s_new_score = 0;
-				s_update_rainbow = 1;
-			}
-			if (s_trick) {
-				uint16_t trick_len = 0;
-				while (!(tricks[s_trick-1][trick_len++].lastframe & BIT7));
-				trick_len *= 4; // TODO.
-				if (!(s_propped || s_prop) ||
-						(s_propped && trick_len+TIME_LOOP_HZ < s_prop_cycles) ||
-						(trick_len+TIME_LOOP_HZ < s_prop_cycles - s_prop_animation_length))
-				{
-					am_idle = 0;
-
-					if (pair_state == PAIR_IDLE) {
-						ir_proto_seqnum = s_trick;
-					}
-					left_sprite_animate((spriteframe *)tricks[s_trick-1], 4);
-					s_trick = 0; // this needs to be after the above statement. Duh.
-				}
-			}
-		}
-
-		if (f_paired_trick > TRICK_COUNT+1) {
-			f_paired_trick = 0;
-		}
-		if (pair_state == PAIR_IDLE && f_paired_trick) {
-			right_sprite_animate((spriteframe *)tricks[f_paired_trick-1], 4, 1, 1, 0xff);
-			f_paired_trick = 0;
-		}
-
-		// Background:
-		if (s_update_rainbow) {
-			s_update_rainbow = 0;
-			rainbow_lights &= 0b1111111111100000;
-			if (clock_is_set)
-				rainbow_lights &= ~BIT9;
-			if (itps_pattern) {
-				rainbow_lights |= itps_pattern;
-			} else if (s_count_score) {
-				rainbow_lights |= (shown_score & 0b11111);
-			} else {
-				if (my_score >= 31) {
-					rainbow_lights |= 0b11111;
-				} else {
-					rainbow_lights |= (my_score & 0b11111);
-				}
-			}
-
-			if (!light_blink) {
-				rainbow_lights &= 0b1111111000011111;
-				// set according to events attended...
-				uint8_t reverse_events = ((my_conf.events_attended * 0x0802LU & 0x22110LU) | (my_conf.events_attended * 0x8020LU & 0x88440LU)) * 0x10101LU >> 16;
-				rainbow_lights |= ((uint16_t) ~reverse_events & 0b11111000) << 2;
-			}
-
-			led_set_rainbow(rainbow_lights);
-		}
-#endif
-
 		// Going to sleep... mode...
-		__bis_SR_register(LPM3_bits + GIE);
+//		__bis_SR_register(LPM3_bits + GIE);
 	}
 } // end main()
 
