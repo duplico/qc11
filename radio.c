@@ -127,10 +127,13 @@ void init_radio() {
 	delay(10);
 
 	//Enable Receive interrupt
-	USCI_B_SPI_clearInterruptFlag(USCI_B1_BASE, USCI_B_SPI_RECEIVE_INTERRUPT);
-	USCI_B_SPI_enableInterrupt(USCI_B1_BASE, USCI_B_SPI_RECEIVE_INTERRUPT);
-	USCI_B_SPI_clearInterruptFlag(USCI_B1_BASE, USCI_B_SPI_TRANSMIT_INTERRUPT);
-	USCI_B_SPI_enableInterrupt(USCI_B1_BASE, USCI_B_SPI_TRANSMIT_INTERRUPT);
+
+//	USCI_B_SPI_clearInterruptFlag(USCI_B1_BASE, USCI_B_SPI_RECEIVE_INTERRUPT);
+//	USCI_B_SPI_enableInterrupt(USCI_B1_BASE, USCI_B_SPI_RECEIVE_INTERRUPT);
+//	USCI_B_SPI_clearInterruptFlag(USCI_B1_BASE, USCI_B_SPI_TRANSMIT_INTERRUPT);
+//	USCI_B_SPI_enableInterrupt(USCI_B1_BASE, USCI_B_SPI_TRANSMIT_INTERRUPT);
+	UCB1IFG &= ~(USCI_B_SPI_RECEIVE_INTERRUPT + USCI_B_SPI_TRANSMIT_INTERRUPT);
+	UCB1IE |= (USCI_B_SPI_RECEIVE_INTERRUPT + USCI_B_SPI_TRANSMIT_INTERRUPT);
 
 	rfm_reg_state = RFM_REG_IDLE;
 	mode_sb_sync();
@@ -184,7 +187,7 @@ void init_radio() {
 //	write_single_register(0x2d, 0x10); // 16 preamble bytes
 
 	for (uint8_t sync_addr=0x2f; sync_addr<=0x36; sync_addr++) {
-		write_single_register(sync_addr, 0x01);
+		write_single_register(sync_addr, "qcxi"[sync_addr%4]);
 	}
 
 	// Now that we're done with this setup business, we can enable the
@@ -229,19 +232,13 @@ void write_single_register(uint8_t addr, uint8_t data) {
 	while (rfm_reg_state != RFM_REG_IDLE); // Block until written.
 }
 
-void read_single_register_async(uint8_t addr) {
-	if (rfm_reg_state != RFM_REG_IDLE)
-		return; // TODO: flag a fault?
+uint8_t read_single_register_sync(uint8_t addr) {
+	while (rfm_reg_state != RFM_REG_IDLE); // Block until ready to read.
 	rfm_reg_state = RFM_REG_RX_SINGLE_CMD;
 	addr = 0b01111111 & addr; // MSB=0 => write command
 //	GPIO_setOutputLowOnPin(RFM_NSS_PORT, RFM_NSS_PIN); // Hold NSS low to begin frame.
 	RFM_NSS_PORT_OUT &= ~RFM_NSS_PIN;
 	USCI_B_SPI_transmitData(USCI_B1_BASE, addr); // Send our command.
-}
-
-uint8_t read_single_register_sync(uint8_t addr) {
-	while (rfm_reg_state != RFM_REG_IDLE); // Block until ready to read.
-	read_single_register_async(addr);
 	while (rfm_reg_state != RFM_REG_IDLE); // Block until read finished.
 	return rfm_single_msg;
 }
@@ -276,21 +273,6 @@ void mode_sb_sync() {
 	while (!(BIT7 & reg_read));
 }
 
-void mode_tx_async() {
-	write_single_register_async(RFM_OPMODE, 0b00001100); // TX mode.
-}
-
-void mode_tx_sync() {
-	while (rfm_reg_state != RFM_REG_IDLE);
-	mode_tx_async(); // TX mode.
-	while (rfm_reg_state != RFM_REG_IDLE);
-	uint8_t reg_read;
-	do {
-		reg_read = read_single_register_sync(RFM_IRQ1);
-	}
-	while (!(BIT7 & reg_read));
-}
-
 uint8_t expected_dio_interrupt = 0;
 
 void radio_send_sync() {
@@ -313,7 +295,7 @@ void radio_send_sync() {
 	mode_rx_async(); // Set the mode so we'll re-enter RX mode once xmit is done.
 }
 
- void radio_recv_start() {
+inline void radio_recv_start() {
 	if (rfm_reg_state != RFM_REG_IDLE) {
 		led_print_scroll("??!!", 1);
 		return; // TODO: flag a fault?
