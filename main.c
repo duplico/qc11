@@ -556,7 +556,7 @@ int main( void )
 				}
 			}
 
-			if (in_payload.beacon && in_payload.from_addr != 0xff) {
+			if (in_payload.beacon && in_payload.from_addr < BADGES_IN_SYSTEM) {
 				// It's a beacon (one per cycle).
 				// Increment our beacon count in the current position in our
 				// sliding window.
@@ -638,7 +638,10 @@ int main( void )
 #if BADGE_TARGET
 			if (!trick_seconds) {
 				trick_seconds = TRICK_INTERVAL_SECONDS-1 + (rand()%3);
-				if (rand() % 3) {
+				if (f_paired_new_trick) {
+					s_trick = f_paired_new_trick;
+					f_paired_new_trick = 0;
+				} else if (rand() % 3) {
 					// wave
 					s_trick = TRICK_COUNT+1;
 				} else if (!s_prop && !s_propped && neighbor_count && known_props) { // && !(rand() % 4)) { // TODO
@@ -965,6 +968,9 @@ int main( void )
 			}
 		}
 
+		if (f_paired_trick > TRICK_COUNT+1) {
+			f_paired_trick = 0;
+		}
 		if (pair_state == PAIR_IDLE && f_paired_trick) {
 			right_sprite_animate((spriteframe *)tricks[f_paired_trick-1], 4, 1, 1, 0xff);
 			f_paired_trick = 0;
