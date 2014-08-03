@@ -31,7 +31,7 @@ uint8_t ir_reject_loopback = 0;
 
 // Protocol: SYNC0, SYNC1, FROM, TO, LEN, DATA, CRC_MSB, CRC_LSB, SYNC2, SYNC3
 // CRC16 of:              |_____|        |.....|
-//  Max length: 31 bytes
+//  Max length: 31 bytes (including opcode and seqnum)
 uint8_t ir_tx_frame[MAX_IR_LEN + 9] = {SYNC0, SYNC1, 0, 0xFF, 1, 0, 0, 0, SYNC2, SYNC3, 0};
 volatile uint8_t ir_xmit = 0;
 volatile uint8_t ir_xmit_index = 0;
@@ -199,6 +199,11 @@ void ir_proto_setup(uint8_t to_addr, uint8_t opcode, uint8_t seqnum) {
 	if (opcode == IR_OP_ITP) {
 		// this is the one where we send our message...
 		len = 30;
+		memcpy(&(ir_tx_frame[7]), ir_pair_payload, 30);
+	} else if (opcode == IR_OP_KEEPALIVE || opcode == IR_OP_STILLALIVE) {
+		memcpy(&(ir_tx_frame[7]), my_conf.paired_ids, 28); // paired_ids and scores
+		ir_tx_frame[35] = my_conf.events_attended;
+		len = 29;
 	}
 
 	// Packet header:
@@ -211,7 +216,6 @@ void ir_proto_setup(uint8_t to_addr, uint8_t opcode, uint8_t seqnum) {
 	ir_tx_frame[6] = seqnum;
 
 	if (len>2) {
-		memcpy(&(ir_tx_frame[7]), ir_pair_payload, 30);
 	}
 
 	CRC_setSeed(CRC_BASE, 0xBEEF);
