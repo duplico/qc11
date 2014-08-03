@@ -910,7 +910,7 @@ int main( void )
 					memset(pairing_message, 0, 20);
 					strcat(pairing_message, "Hi ");
 					strcat(pairing_message, ir_rx_handle);
-					led_print_scroll(pairing_message, 2);
+					led_print_scroll(pairing_message, 1);
 					pair_state = PAIR_GREETING;
 					break;
 				case PAIR_GREETING:
@@ -918,7 +918,7 @@ int main( void )
 						pair_state = PAIR_IDLE;
 					} else {
 						am_idle = 0;
-						led_print_scroll(ir_rx_message, 2);
+						led_print_scroll(ir_rx_message, 1);
 						pair_state = PAIR_MESSAGE;
 						break;
 					}
