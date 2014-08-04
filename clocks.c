@@ -14,8 +14,8 @@ uint8_t next_event_flag = 0;
 
 char *event_times[] = {
 		"4pm!",
-		"10pm!",
 		"9pm!",
+		"11pm!",
 		"12am!"
 };
 
@@ -188,12 +188,12 @@ void init_clocks() {
  *    that to get the first alarm time.
  */
 const alarm_time alarms[] = {
-		{8, 15, 1, 120, 0}, // Friday mixer at iBar
-		{8, 21, 5, 225, 1}, // Now: Friday pool party at Palms
-		{9, 15, 2, 120, 0}, // Now: Saturday mixer at iBar
-		{9, 20, 6, 0, 2}, // Now: Saturday party at Piranha
+		{8, 15, 1, 60, 0}, // Friday mixer at iBar
+		{8, 20, 5, 225, 1}, // Now: Friday pool party at Palms
+		{9, 15, 2, 60, 0}, // Now: Saturday mixer at iBar
+		{9, 22, 6, 0, 2}, // Now: Saturday party at Piranha
 		{9, 23, 7, 0, 3}, // Now: Saturday karaoke
-		{10, 15, 3, 120, 0}, // Now: Sunday mixer at iBar
+		{10, 15, 3, 60, 0}, // Now: Sunday mixer at iBar
 		{10, 20, 4, 225, 0}, // Now: Sunday after-party
 };
 
