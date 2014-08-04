@@ -29,16 +29,18 @@ const qcxiconf my_conf;
 //}; // TODO
 
 #if BADGE_TARGET
-const qcxiconf backup_conf = {
-		{0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff},
-		{0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff},
-		{0xffff, 0xffff, 0xffff, 0xffff},
-		0xff, 0xff,
-		0x55,
-		"George",
-		"0xDECAFBAD!",
-		0xffff
-};
+const qcxiconf backup_conf
+//= {
+//		{0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff},
+//		{0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff},
+//		{0xffff, 0xffff, 0xffff, 0xffff},
+//		0xff, 0xff,
+//		0x55,
+//		"George",
+//		"0xDECAFBAD!",
+//		0xffff
+//}
+;
 #else
 const qcxiconf backup_conf = {
 		{0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff},
@@ -672,24 +674,20 @@ int main( void )
 			}
 #endif
 
-			currentTime.Seconds++;
-			if (currentTime.Seconds >= 60) {
-				currentTime = RTC_A_getCalendarTime(RTC_A_BASE);
-				out_payload.time.Hours = currentTime.Hours;
-				out_payload.time.Minutes = currentTime.Minutes;
-				out_payload.time.DayOfMonth = currentTime.DayOfMonth;
-				out_payload.time.DayOfWeek = currentTime.DayOfWeek;
-				out_payload.time.Month = currentTime.Month;
-				out_payload.time.Year = currentTime.Year;
-
-				if (currentTime.Hours == 7 && currentTime.DayOfMonth >= 8 &&
-						currentTime.DayOfMonth <= 10) {
-					// 7am Friday, Saturday, and Sunday.
-					set_score(49+currentTime.DayOfMonth-8, 1); // OBEY: on at 7
-				}
-
-			}
+			currentTime = RTC_A_getCalendarTime(RTC_A_BASE);
+			out_payload.time.Hours = currentTime.Hours;
+			out_payload.time.Minutes = currentTime.Minutes;
+			out_payload.time.DayOfMonth = currentTime.DayOfMonth;
+			out_payload.time.DayOfWeek = currentTime.DayOfWeek;
+			out_payload.time.Month = currentTime.Month;
+			out_payload.time.Year = currentTime.Year;
 			out_payload.time.Seconds = currentTime.Seconds;
+
+			if (currentTime.Hours == 7 && currentTime.DayOfMonth >= 8 &&
+					currentTime.DayOfMonth <= 10) {
+				// 7am Friday, Saturday, and Sunday.
+				set_score(49+currentTime.DayOfMonth-8, 1); // OBEY: on at 7
+			}
 #if BADGE_TARGET
 			if (!trick_seconds && !itps_pattern) {
 				trick_seconds = TRICK_INTERVAL_SECONDS-1 + (rand()%3);
