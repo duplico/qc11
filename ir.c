@@ -296,7 +296,11 @@ void ir_process_timestep() {
 		} else {
 			// time out
 			if (ir_paired()) {
-				f_unpaired = (ir_partner != 0xff);
+				if (ir_partner == 0xff) {
+					set_score(52, 2); // pair with a base
+				} else {
+					f_unpaired = 1;
+				}
 			}
 			ir_pair_setstate(IR_PROTO_LISTEN);
 		}
