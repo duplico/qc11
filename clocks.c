@@ -202,7 +202,6 @@ uint8_t offsets[] = {0, 15, 20, 25, 30, 45, 60, 0};
 char alarm_msg[40] = "";
 
 void init_alarms() {
-
 	currentTime = RTC_A_getCalendarTime(RTC_A_BASE);
 
 	// Find the next alarm:

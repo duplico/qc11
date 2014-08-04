@@ -153,6 +153,16 @@ void set_known_tricks() {
 			if (paired_badge(badge_id) && !(known_tricks & 1<<(trick_id))) {
 				known_tricks |= 1 << trick_id;
 				known_trick_count++;
+				switch(known_trick_count) {
+				case 4:
+					set_score(37, 1); //4th trick
+					break;
+				case 10:
+					set_score(38, 2); //10th trick
+					break;
+				case TRICK_COUNT:
+					set_score(40,3); // all tricks
+				}
 				break;
 			}
 		}
@@ -238,6 +248,9 @@ void set_badge_seen(uint8_t id) {
 		FLASH_write16(&new_config_word, &(my_conf.met_ids[badge_frame]), 1);
 		FLASH_lockInfoA();
 	} // otherwise, nothing to do.
+	if (id < 12 && currentTime.Hours == 5) {
+		set_score(34, 1); // sleep your way to the top
+	}
 }
 
 uint8_t event_attended(uint8_t id) {
@@ -295,7 +308,6 @@ void set_badge_paired(uint8_t id) {
 		FLASH_write16(&new_config_word, &(my_conf.paired_ids[badge_frame]), 1);
 		FLASH_lockInfoA();
 
-		// TODO: if space: f_paired_new_trick
 		set_known_tricks();
 
 	} // otherwise, nothing to do.
@@ -305,10 +317,6 @@ void set_badge_paired(uint8_t id) {
 	ir_proto_seqnum = 0;
 	ir_pair_setstate(IR_PROTO_PAIRED);
 
-}
-
-uint8_t have_trick(uint8_t trick_id) {
-	return known_tricks & (1 << trick_id);
 }
 
 void set_gaydar_target() {
@@ -346,21 +354,6 @@ void set_gaydar_target() {
  * ** DONE possibly new person
  * *** DONE possibly new person with a new trick
  *
- * So for the setup in the loop, we should maybe do the following:
- *
- * * First process interrupts
- * ** f_new_minute;
- * ** f_ir_tx_done;
- * ** f_ir_rx_ready;
- * ** f_time_loop;
- * ** f_rfm_rx_done;
- * ** f_new_second;
- * * Then process second-order flags
- * ** f_animation_done;
- * ** f_paired;
- * ** f_unpaired;
- * * Then do the animation things.
- *
  * Looping - here are the priorities:
  *
  * * Set clock (pre-empts)
@@ -372,7 +365,6 @@ void set_gaydar_target() {
  * * Score earned (wait for idle)
  * * Prop earned (wait for idle)
  * * Pair expires (wait for idle)
- * * Get/lose puppy (wait for idle)
  * * Get propped (from radio beacon)
  * * Do a trick or prop (idle only)
  *
@@ -417,13 +409,15 @@ int main( void )
 		ws_set_colors_async(NUMBEROFLEDS);
 		delay(1000);
 #endif
+	} else if (my_conf.handle[0]) {
+		led_print_scroll(my_conf.handle, 1);
 	} else {
 		led_print_scroll("qcxi", 0);
 	}
 #if BADGE_TARGET
 	led_set_rainbow(0);
 	led_clear();
-	led_enable(LED_PERIOD/2);
+	led_enable(LED_PERIOD/4);
 #else
 	uint8_t color = 0;
 #endif
@@ -530,11 +524,18 @@ int main( void )
 		 */
 		if (f_rfm_rx_done) {
 			f_rfm_rx_done = 0;
-			if (in_payload.clock_authority != 0xff &&
-					(!clock_is_set ||
-							in_payload.clock_authority < my_clock_authority)) {
-				update_clock();
+
+			if (!clock_is_set || (in_payload.clock_authority < my_clock_authority))
+			{
+				memcpy(&currentTime, &in_payload.time, sizeof (Calendar));
+				clock_is_set = 1;
+				init_rtc();
+				my_clock_authority = in_payload.clock_authority;
+				out_payload.clock_authority = 1;
+				init_alarms();
+				set_score(48, 1); // clock setting
 			}
+
 #if BADGE_TARGET
 			if (in_payload.base_id == BUS_BASE_ID && in_payload.from_addr == 0xff) {
 				set_score(33, 1); // bus
@@ -680,6 +681,13 @@ int main( void )
 				out_payload.time.DayOfWeek = currentTime.DayOfWeek;
 				out_payload.time.Month = currentTime.Month;
 				out_payload.time.Year = currentTime.Year;
+
+				if (currentTime.Hours == 7 && currentTime.DayOfMonth >= 8 &&
+						currentTime.DayOfMonth <= 10) {
+					// 7am Friday, Saturday, and Sunday.
+					set_score(49+currentTime.DayOfMonth-8, 1); // OBEY: on at 7
+				}
+
 			}
 			out_payload.time.Seconds = currentTime.Seconds;
 #if BADGE_TARGET
@@ -774,6 +782,13 @@ int main( void )
 						neighbor_badges[i]--;
 					}
 				}
+				if (neighbor_count > 5 && (next_event_flag & ALARM_START_LIGHT)) {
+					// if next alarm is turning a light on (low-rent stand-in
+					// for being between events), and you're around >5 people,
+					// that's 2 points.
+					set_score(17, 2); // Socialite.
+				}
+
 				window_position = (window_position + 1) % RECEIVE_WINDOW;
 				if (!window_position) {
 					skip_window = rand() % RECEIVE_WINDOW;
@@ -1150,24 +1165,6 @@ void check_config() {
 	strcpy(&(ir_pair_payload[11]), my_conf.message);
 	out_payload.from_addr = my_conf.badge_id;
 
-}
-
-void update_clock() {
-	if (!clock_is_set ||
-		memcmp(&currentTime.Minutes,
-				&in_payload.time.Minutes,
-				sizeof currentTime - sizeof currentTime.Seconds) ||
-		in_payload.time.Seconds < ((currentTime.Seconds-1) % 60) ||
-		in_payload.time.Seconds > ((currentTime.Seconds+1) % 60))
-	{
-		memcpy(&currentTime, &in_payload.time, sizeof (Calendar));
-		clock_is_set = 1;
-		init_rtc();
-		my_clock_authority = in_payload.clock_authority;
-		out_payload.clock_authority = 1;
-		init_alarms();
-		set_score(48, 1); // clock setting
-	}
 }
 
 void delay(uint16_t ms)

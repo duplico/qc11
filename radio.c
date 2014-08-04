@@ -214,7 +214,7 @@ void init_radio() {
 
 void write_single_register_async(uint8_t addr, uint8_t data) {
 	if (rfm_reg_state != RFM_REG_IDLE)
-		return; // TODO: flag a fault?
+		return;
 	rfm_reg_state = RFM_REG_TX_SINGLE_CMD;
 	rfm_single_msg = data;
 	addr = addr | 0b10000000; // MSB=1 => write command
