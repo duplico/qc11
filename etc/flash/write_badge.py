@@ -2,10 +2,11 @@ import sys
 import os
 
 def main():
+    print "Usage: write_badge.py txtfile {clobber|noclobber} {'handle'|none} {'message'|none} id"
     txtfile = sys.argv[1]
     clobber = sys.argv[2] == "clobber"
-    handle = sys.argv[3] if sys.argv[3] != "none" else ""
-    message = sys.argv[4] if sys.argv[4] != "none" else ""
+    handle = sys.argv[3].replace('~','-') if sys.argv[3] != "none" else ""
+    message = sys.argv[4].replace('~','-') if sys.argv[4] != "none" else ""
     id = int(sys.argv[5])
     
     if len(handle) > 10:
