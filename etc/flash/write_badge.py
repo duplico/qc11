@@ -4,8 +4,8 @@ import os
 def main():
     txtfile = sys.argv[1]
     id = int(sys.argv[2])
-    handle = sys.argv[3]
-    message = sys.argv[4]
+    handle = sys.argv[3] if sys.argv[3] != "none" else ""
+    message = sys.argv[4] if sys.argv[4] != "none" else ""
     clobber = False
     if len(sys.argv) > 5 and sys.argv[5] == 'clobber':
         clobber = True
