@@ -525,7 +525,7 @@ int main( void )
 		if (f_rfm_rx_done) {
 			f_rfm_rx_done = 0;
 
-			if (!clock_is_set || (in_payload.clock_authority < my_clock_authority))
+			if ((!clock_is_set && in_payload.clock_authority != 0xff) || (in_payload.clock_authority < my_clock_authority))
 			{
 				memcpy(&currentTime, &in_payload.time, sizeof (Calendar));
 				clock_is_set = 1;
