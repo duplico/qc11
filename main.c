@@ -17,16 +17,6 @@
 #pragma DATA_SECTION (backup_conf, ".infoB");
 
 const qcxiconf my_conf;
-//const qcxiconf backup_conf = {
-//		{0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff},
-//		{0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff},
-//		{0xffff, 0xffff, 0xffff, 0xffff},
-//		0xff, 0xff,
-//		101,
-//		"",
-//		"",
-//		0xffff
-//}; // TODO
 
 #if BADGE_TARGET
 const qcxiconf backup_conf
@@ -697,7 +687,7 @@ int main( void )
 				} else if (rand() % 3) {
 					// wave
 					s_trick = TRICK_COUNT+1;
-				} else if (badge_status == BSTAT_GAYDAR && !s_prop && !s_propped && neighbor_count && known_props && rand() % 2) { // TODO
+				} else if (badge_status == BSTAT_GAYDAR && !s_prop && !s_propped && neighbor_count && known_props && rand() % 2) {
 					// prop
 					s_prop = 1;
 					s_prop_authority = my_conf.badge_id;
@@ -890,7 +880,21 @@ int main( void )
 		if (am_idle) { // Can do another action now.
 			switch(badge_status) {
 			case BSTAT_GAYDAR:
-				if (s_prop && s_prop_cycles <= s_prop_animation_length) {
+				if (f_paired) { // TODO: This might should be pre-emptive?
+					f_paired = 0;
+					s_prop = 0;
+					s_propped = 0;
+					s_prop_cycles = 0;
+					out_payload.prop_from = 0xff;
+					out_payload.prop_time_loops_before_start = 0;
+					pair_state = PAIR_INIT;
+					itps_pattern = 0;
+					s_update_rainbow = 1;
+					badge_status = BSTAT_PAIR;
+					am_idle = 0;
+					gaydar_index = 0;
+					right_sprite_animate(anim_sprite_walkin, 2, 1, 1, 1);
+				} else if (s_prop && s_prop_cycles <= s_prop_animation_length) {
 					// Do a prop use:
 					am_idle = 0;
 					s_prop = 0;
@@ -920,20 +924,6 @@ int main( void )
 					}
 					s_trick = 0;
 
-				} else if (f_paired) { // TODO: This might should be pre-emptive?
-					f_paired = 0;
-					s_prop = 0;
-					s_propped = 0;
-					s_prop_cycles = 0;
-					out_payload.prop_from = 0xff;
-					out_payload.prop_time_loops_before_start = 0;
-					pair_state = PAIR_INIT;
-					itps_pattern = 0;
-					s_update_rainbow = 1;
-					badge_status = BSTAT_PAIR;
-					am_idle = 0;
-					gaydar_index = 0;
-					right_sprite_animate(anim_sprite_walkin, 2, 1, 1, 1);
 				} else if (target_gaydar_index > gaydar_index) {
 					am_idle = 0;
 					right_sprite_animate(gaydar[gaydar_index], 4, 0, 1, 1);
