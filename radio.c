@@ -190,7 +190,7 @@ void init_radio() {
 //	write_single_register(0x2d, 0x10); // 16 preamble bytes
 
 	for (uint8_t sync_addr=0x2f; sync_addr<=0x36; sync_addr++) {
-		write_single_register(sync_addr, "qcxi"[sync_addr%4]);
+		write_single_register(sync_addr, "QCXI"[sync_addr%4]);
 	}
 
 	// Now that we're done with this setup business, we can enable the
