@@ -1162,6 +1162,7 @@ void update_clock() {
 	{
 		memcpy(&currentTime, &in_payload.time, sizeof (Calendar));
 		clock_is_set = 1;
+		init_rtc();
 		my_clock_authority = in_payload.clock_authority;
 		out_payload.clock_authority = 1;
 		init_alarms();
