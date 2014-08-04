@@ -1116,7 +1116,7 @@ void check_config() {
 
 	uint16_t crc = config_crc(my_conf);
 
-	if (crc != my_conf.crc || 1) { // TODO!!!!!!!!!!!!!1
+	if (crc != my_conf.crc) {
 		// this means we need to load the backup conf:
 		// we ignore the CRC of the backup conf.
 		uint8_t* new_config_bytes = (uint8_t *) &backup_conf;
