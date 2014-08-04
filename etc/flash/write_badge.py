@@ -3,12 +3,11 @@ import os
 
 def main():
     txtfile = sys.argv[1]
-    id = int(sys.argv[2])
+    clobber = sys.argv[2] == "clobber"
     handle = sys.argv[3] if sys.argv[3] != "none" else ""
     message = sys.argv[4] if sys.argv[4] != "none" else ""
-    clobber = False
-    if len(sys.argv) > 5 and sys.argv[5] == 'clobber':
-        clobber = True
+    id = int(sys.argv[5])
+    
     if len(handle) > 10:
         print "fail on handle length"
         exit(1)
