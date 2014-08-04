@@ -71,7 +71,7 @@ uint8_t f_paired_trick = 0;
 
 // Global state:
 uint8_t clock_is_set = 0;
-uint8_t my_clock_authority = 0;
+uint8_t my_clock_authority = 0xff;
 uint16_t loops_to_rf_beacon = 10 * TIME_LOOP_HZ;
 char pairing_message[20] = "";
 char event_message[40] = "";
@@ -183,11 +183,11 @@ void set_my_score_from_config() {
 	known_props += (my_score>=31);
 }
 
-void set_score(uint8_t id, uint8_t value) {
-	uint8_t score_frame = id / 16;
+void set_score(uint16_t id, uint16_t value) {
+	uint16_t score_frame = id / 16;
 	uint16_t score_bits = 0;
 	while (value--) {
-		score_bits |= 1 << (id+value % 16);
+		score_bits |= 1 << (id % 16) + value;
 	}
 	if (!(~(my_conf.scores[score_frame]) & score_bits)) {
 		// haven't seen it, so we need to set its 1 to a 0.
@@ -533,7 +533,6 @@ int main( void )
 			if (in_payload.clock_authority != 0xff &&
 					(!clock_is_set ||
 							in_payload.clock_authority < my_clock_authority)) {
-				am_idle = 0;
 				update_clock();
 			}
 #if BADGE_TARGET
@@ -583,7 +582,11 @@ int main( void )
 				// If we're paired, and this is from the person
 				// we're paired with, it's the most authoritative prop possible.
 				uint8_t prop_authority = in_payload.prop_from;
-				if (((!s_propped && !s_prop) || prop_authority < s_prop_authority) && in_payload.prop_time_loops_before_start) {
+				if (( (!s_propped && !s_prop)
+				     || prop_authority < s_prop_authority
+					)
+					&& in_payload.prop_time_loops_before_start)
+				{
 					s_propped = 1;
 					s_prop = 0;
 					s_prop_authority = in_payload.prop_from;
@@ -690,7 +693,6 @@ int main( void )
 					s_trick = TRICK_COUNT+1;
 				} else if (badge_status == BSTAT_GAYDAR && !s_prop && !s_propped && neighbor_count && known_props && rand() % 2) { // TODO
 					// prop
-					// TODO:
 					s_prop = 1;
 					s_prop_authority = my_conf.badge_id;
 
@@ -847,21 +849,13 @@ int main( void )
 #endif
 			if (!clock_is_set)
 				out_payload.clock_authority = 0xff;
-#if !BADGE_TARGET
-			else
-				out_payload.clock_authority = 0;
-#endif
 			radio_send_sync();
 			s_need_rf_beacon = 0;
-		} else if (s_rf_retransmit && rfm_reg_state == RFM_REG_IDLE) {
+		} else if (s_rf_retransmit && rfm_reg_state == RFM_REG_IDLE && !(read_single_register_sync(0x27) & (BIT1+BIT0))) {
 			out_payload.beacon = 0;
 
 			if (!clock_is_set)
 				out_payload.clock_authority = 0xff;
-#if !BADGE_TARGET
-			else
-				out_payload.clock_authority = 0;
-#endif
 			radio_send_sync();
 			s_rf_retransmit = 0;
 		}
@@ -1122,7 +1116,7 @@ void check_config() {
 
 	uint16_t crc = config_crc(my_conf);
 
-	if (crc != my_conf.crc) { // TODO!!!!!!!!!!!!!1
+	if (crc != my_conf.crc || 1) { // TODO!!!!!!!!!!!!!1
 		// this means we need to load the backup conf:
 		// we ignore the CRC of the backup conf.
 		uint8_t* new_config_bytes = (uint8_t *) &backup_conf;
@@ -1150,8 +1144,10 @@ void check_config() {
 	s_new_score = 0;
 
 	// Setup our IR pairing payload:
-	memcpy(&(ir_pair_payload[0]), my_conf.handle, 11);
-	memcpy(&(ir_pair_payload[11]), my_conf.message, 17);
+//	memcpy(&(ir_pair_payload[0]), my_conf.handle, 11); // causes problems?
+//	memcpy(&(ir_pair_payload[11]), my_conf.message, 17);
+	strcpy(&(ir_pair_payload[0]), my_conf.handle);
+	strcpy(&(ir_pair_payload[11]), my_conf.message);
 	out_payload.from_addr = my_conf.badge_id;
 
 }
@@ -1168,8 +1164,6 @@ void update_clock() {
 		clock_is_set = 1;
 		my_clock_authority = in_payload.clock_authority;
 		out_payload.clock_authority = 1;
-		if (!out_payload.clock_authority)
-			out_payload.clock_authority = 1;
 		init_alarms();
 		set_score(48, 1); // clock setting
 	}

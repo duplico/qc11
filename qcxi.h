@@ -91,7 +91,7 @@ uint8_t paired_badge(uint8_t);
 void set_badge_paired(uint8_t);
 uint8_t have_trick(uint8_t);
 void set_event_occurred(uint8_t id);
-void set_score(uint8_t id, uint8_t value);
+void set_score(uint16_t id, uint16_t value);
 
 // For setting up our time-based loop:
 // 128 Hz / 4 = 32 Hz
