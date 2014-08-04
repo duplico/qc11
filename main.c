@@ -117,7 +117,6 @@ uint8_t s_prop_id = 0,
 		s_propped = 0,
 		s_need_rf_beacon = 0,
 		s_rf_retransmit = 0,
-		s_pair = 0, // f_pair
 		s_new_pair = 0,
 		s_new_trick = 0,
 		s_new_score = 0,
@@ -313,7 +312,7 @@ void set_badge_paired(uint8_t id) {
 
 void set_gaydar_target() {
 	if (neighbor_count > 3)
-		target_gaydar_index = 3;
+		target_gaydar_index = 4;
 	else
 		target_gaydar_index = neighbor_count;
 }

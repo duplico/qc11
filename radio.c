@@ -31,6 +31,9 @@ volatile uint8_t rfm_reg_state = RFM_REG_IDLE;
 // The protocol machine:
 volatile uint8_t rfm_proto_state = 0;
 
+// temp buffer:
+uint8_t in_bytes[sizeof(in_payload)];
+
 void init_radio() {
 
 	// SPI for radio //////////////////////////////////////////////////////////
@@ -343,7 +346,7 @@ __interrupt void USCI_B1_ISR(void)
 			break;
 		case RFM_REG_RX_FIFO_DAT:
 			// Got a data byte from the FIFO. Put it into its proper place.
-			((uint8_t *) &in_payload)[rfm_reg_rx_index] = USCI_B_SPI_receiveData(USCI_B1_BASE);
+			(in_bytes)[rfm_reg_rx_index] = USCI_B_SPI_receiveData(USCI_B1_BASE);
 			rfm_reg_rx_index++;
 			if (rfm_reg_rx_index == sizeof(qcxipayload)) {
 				// That was the last one we were expecting.
@@ -448,6 +451,7 @@ __interrupt void USCI_B1_ISR(void)
 			break;
 		case RFM_REG_RX_FIFO_DAT:
 			rfm_reg_state = RFM_REG_IDLE;
+			memcpy(&in_payload, in_bytes, sizeof(qcxipayload));
 			f_rfm_rx_done = 1;
 			break;
 		case RFM_REG_TX_FIFO_DAT:
