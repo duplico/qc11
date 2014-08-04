@@ -282,7 +282,7 @@ void init_alarms() {
 
 			break;
 		}
-		if (next_alarm != 4 && clock_is_set)
+		if (!done && next_alarm != 4 && clock_is_set)
 			set_event_occurred(alarms[next_alarm].event_id);
 		next_alarm++;
 	}
@@ -294,36 +294,34 @@ void init_alarms() {
 }
 
 void init_rtc() {
-	//Starting Time for Calendar:
-	currentTime.Seconds    = 0;
-	currentTime.Minutes    = 0;
-	currentTime.Hours      = 20;
-	currentTime.DayOfWeek  = 0; // we don't use this.
-	currentTime.DayOfMonth = 7;
-	currentTime.Month      = 8;
-	currentTime.Year       = 2014;
+	if (!clock_is_set) {
+		//Starting Time for Calendar:
+		currentTime.Seconds    = 0;
+		currentTime.Minutes    = 0;
+		currentTime.Hours      = 20;
+		currentTime.DayOfWeek  = 0; // we don't use this.
+		currentTime.DayOfMonth = 7;
+		currentTime.Month      = 8;
+		currentTime.Year       = 2014;
 
-	// Setting our interim clock (the one that helps us figure out if the
-	// con is over, if nothing else)
-	// looking one per day...
-	if (~my_conf.events_occurred & BIT7) { // after defcon...
-		currentTime.DayOfMonth = 11; // monday
-	} else if (~my_conf.events_occurred & BIT3) {
-		currentTime.DayOfMonth = 10; // sunday
-	} else if (~my_conf.events_occurred & BIT2) { // saturday mixer
-		currentTime.DayOfMonth = 9; // saturday
-	} else if (~my_conf.events_occurred & BIT1) { // Friday mixer
-		currentTime.DayOfMonth = 8; // friday
+		// Setting our interim clock (the one that helps us figure out if the
+		// con is over, if nothing else)
+		// looking one per day...
+		if (~my_conf.events_occurred & BIT7) { // after defcon...
+			currentTime.DayOfMonth = 11; // monday
+		} else if (~my_conf.events_occurred & BIT3) {
+			currentTime.DayOfMonth = 10; // sunday
+		} else if (~my_conf.events_occurred & BIT2) { // saturday mixer
+			currentTime.DayOfMonth = 9; // saturday
+		} else if (~my_conf.events_occurred & BIT1) { // Friday mixer
+			currentTime.DayOfMonth = 8; // friday
+		}
 	}
 
 	//Initialize Calendar Mode of RTC
 	RTC_A_calendarInit(RTC_A_BASE,
 			currentTime,
 			RTC_A_FORMAT_BINARY);
-
-	//Interrupt to every minute with a CalendarEvent
-	RTC_A_setCalendarEvent(RTC_A_BASE,
-			RTC_A_CALENDAREVENT_MINUTECHANGE);
 
 	//Enable interrupt for RTC Ready Status, which asserts when the RTC
 	//Calendar registers are ready to read.
