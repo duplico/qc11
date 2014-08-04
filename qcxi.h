@@ -109,6 +109,7 @@ extern uint8_t badge_status;
 extern uint8_t am_idle;
 extern uint8_t clock_is_set;
 extern uint8_t gaydar_index;
+extern uint8_t my_clock_authority;
 
 // Power-on self test result codes:
 #define POST_XT1F 	0b1

@@ -204,6 +204,11 @@ char alarm_msg[40] = "";
 void init_alarms() {
 	currentTime = RTC_A_getCalendarTime(RTC_A_BASE);
 
+	if (currentTime.Year == 0) {
+		clock_is_set = 0;
+		init_rtc();
+	}
+
 	// Find the next alarm:
 	uint8_t next_alarm = 0;
 	uint8_t min;
@@ -315,6 +320,9 @@ void init_rtc() {
 		} else if (~my_conf.events_occurred & BIT1) { // Friday mixer
 			currentTime.DayOfMonth = 8; // friday
 		}
+
+		my_clock_authority = 0xff;
+		out_payload.clock_authority = 0xff;
 	}
 
 	//Initialize Calendar Mode of RTC
