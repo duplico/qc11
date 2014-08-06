@@ -261,6 +261,10 @@ void ser_print(char* text) {
 	USCI_A_UART_transmitData(USCI_A1_BASE, ser_buffer_tx[ser_index_tx]);
 }
 
+void ser_cls() {
+	ser_print("\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n");
+}
+
 volatile uint8_t echo = 0;
 #pragma vector=USCI_A1_VECTOR
 __interrupt void ser_debug_isr(void)

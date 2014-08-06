@@ -12,7 +12,7 @@
 #include "driverlib.h"
 
 // Configuration flags
-#define BADGE_TARGET 1
+#define BADGE_TARGET 0
 #define DEBUG_SERIAL 0
 #define BADGES_IN_SYSTEM 160
 #define RECEIVE_WINDOW 8
@@ -161,6 +161,7 @@ typedef struct {
 	uint16_t crc;
 } qcxiconf;
 extern const qcxiconf my_conf;
+extern qcxiconf disk_conf;
 
 extern volatile Calendar currentTime;
 
@@ -184,6 +185,9 @@ extern uint8_t f_ir_itp_step;
 extern uint8_t f_ir_pair_abort;
 extern uint8_t f_paired_trick;
 
+extern uint8_t s_disk_is_inserted;
+extern volatile uint8_t f_disk_is_inserted;
+
 typedef struct {
 	uint8_t to_addr, from_addr, base_id, clock_authority;
 	uint8_t prop_from;
@@ -202,6 +206,7 @@ extern qcxipayload in_payload, out_payload;
 	extern volatile char ser_buffer_tx[255];
 	extern volatile uint8_t f_ser_rx;
 	void ser_print(char*);
+	void ser_cls();
 	void ser_init();
 	// WS2812 LEDs:
 	extern uint8_t ws_frameBuffer[];
