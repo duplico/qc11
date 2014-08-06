@@ -367,6 +367,12 @@ void ir_process_rx_ready() {
 		break;
 
 	case IR_OP_KEEPALIVE:
+		if (!s_disk_is_inserted) {
+			f_disk_is_inserted = 1;
+			memcpy(&disk_conf.paired_ids, &(ir_rx_frame[2]), 28); // paired_ids and scores
+			disk_conf.events_attended = ir_rx_frame[31];
+			disk_conf.badge_id = ir_partner;
+		}
 		if (ir_pair_role == IR_ROLE_S && ir_rx_from == ir_partner) {
 			switch(ir_proto_state) {
 			case IR_PROTO_ITP:
@@ -386,6 +392,12 @@ void ir_process_rx_ready() {
 	case IR_OP_STILLALIVE:
 		if (ir_proto_state == IR_PROTO_PAIRED && ir_pair_role == IR_ROLE_C && ir_rx_from == ir_partner) {
 			// Got a stillalive.
+			if (!s_disk_is_inserted) {
+				f_disk_is_inserted = 1;
+				memcpy(&disk_conf.paired_ids, &(ir_rx_frame[2]), 28); // paired_ids and scores
+				disk_conf.events_attended = ir_rx_frame[31];
+				disk_conf.badge_id = ir_partner;
+			}
 			if (seqnum) {
 				f_paired_trick = seqnum;
 			}

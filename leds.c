@@ -388,6 +388,7 @@ void led_set_rainbow(uint16_t value) {
 	led_values[4] |= ((value & BIT1) << 7) | (value & BIT0);
 }
 
+#if BADGE_TARGET
 void led_update_display() {
 	// Clear everything but the rainbows on the end:
 	led_values[0] &= 0b1000000000000001;
@@ -429,6 +430,23 @@ void led_update_display() {
 	P1OUT |= BIT7; P1OUT &= ~BIT7;
 
 }
+#else
+void led_update_display() {
+	ser_cls();
+	// TODO: maybe draw a box around this.
+	for (uint8_t row=0; row<5; row++) {
+		ser_print("                                  ");
+		for (uint8_t col=0; col<14; col++) {
+			if (disp_buffer[led_display_bottom + (4-row)] & (1 << (1-col)))
+				ser_print("\0x71");
+			else
+				ser_print(" ");
+		}
+
+		ser_print("\r\n");
+	}
+}
+#endif
 
 void led_enable(uint16_t duty_cycle) {
 //	GPIO_setAsPeripheralModuleFunctionOutputPin(LED_PORT, LED_BLANK);

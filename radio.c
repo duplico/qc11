@@ -156,7 +156,7 @@ void init_radio() {
 	write_single_register(0x3c, sizeof(qcxipayload));
 
 	/// Output configuration:
-	write_single_register(0x11, 0b10011010); // Output power
+	write_single_register(0x11, 0b10011111); // Output power
 //	write_single_register(0x12, 0b00001111); // PA0 ramp time
 
 	write_single_register(0x25, 0b00000000); // GPIO map to default
