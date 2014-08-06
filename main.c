@@ -770,6 +770,7 @@ int main( void )
 			uint8_t badge_frame;
 			uint8_t badge_bit;
 			uint8_t pair_count;
+			uint8_t uber_count;
 			char pair_count_str[4] = {'0', '0', '0', 0};
 
 			for (uint8_t i=0; i<150; i++) {
@@ -781,22 +782,73 @@ int main( void )
 				uint8_t pair_count = 0;
 				if (!(disk_conf.paired_ids[badge_frame]) & badge_bit) {
 					pair_count++;
+					if (i < 12) {
+						uber_count++;
+					}
 					ser_print("#");
 				} else {
 					ser_print(" ");
 				}
 			}
+
 			pair_count_str[0] = '0' + pair_count/100;
 			pair_count_str[1] = '0' + (pair_count/10) % 10;
 			pair_count_str[2] = '0' + pair_count % 10;
 			ser_print("\r\n                         ");
 			ser_print(pair_count_str);
-			ser_print("/150\r\n\r\n");
+			ser_print("/150 with ");
+			pair_count_str[0] = uber_count/10;
+			pair_count_str[1] = uber_count % 10;
+			pair_count_str[2] = 0;
+			ser_print(pair_count_str);
+			ser_print(" ubers.");
+
+			uint8_t disk_known_trick_count = 1;
+			uint16_t disk_known_tricks = 1 << (disk_conf.badge_id % TRICK_COUNT);
+
+			for (uint8_t trick_id = 0; trick_id < TRICK_COUNT; trick_id++) {
+				if (trick_id == disk_conf.badge_id % TRICK_COUNT) continue;
+				for (uint8_t badge_id = trick_id; badge_id < BADGES_IN_SYSTEM; badge_id+=TRICK_COUNT) {
+					if (paired_badge(badge_id) && !(disk_known_tricks & 1<<(trick_id))) {
+						disk_known_tricks |= 1 << trick_id;
+						disk_known_trick_count++;
+						break;
+					}
+				}
+			}
+
+			ser_print("You've learned to do ");
+			pair_count_str[0] = disk_known_trick_count/10 + '0';
+			pair_count_str[1] = (disk_known_trick_count % 10) + '0';
+			pair_count_str[2] = 0;
+			ser_print(pair_count_str);
+			ser_print("/12 tricks.\r\n\r\n");
+
+			uint8_t disk_score = 0;
+
+			// Count the bits set in score:
+			uint16_t v = 0;
+			for (uint8_t i=0; i<4; i++) {
+				v = ~my_conf.scores[i];
+				for (;v;my_score++) {
+					v &= v - 1;
+				}
+			}
+
+			s_count_score_cycles = COUNT_SCORE_CYCLES;
+			shown_score = 0;
+			s_count_score = 1;
+
+			known_props = 0;
+			known_props += (my_score>=3);
+			known_props += (my_score>=6);
+			known_props += (my_score>=11);
+			known_props += (my_score>=17);
+			known_props += (my_score>=24);
+			known_props += (my_score>=31);
 
 
-
-			ser_print("")
-
+			ser_print("Your score is currently ");
 
 		}
 
