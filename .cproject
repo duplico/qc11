@@ -24,7 +24,7 @@
 								<listOptionValue builtIn="false" value="LINKER_COMMAND_FILE=lnk_msp430f5308.cmd"/>
 								<listOptionValue builtIn="false" value="RUNTIME_SUPPORT_LIBRARY=libc.a"/>
 								<listOptionValue builtIn="false" value="ADDITIONAL_FLAGS__COMPILER="/>
-								<listOptionValue builtIn="false" value="ADDITIONAL_FLAGS__LINKER=--cinit_compression=lzss"/>
+								<listOptionValue builtIn="false" value="ADDITIONAL_FLAGS__LINKER="/>
 								<listOptionValue builtIn="false" value="OUTPUT_TYPE=executable"/>
 							</option>
 							<option id="com.ti.ccstudio.buildDefinitions.core.OPT_CODEGEN_VERSION.1171211522" name="Compiler version" superClass="com.ti.ccstudio.buildDefinitions.core.OPT_CODEGEN_VERSION" value="4.3.3" valueType="string"/>

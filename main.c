@@ -378,7 +378,6 @@ int main( void )
 		fillFrameBufferSingleColor(&leds[6], NUMBEROFLEDS, ws_frameBuffer, ENCODING);
 		ws_set_colors_async(NUMBEROFLEDS);
 		delay(1000);
-#endif
 	} else if (my_conf.handle[0]) {
 		led_print_scroll(my_conf.handle, 1);
 	} else {
@@ -387,6 +386,7 @@ int main( void )
 	uint8_t color = 0;
 	led_anim_init();
 
+	ser_cls();
 	ser_print("Starting up...");
 	delay(1000);
 
@@ -616,7 +616,7 @@ int main( void )
 		if (f_time_loop) {
 			f_time_loop = 0;
 			if (!s_disk_is_inserted) {
-				led_timestep();
+//				led_timestep();
 			}
 
 			fillFrameBufferSingleColor(&leds[color], NUMBEROFLEDS, ws_frameBuffer, ENCODING);
@@ -646,14 +646,14 @@ int main( void )
 
 			if (!clock_is_set)
 				out_payload.clock_authority = 0xff;
-			radio_send_sync();
+//			radio_send_sync();
 			s_need_rf_beacon = 0;
 		} else if (s_rf_retransmit && rfm_reg_state == RFM_REG_IDLE && !(read_single_register_sync(0x27) & (BIT1+BIT0))) {
 			out_payload.beacon = 0;
 
 			if (!clock_is_set)
 				out_payload.clock_authority = 0xff;
-			radio_send_sync();
+//			radio_send_sync();
 			s_rf_retransmit = 0;
 		}
 
@@ -665,83 +665,83 @@ int main( void )
 		}
 
 		// Pre-emptive:
+//
+//		if (am_idle) { // Can do another action now.
+//			switch(badge_status) {
+//			case BSTAT_GAYDAR:
+//				if (s_propped && !s_prop_cycles) {
+//					// Do a prop effect:
+//					am_idle = 0;
+//					s_propped = 0;
+//					out_payload.prop_from = 0xff;
+//					out_payload.prop_time_loops_before_start = 0;
+//
+//					if (s_prop_id <= 1) { // 0, 1 are full:
+//						if (s_prop_id != 1)
+//							led_display_left &= ~BIT0;
+////						full_animate(prop_effects[s_prop_id], PROP_FRAMESKIP);
+//					} else { // the rest are full:
+////						left_sprite_animate(prop_effects_sprites[s_prop_id-2], PROP_FRAMESKIP);
+//					}
+//					s_trick = 0;
+//
+//				} else if (target_gaydar_index > gaydar_index) {
+//					am_idle = 0;
+//					right_sprite_animate(gaydar[gaydar_index], 4, 0, 1, 1);
+//					left_sprite_animate(anim_sprite_wave, 4);
+//					gaydar_index++;
+//				} else if (target_gaydar_index < gaydar_index) {
+//					am_idle = 0;
+//					gaydar_index--;
+//					right_sprite_animate(gaydar[gaydar_index], 4, 0, -1, gaydar_index!=0);
+//					left_sprite_animate(anim_sprite_wave, 4);
+//				}
+//				break;
+//			case BSTAT_PAIR:
+//				if (f_unpaired) {
+//					f_unpaired = 0;
+//					s_disk_is_inserted = 0;
+//					itps_pattern = 0;
+//					s_update_rainbow = 1;
+//					badge_status = BSTAT_GAYDAR;
+//					am_idle = 0;
+//					right_sprite_animate(anim_sprite_walkin, 2, 1, -1, 0);
+//					left_sprite_animate(anim_sprite_wave, 2);
+//					break;
+//				}
+//				switch(pair_state) {
+//				case PAIR_INIT: // Pat just walked on
+//					am_idle = 0;
+//					pair_state = PAIR_WAVE;
+//					right_sprite_animate(anim_sprite_wave, 5, 1, 1, 1);
+//					left_sprite_animate(anim_sprite_wave, 5);
+//					break;
+//				case PAIR_WAVE:
+//					am_idle = 0;
+//					memset(pairing_message, 0, 20);
+//					strcat(pairing_message, "Hi ");
+//					strcat(pairing_message, ir_rx_handle);
+//					led_print_scroll(pairing_message, 1);
+//					pair_state = PAIR_GREETING;
+//					break;
+//				case PAIR_GREETING:
+//					if (!ir_rx_message[0]) {
+//						pair_state = PAIR_IDLE;
+//					} else {
+//						am_idle = 0;
+//						led_print_scroll(ir_rx_message, 1);
+//						pair_state = PAIR_MESSAGE;
+//						break;
+//					}
+//					break;
+//				case PAIR_MESSAGE:
+//					pair_state = PAIR_IDLE;
+//					break;
+//				}
+//			} // end switch(badge_status)
+//		}
 
-		if (am_idle) { // Can do another action now.
-			switch(badge_status) {
-			case BSTAT_GAYDAR:
-				if (s_propped && !s_prop_cycles) {
-					// Do a prop effect:
-					am_idle = 0;
-					s_propped = 0;
-					out_payload.prop_from = 0xff;
-					out_payload.prop_time_loops_before_start = 0;
-
-					if (s_prop_id <= 1) { // 0, 1 are full:
-						if (s_prop_id != 1)
-							led_display_left &= ~BIT0;
-						full_animate(prop_effects[s_prop_id], PROP_FRAMESKIP);
-					} else { // the rest are full:
-						left_sprite_animate(prop_effects_sprites[s_prop_id-2], PROP_FRAMESKIP);
-					}
-					s_trick = 0;
-
-				} else if (target_gaydar_index > gaydar_index) {
-					am_idle = 0;
-					right_sprite_animate(gaydar[gaydar_index], 4, 0, 1, 1);
-					left_sprite_animate(anim_sprite_wave, 4);
-					gaydar_index++;
-				} else if (target_gaydar_index < gaydar_index) {
-					am_idle = 0;
-					gaydar_index--;
-					right_sprite_animate(gaydar[gaydar_index], 4, 0, -1, gaydar_index!=0);
-					left_sprite_animate(anim_sprite_wave, 4);
-				}
-				break;
-			case BSTAT_PAIR:
-				if (f_unpaired) {
-					f_unpaired = 0;
-					s_disk_is_inserted = 0;
-					itps_pattern = 0;
-					s_update_rainbow = 1;
-					badge_status = BSTAT_GAYDAR;
-					am_idle = 0;
-					right_sprite_animate(anim_sprite_walkin, 2, 1, -1, 0);
-					left_sprite_animate(anim_sprite_wave, 2);
-					break;
-				}
-				switch(pair_state) {
-				case PAIR_INIT: // Pat just walked on
-					am_idle = 0;
-					pair_state = PAIR_WAVE;
-					right_sprite_animate(anim_sprite_wave, 5, 1, 1, 1);
-					left_sprite_animate(anim_sprite_wave, 5);
-					break;
-				case PAIR_WAVE:
-					am_idle = 0;
-					memset(pairing_message, 0, 20);
-					strcat(pairing_message, "Hi ");
-					strcat(pairing_message, ir_rx_handle);
-					led_print_scroll(pairing_message, 1);
-					pair_state = PAIR_GREETING;
-					break;
-				case PAIR_GREETING:
-					if (!ir_rx_message[0]) {
-						pair_state = PAIR_IDLE;
-					} else {
-						am_idle = 0;
-						led_print_scroll(ir_rx_message, 1);
-						pair_state = PAIR_MESSAGE;
-						break;
-					}
-					break;
-				case PAIR_MESSAGE:
-					pair_state = PAIR_IDLE;
-					break;
-				}
-			} // end switch(badge_status)
-		}
-
-		if (pair_state == PAIR_IDLE && f_disk_is_inserted) {
+		if (f_disk_is_inserted) {
 			f_disk_is_inserted = 0;
 			s_disk_is_inserted = 1;
 
@@ -776,9 +776,10 @@ int main( void )
 			for (uint8_t i=0; i<150; i++) {
 				if (i % 30 == 0) {
 					ser_print("\r\n                         ");
+					delay(100);
 				}
-				badge_frame = id / 16;
-				badge_bit = 1 << (id % 16);
+				badge_frame = disk_conf.badge_id / 16;
+				badge_bit = 1 << (disk_conf.badge_id % 16);
 				pair_count = 0;
 				if (!(disk_conf.paired_ids[badge_frame]) & badge_bit) {
 					pair_count++;
@@ -790,6 +791,7 @@ int main( void )
 					ser_print(" ");
 				}
 			}
+			delay(100);
 
 			pair_count_str[0] = '0' + pair_count/100;
 			pair_count_str[1] = '0' + (pair_count/10) % 10;
@@ -856,7 +858,7 @@ int main( void )
 		if (am_idle) {
 			if (s_trick) {
 				uint16_t trick_len = 0;
-				while (!(tricks[s_trick-1][trick_len++].lastframe & BIT7));
+//				while (!(tricks[s_trick-1][trick_len++].lastframe & BIT7));
 				trick_len *= 4; // TODO.
 				if (!(s_propped || s_prop) ||
 						(s_propped && trick_len+TIME_LOOP_HZ < s_prop_cycles) ||
@@ -867,7 +869,7 @@ int main( void )
 					if (pair_state == PAIR_IDLE) {
 						ir_proto_seqnum = s_trick;
 					}
-					left_sprite_animate((spriteframe *)tricks[s_trick-1], 4);
+//					left_sprite_animate((spriteframe *)tricks[s_trick-1], 4);
 					s_trick = 0; // this needs to be after the above statement. Duh.
 				}
 			}
@@ -877,7 +879,7 @@ int main( void )
 			f_paired_trick = 0;
 		}
 		if (pair_state == PAIR_IDLE && f_paired_trick) {
-			right_sprite_animate((spriteframe *)tricks[f_paired_trick-1], 4, 1, 1, 0xff);
+//			right_sprite_animate((spriteframe *)tricks[f_paired_trick-1], 4, 1, 1, 0xff);
 			f_paired_trick = 0;
 		}
 
@@ -906,11 +908,11 @@ int main( void )
 				rainbow_lights |= ((uint16_t) ~reverse_events & 0b11111000) << 2;
 			}
 
-			led_set_rainbow(rainbow_lights);
+//			led_set_rainbow(rainbow_lights);
 		}
 
 		// Going to sleep... mode...
-		__bis_SR_register(LPM3_bits + GIE);
+//		__bis_SR_register(LPM3_bits + GIE);
 	}
 } // end main()
 
