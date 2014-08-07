@@ -271,14 +271,14 @@ void set_event_occurred(uint8_t id) {
 }
 
 uint8_t paired_badge(uint8_t id) {
-	uint8_t badge_frame = id / 16;
-	uint8_t badge_bit = 1 << (id % 16);
+	uint16_t badge_frame = id / 16;
+	uint16_t badge_bit = 1 << (id % 16);
 	return (~(my_conf.paired_ids[badge_frame]) & badge_bit)? 1: 0;
 }
 
 void set_badge_paired(uint8_t id) {
-	uint8_t badge_frame = id / 16;
-	uint8_t badge_bit = 1 << (id % 16);
+	uint16_t badge_frame = id / 16;
+	uint16_t badge_bit = 1 << (id % 16);
 
 	// See if this is a new pair.
 	if (id != 0xff && !(~(my_conf.paired_ids[badge_frame]) & badge_bit)) {
