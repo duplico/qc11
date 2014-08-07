@@ -248,21 +248,24 @@ void ser_init() {
 			USCI_A_UART_RECEIVE_INTERRUPT
 	);
 
-	USCI_A_UART_clearInterruptFlag(USCI_A1_BASE, USCI_A_UART_TRANSMIT_INTERRUPT_FLAG);
-	USCI_A_UART_enableInterrupt(
+//	USCI_A_UART_clearInterruptFlag(USCI_A1_BASE, USCI_A_UART_TRANSMIT_INTERRUPT_FLAG);
+	USCI_A_UART_disableInterrupt(
 			USCI_A1_BASE,
 			USCI_A_UART_TRANSMIT_INTERRUPT
 	);
 }
 
 void ser_print(char* text) {
-	strcpy(ser_buffer_tx, text);
-	ser_index_tx = 0;
-	USCI_A_UART_transmitData(USCI_A1_BASE, ser_buffer_tx[ser_index_tx]);
+	uint8_t i=0;
+	while (text[i]) {
+		USCI_A_UART_transmitData(USCI_A1_BASE, text[i]);
+		i++;
+	}
 }
 
 void ser_cls() {
-	ser_print("\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n");
+	ser_print("\033[2J\033[H");
+//	ser_print("\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n");
 }
 
 volatile uint8_t echo = 0;
@@ -275,8 +278,8 @@ __interrupt void ser_debug_isr(void)
 		break;
 	case 2:	// RXIFG: RX buffer ready to read.
 		ser_buffer_rx[ser_index_rx] = USCI_A_UART_receiveData(USCI_A1_BASE);
-		echo = 1;
-		USCI_A_UART_transmitData(USCI_A1_BASE, ser_buffer_rx[ser_index_rx]);
+//		echo = 1;
+//		USCI_A_UART_transmitData(USCI_A1_BASE, ser_buffer_rx[ser_index_rx]);
 		if (ser_buffer_rx[ser_index_rx] == 0x0d) {
 			f_ser_rx = 1;
 			ser_index_rx = 0;
