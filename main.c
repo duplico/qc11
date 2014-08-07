@@ -767,10 +767,10 @@ int main( void )
 			ser_print("Let's see how you're doing with meeting people...\r\n");
 			delay(100);
 
-			uint8_t badge_frame;
-			uint8_t badge_bit;
-			uint8_t pair_count;
-			uint8_t uber_count;
+			uint8_t badge_frame = 0;
+			uint16_t badge_bit = 0;
+			uint8_t pair_count = 0;
+			uint8_t uber_count = 0;
 			char pair_count_str[4] = {'0', '0', '0', 0};
 
 			for (uint8_t i=0; i<150; i++) {
@@ -778,10 +778,9 @@ int main( void )
 					ser_print("\r\n                         ");
 					delay(100);
 				}
-				badge_frame = disk_conf.badge_id / 16;
-				badge_bit = 1 << (disk_conf.badge_id % 16);
-				pair_count = 0;
-				if (!(disk_conf.paired_ids[badge_frame]) & badge_bit) {
+				badge_frame = i / 16;
+				badge_bit = 1 << (i % 16);
+				if (~(disk_conf.paired_ids[badge_frame]) & badge_bit) {
 					pair_count++;
 					if (i < 12) {
 						uber_count++;
