@@ -760,7 +760,7 @@ int main( void )
 			}
 			ser_print("\r\n\r\n");
 			delay(100);
-			ser_print("This is your badge\r\n")
+			ser_print("This is your badge\r\n");
 			delay(100);
 			ser_print("There are many like it, but this one is yours.\r\n");
 			delay(100);
@@ -777,9 +777,9 @@ int main( void )
 				if (i % 30 == 0) {
 					ser_print("\r\n                         ");
 				}
-				uint8_t badge_frame = id / 16;
-				uint8_t badge_bit = 1 << (id % 16);
-				uint8_t pair_count = 0;
+				badge_frame = id / 16;
+				badge_bit = 1 << (id % 16);
+				pair_count = 0;
 				if (!(disk_conf.paired_ids[badge_frame]) & badge_bit) {
 					pair_count++;
 					if (i < 12) {
