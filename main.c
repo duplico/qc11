@@ -397,10 +397,21 @@ int main( void )
 		// New serial message?
 		if (f_ser_rx) {
 			f_ser_rx = 0;
-			// TODO: remove this echo.
 			ser_print((uint8_t *) ser_buffer_rx);
-
-			// TODO: Clock setting
+			if (ser_buffer_rx[1] >= '0' && ser_buffer_rx[1] <= '7') {
+				// BEGIN event
+				ser_print("Setting this base station up for event.");
+//				ser_print(ser_buffer_rx);
+				out_payload.base_id = ser_buffer_rx[1] - '0';
+			} else if (ser_buffer_rx[1] == 'Q') {
+				out_payload.base_id = 0xff;
+				ser_print("Ending event.");
+				// END event
+			} else if (ser_buffer_rx[1] == 'B') {
+				out_payload.base_id = BUS_BASE_ID;
+				ser_print("I'm the bus.");
+			}
+			memset(ser_buffer_rx, 0, 255);
 		}
 
 		if (f_rfm_tx_done) {
@@ -419,39 +430,9 @@ int main( void )
 
 		if (f_ir_pair_abort) {
 			f_ir_pair_abort = 0;
-#if BADGE_TARGET
-			if (itps_pattern) {
-				s_count_score_cycles = (my_score > 31) ? 1 : COUNT_SCORE_CYCLES;
-				shown_score = 0;
-				s_count_score = 1;
-			}
-			itps_pattern = 0;
-#endif
 		}
 
-		/*
-		 * Unlike with the IR pairing mechanism, there is very little state
-		 *  in the RF system. So we just need to load up the beacon into a
-		 *  buffer, and decide if we:
-		 *   * adjust neighbor count
-		 *   * are near a base station (arrive event)
-		 *   * should schedule a prop
-		 *   * set our clock
-		 *   * get the puppy
-		 *   * got confirmation we should give up the puppy (this will have
-		 *      some state)
-		 *
-		 *
-		 *  Here we can set:
-		 *   s_event_arrival = 0,
-		 *	 s_on_bus = 0;
-		 *	 s_new_score = 0,
-		 *	 s_new_prop = 0,
-		 *	 s_get_puppy;
-		 *	 s_lose_puppy;
-		 *
-		 *
-		 */
+
 		if (f_rfm_rx_done) {
 			f_rfm_rx_done = 0;
 
@@ -642,18 +623,20 @@ int main( void )
 		// This is background:
 		if (s_need_rf_beacon && rfm_reg_state == RFM_REG_IDLE  && !(read_single_register_sync(0x27) & (BIT1+BIT0))) {
 			out_payload.beacon = 0;
-			out_payload.base_id = 3;
 
 			if (!clock_is_set)
 				out_payload.clock_authority = 0xff;
-//			radio_send_sync();
+			// TODO: only send if clock is set.
+			if (clock_is_set)
+				radio_send_sync();
 			s_need_rf_beacon = 0;
 		} else if (s_rf_retransmit && rfm_reg_state == RFM_REG_IDLE && !(read_single_register_sync(0x27) & (BIT1+BIT0))) {
 			out_payload.beacon = 0;
 
 			if (!clock_is_set)
 				out_payload.clock_authority = 0xff;
-//			radio_send_sync();
+			if (clock_is_set)
+				radio_send_sync();
 			s_rf_retransmit = 0;
 		}
 
@@ -764,7 +747,7 @@ int main( void )
 			delay(100);
 			ser_print("There are many like it, but this one is yours.\r\n");
 			delay(100);
-			ser_print("Let's see how you're doing with meeting people...\r\n");
+			ser_print("Here's a graph of your pairing history...\r\n");
 			delay(100);
 
 			uint8_t badge_frame = 0;
@@ -772,51 +755,57 @@ int main( void )
 			uint8_t pair_count = 0;
 			uint8_t uber_count = 0;
 			char pair_count_str[4] = {'0', '0', '0', 0};
+			ser_print("________________________________");
+
+			uint8_t disk_known_trick_count = 1;
+			uint16_t disk_known_tricks = 1 << (disk_conf.badge_id % TRICK_COUNT);
+			uint8_t trick_id = 0;
 
 			for (uint8_t i=0; i<150; i++) {
 				if (i % 30 == 0) {
-					ser_print("\r\n                         ");
-					delay(100);
+					ser_print("\r\n|");
 				}
 				badge_frame = i / 16;
 				badge_bit = 1 << (i % 16);
 				if (~(disk_conf.paired_ids[badge_frame]) & badge_bit) {
 					pair_count++;
+					trick_id = i % TRICK_COUNT;
+					if (!(disk_known_tricks & 1<<(trick_id))) {
+						disk_known_tricks |= 1 << trick_id;
+						disk_known_trick_count++;
+					}
+
 					if (i < 12) {
 						uber_count++;
+						ser_print("U");
+					} else {
+						ser_print("#");
 					}
-					ser_print("#");
 				} else {
 					ser_print(" ");
 				}
+				if (i % 30 == 29) {
+					ser_print("|");
+					delay(100);
+				}
 			}
+			ser_print("\r\n--------------------------------\r\n");
+
 			delay(100);
 
 			pair_count_str[0] = '0' + pair_count/100;
 			pair_count_str[1] = '0' + (pair_count/10) % 10;
 			pair_count_str[2] = '0' + pair_count % 10;
-			ser_print("\r\n                         ");
+			ser_print("\r\n  ");
 			ser_print(pair_count_str);
 			ser_print("/150 with ");
-			pair_count_str[0] = uber_count/10;
-			pair_count_str[1] = uber_count % 10;
+			pair_count_str[0] = '0'+uber_count/10;
+			pair_count_str[1] = '0'+uber_count % 10;
 			pair_count_str[2] = 0;
 			ser_print(pair_count_str);
-			ser_print(" ubers.");
+			ser_print(" ubers.\r\n\r\n");
 
-			uint8_t disk_known_trick_count = 1;
-			uint16_t disk_known_tricks = 1 << (disk_conf.badge_id % TRICK_COUNT);
-
-			for (uint8_t trick_id = 0; trick_id < TRICK_COUNT; trick_id++) {
-				if (trick_id == disk_conf.badge_id % TRICK_COUNT) continue;
-				for (uint8_t badge_id = trick_id; badge_id < BADGES_IN_SYSTEM; badge_id+=TRICK_COUNT) {
-					if (paired_badge(badge_id) && !(disk_known_tricks & 1<<(trick_id))) {
-						disk_known_tricks |= 1 << trick_id;
-						disk_known_trick_count++;
-						break;
-					}
-				}
-			}
+			delay(500);
 
 			ser_print("You've learned to do ");
 			pair_count_str[0] = disk_known_trick_count/10 + '0';
@@ -825,32 +814,70 @@ int main( void )
 			ser_print(pair_count_str);
 			ser_print("/12 tricks.\r\n\r\n");
 
+			delay(1000);
+
 			uint8_t disk_score = 0;
 
 			// Count the bits set in score:
 			uint16_t v = 0;
 			for (uint8_t i=0; i<4; i++) {
-				v = ~my_conf.scores[i];
-				for (;v;my_score++) {
+				v = ~disk_conf.scores[i];
+				for (;v;disk_score++) {
 					v &= v - 1;
 				}
 			}
 
-			s_count_score_cycles = COUNT_SCORE_CYCLES;
-			shown_score = 0;
-			s_count_score = 1;
-
-			known_props = 0;
-			known_props += (my_score>=3);
-			known_props += (my_score>=6);
-			known_props += (my_score>=11);
-			known_props += (my_score>=17);
-			known_props += (my_score>=24);
-			known_props += (my_score>=31);
-
-
+			uint8_t disk_known_props = 0;
 			ser_print("Your score is currently ");
 
+			pair_count_str[0] = disk_score/10 + '0';
+			pair_count_str[1] = (disk_score % 10) + '0';
+			pair_count_str[2] = 0;
+
+			ser_print(pair_count_str);
+			ser_print(".\r\n\r\n");
+
+			delay(1000);
+
+//			known_props += (my_score>=3);
+//			known_props += (my_score>=6);
+//			known_props += (my_score>=11);
+//			known_props += (my_score>=17);
+//			known_props += (my_score>=24);
+//			known_props += (my_score>=31);
+//
+			if (disk_score >= 3) {
+				ser_print(" * Your badge knows the 'Ball' prop\r\n");
+				delay(500);
+			}
+			if (disk_score >= 6) {
+				ser_print(" * Your badge knows the 'Rainstick' prop\r\n");
+				delay(500);
+			}
+			if (disk_score >= 11) {
+				ser_print(" * Your badge knows the 'Earthquake' prop\r\n");
+				delay(500);
+			}
+			if (disk_score >= 17) {
+				ser_print(" * Your badge knows the 'Disco wand' prop\r\n");
+				delay(500);
+			}
+			if (disk_score >= 24) {
+				ser_print(" * Your badge knows the 'Trapdoor' prop\r\n");
+				delay(500);
+			}
+			if (disk_score >= 31) {
+				ser_print(" * Your badge knows the 'Dynamite' prop!\r\n");
+				ser_print("You've collected every prop!\r\n");
+				delay(500);
+			}
+
+		}
+
+		if (f_unpaired) {
+			f_unpaired = 0;
+			ser_cls();
+			s_disk_is_inserted = 0;
 		}
 
 		// Any status, if we have no more idle-status-change processing to do:
@@ -1019,7 +1046,6 @@ void check_config() {
 	strcpy(&(ir_pair_payload[0]), my_conf.handle);
 	strcpy(&(ir_pair_payload[11]), my_conf.message);
 	out_payload.from_addr = my_conf.badge_id;
-
 }
 
 void delay(uint16_t ms)
