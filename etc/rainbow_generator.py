@@ -13,7 +13,7 @@ def make_color_gradient(freq1, freq2, freq3,
         red = math.sin(freq1*i + phase1) * width + center
         green = math.sin(freq1*i + phase2) * width + center
         blue = math.sin(freq2*i + phase3) * width + center
-        print "{ 0x%x, 0x%x, 0x%x }," % (red/10, green/10, blue/10)
+        print "{ 0x%x, 0x%x, 0x%x }," % (red, green, blue)
 
 if __name__ == "__main__":
-    make_color_gradient(0.3, 0.3, 0.3, 0, 2*math.pi/3, 4*math.pi/3, len=25)
+    make_color_gradient(0.3, 0.3, 0.3, 0, 2*math.pi/3, 4*math.pi/3, len=21)
