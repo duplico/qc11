@@ -264,7 +264,8 @@ void ser_print(char* text) {
 }
 
 void ser_cls() {
-	ser_print("\033[2J\033[H");
+	ser_print("\033*\033{");
+//	ser_print("\033[2J\033[H");
 //	ser_print("\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n");
 }
 
