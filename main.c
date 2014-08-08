@@ -285,8 +285,8 @@ void set_badge_paired(uint8_t id) {
 
 		if (id < 12) {
 			set_score(id, 1); // seen each uber
-			// all zeroes means all seen:
-			if (!(~my_conf.scores[0] & 0b111111111111)) {
+			// if there are any 1s left, we have NOT seen all ubers:
+			if (!(my_conf.scores[0] & 0b111111111111)) {
 				set_score(12, 3); // seen all ubers
 			}
 		}
@@ -545,6 +545,9 @@ int main( void )
 						break;
 					case 2:
 						set_score(26, 1); // saturday mixer
+						break;
+					case 3:
+						set_score(32, 1); // sunday mixer
 						break;
 					case 4:
 						set_score(27, 5); // sunday after party
