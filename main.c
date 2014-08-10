@@ -392,6 +392,10 @@ int main( void )
 
 	// Main sequence:
 	f_rfm_rx_done = 0;
+
+	// BUS:
+	out_payload.base_id = 2;
+
 	while (1) {
 
 		// New serial message?
