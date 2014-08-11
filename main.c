@@ -746,7 +746,7 @@ int main( void )
 			ser_print("This is your badge\r\n");
 			delay(100);
 			ser_print("There are many like it, but this one is yours.\r\n");
-			delay(100);
+			delay(1200);
 			ser_print("Here's a graph of your pairing history...\r\n");
 			delay(100);
 
@@ -767,7 +767,9 @@ int main( void )
 				}
 				badge_frame = i / 16;
 				badge_bit = 1 << (i % 16);
-				if (~(disk_conf.paired_ids[badge_frame]) & badge_bit) {
+
+				if ((~(disk_conf.paired_ids[badge_frame]) & badge_bit)
+						|| (i < 12 && (~(disk_conf.scores[0]) & badge_bit))) {
 					pair_count++;
 					trick_id = i % TRICK_COUNT;
 					if (!(disk_known_tricks & 1<<(trick_id))) {
@@ -827,24 +829,7 @@ int main( void )
 				}
 			}
 
-			uint8_t disk_known_props = 0;
-			ser_print("Your score is currently ");
-
-			pair_count_str[0] = disk_score/10 + '0';
-			pair_count_str[1] = (disk_score % 10) + '0';
-			pair_count_str[2] = 0;
-
-			ser_print(pair_count_str);
-			ser_print(".\r\n\r\n");
-
 			delay(1000);
-
-//			known_props += (my_score>=3);
-//			known_props += (my_score>=6);
-//			known_props += (my_score>=11);
-//			known_props += (my_score>=17);
-//			known_props += (my_score>=24);
-//			known_props += (my_score>=31);
 //
 			if (disk_score >= 3) {
 				ser_print(" * Your badge knows the 'Ball' prop\r\n");
@@ -871,6 +856,164 @@ int main( void )
 				ser_print("You've collected every prop!\r\n");
 				delay(500);
 			}
+
+			delay(2000);
+
+
+			// Now list scores?
+			ser_print("\r\n\r\n\r\n\r\nHere are your scoring achievements:\r\n\r\n");
+			delay(500);
+
+			ser_print(" [");
+			pair_count_str[0] = '0'+uber_count/10;
+			pair_count_str[1] = '0'+uber_count % 10;
+			pair_count_str[2] = 0;
+			ser_print(pair_count_str);
+			ser_print(    "] UBER PAIRER.\r\n");
+			ser_print("      One point for pairing with each QC uber badge holder\r\n\r\n");
+			delay(1500);
+
+			if (~disk_conf.scores[0] & (1 << 12)) {
+				ser_print(" [3] UBER WHORE\r\n");
+				ser_print("     Pair with lots of uber badges.\r\n\r\n");
+				delay(1500);
+			}
+
+			if (~disk_conf.scores[0] & (1 << 15)) {
+				ser_print(" [1] IS ANYBODY THERE?\r\n");
+				ser_print("     Receive a radio beacon for the first time.\r\n\r\n");
+				delay(1500);
+			}
+
+			if (~disk_conf.scores[1] & (1)) {
+				ser_print(" [1] MY BUDDY AND ME\r\n");
+				ser_print("     Pair with another badge.\r\n\r\n");
+				delay(1500);
+			}
+
+			if (~disk_conf.scores[1] & (1 << 1)) {
+				ser_print(" [2] SOCIALITE\r\n");
+				ser_print("     Hang out with a lot of QC badges outside of events.\r\n\r\n");
+				delay(1500);
+			}
+
+			if (~disk_conf.scores[1] & (1 << 3)) {
+				ser_print(" [3] THURSDAY PRE-PARTY\r\n\r\n");
+				delay(1500);
+			}
+
+			if (~disk_conf.scores[1] & (1 << 6)) {
+				ser_print(" [2] FRIDAY MIXER\r\n\r\n");
+				delay(1500);
+			}
+
+			if (~disk_conf.scores[1] & (1 << 8)) {
+				ser_print(" [2] POOL PARTY\r\n\r\n");
+				delay(1500);
+			}
+
+			if (~disk_conf.scores[1] & (1 << 10)) {
+				ser_print(" [1] SATURDAY MIXER\r\n\r\n");
+				delay(1500);
+			}
+
+			if (~disk_conf.scores[1] & (1 << 11)) {
+				ser_print(" [5] SUPER SECRET SQUIRREL\r\n");
+				ser_print("     Sunday night after-party\r\n\r\n");
+				delay(1500);
+			}
+
+			if (~disk_conf.scores[2] & 1) {
+				ser_print(" [1] SUNDAY MIXER\r\n\r\n");
+				delay(1500);
+			}
+
+			if (~disk_conf.scores[2] & (1 << 1)) {
+				ser_print(" [1] I'M ON A BUS\r\n");
+				ser_print("     Ride the bus.\r\n\r\n");
+				delay(1500);
+			}
+
+			if (~disk_conf.scores[2] & (1 << 2)) {
+				ser_print(" [1] SLEEP YOUR WAY TO THE TOP\r\n");
+				ser_print("     Be near a QC uber badge at 5 AM.\r\n\r\n");
+				delay(1500);
+			}
+
+			if (~disk_conf.scores[2] & (1 << 1)) {
+				ser_print(" [2] FASHIONABLY EARLY\r\n");
+				ser_print("     Arrive at a QC event before it starts.\r\n\r\n");
+				delay(1500);
+			}
+
+			if (~disk_conf.scores[3] & (1 << 6)) {
+				ser_print(" [3] CLEANING CREW.\r\n");
+				ser_print("     Stay to the end of a QC event.\r\n\r\n");
+				delay(1500);
+			}
+
+			if (~disk_conf.scores[2] & (1 << 5)) {
+				ser_print(" [1] TRICK COLLECTOR\r\n");
+				ser_print("     Learn at least 4 stick figure tricks.\r\n\r\n");
+				delay(1500);
+			}
+
+			if (~disk_conf.scores[2] & (1 << 6)) {
+				ser_print(" [2] TRICK EXPERT\r\n");
+				ser_print("     Learn at least 10 stick figure tricks.\r\n\r\n");
+				delay(1500);
+			}
+
+			if (~disk_conf.scores[2] & (1 << 8)) {
+				ser_print(" [3] TRICK MASTER\r\n");
+				ser_print("     Learn all the available stick figure tricks.\r\n\r\n");
+				delay(1500);
+			}
+
+			if (~disk_conf.scores[3] & (1)) {
+				ser_print(" [1] WHAT TIME IS IT?\r\n");
+				ser_print("     Get your badge's clock set for the first time.\r\n\r\n");
+				delay(1500);
+			}
+
+			if (~disk_conf.scores[3] & (1 << 1)) {
+				ser_print(" [1] OBEY. (1/3)\r\n");
+				ser_print("     Leave your batteries in overnight on Thursday.\r\n\r\n");
+				delay(1500);
+			}
+
+			if (~disk_conf.scores[3] & (1 << 2)) {
+				ser_print(" [1] OBEY. (2/3)\r\n");
+				ser_print("     Leave your batteries in overnight on Friday.\r\n\r\n");
+				delay(1500);
+			}
+
+			if (~disk_conf.scores[3] & (1 << 3)) {
+				ser_print(" [1] OBEY. (3/3)\r\n");
+				ser_print("     Leave your batteries in overnight on Saturday.\r\n\r\n");
+				delay(1500);
+			}
+
+			if (~disk_conf.scores[3] & (1 << 4)) {
+				ser_print(" [2] FLOPPY DISK.\r\n");
+				ser_print("     Put your badge in the box.\r\n\r\n");
+				delay(1500);
+			}
+
+			ser_print("That makes your score ");
+
+			pair_count_str[0] = disk_score/10 + '0';
+			pair_count_str[1] = (disk_score % 10) + '0';
+			pair_count_str[2] = 0;
+
+			ser_print(pair_count_str);
+			ser_print(".\r\n\r\n");
+
+			delay(500);
+			ser_print("See you next year!\r\n\r\n");
+			delay(500);
+			ser_print("                                     qcxi.");
+			delay(3000);
 
 		}
 
