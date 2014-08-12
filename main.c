@@ -864,13 +864,13 @@ int main( void )
 			ser_print("\r\n\r\n\r\n\r\nHere are your scoring achievements:\r\n\r\n");
 			delay(500);
 
-			ser_print(" [");
+			ser_print("[");
 			pair_count_str[0] = '0'+uber_count/10;
 			pair_count_str[1] = '0'+uber_count % 10;
 			pair_count_str[2] = 0;
 			ser_print(pair_count_str);
-			ser_print(    "] UBER PAIRER.\r\n");
-			ser_print("      One point for pairing with each QC uber badge holder\r\n\r\n");
+			ser_print(   "] UBER PAIRER.\r\n");
+			ser_print("     One point for pairing with each QC uber badge holder\r\n\r\n");
 			delay(1500);
 
 			if (~disk_conf.scores[0] & (1 << 12)) {
