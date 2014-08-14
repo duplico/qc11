@@ -1,3 +1,12 @@
+"""
+sprite_to_c.py
+
+Script to translate Jonathan's sprites into C literals.
+
+(c) 2014 George Louthan
+3-clause BSD license; see license.md.
+
+"""
 import os
 import json
 import re

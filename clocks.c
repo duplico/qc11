@@ -1,8 +1,8 @@
 /*
  * clocks.c
  *
- *  Created on: Jun 12, 2014
- *      Author: George
+ * (c) 2014 George Louthan
+ * 3-clause BSD license; see license.md.
  */
 
 #include "qcxi.h"

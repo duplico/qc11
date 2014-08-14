@@ -1,8 +1,8 @@
 /*
  * qcxi.h
  *
- *  Created on: May 26, 2014
- *      Author: George
+ * (c) 2014 George Louthan
+ * 3-clause BSD license; see license.md.
  */
 
 #ifndef QCXI_H_

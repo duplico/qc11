@@ -1,14 +1,16 @@
+/*
+ * ws2812.c: Source for controlling the WS2812 "Neopixel" LED modules
+ *           and communicating over serial to the base stations.
+ * Original source: (c) RoXXoR @ github <https://github.com/RoXXoR/ws2812>
+ *
+ * Modifications and serial communication code (c) 2014 George Louthan
+ *
+ * In both cases, released under the 3-clause BSD License; see license.md.
+ *
+ */
 #include "qcxi.h"
 
 #if !BADGE_TARGET
-/*
- * Software functions for MSP430 to drive WS2812/B RGB LEDs via one-wire bus
- *
- * The SPI peripheral will be used in cooperation with one of two transport stream encodings schemes.
- * One 3-bit and one 4-bit encoding was implemented.
- *
- */
-
 #include "ws2812.h"
 #include <string.h>
 
@@ -94,7 +96,7 @@ void ws_set_colors_async(ledcount_t ledCount) {
 // copy bytes from the buffer to SPI transmit register
 // should be reworked to use DMA
 void ws_set_colors_blocking(uint8_t* buffer, ledcount_t ledCount) {
-	__bic_SR_register(GIE); // TODO: need to make this interrupt based:
+	__bic_SR_register(GIE);
 	for (ws_byte_index=0; ws_byte_index < (ENCODING * sizeof(ledcolor_t) * ledCount); ws_byte_index++) {
 		while (!(UCB0IFG & UCTXIFG));		// wait for TX buffer to be ready
 		USCI_B_SPI_transmitData(USCI_B0_BASE,buffer[ws_byte_index]);
@@ -298,14 +300,6 @@ __interrupt void ser_debug_isr(void)
 #pragma vector=USCI_B0_VECTOR
 __interrupt void ws_isr(void)
 {
-	/*
-	 * NOTE: The RX interrupt has priority over TX interrupt. As a result,
-	 * although normally after transmitting over IR we'll see the TX interrupt
-	 * first, then the corresponding RX interrupt (because the transceiver
-	 * echoes TX to RX), when stepping through in debug mode it will often
-	 * be the case the the order is reversed: RXI, followed by the corresponding
-	 * TX interrupt.
-	 */
 	switch(__even_in_range(UCB0IV,4))
 	{
 	case 0:	// 0: No interrupt.
