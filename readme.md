@@ -17,14 +17,14 @@ BSD 3-clause license and (c) George Louthan except where noted:
 
 * WS2812 driver:
 
-** (c) RoXXoR @ github <https://github.com/RoXXoR/ws2812>
+    * (c) RoXXoR @ github <https://github.com/RoXXoR/ws2812>
 
-** Modifications (c) George Louthan
+    * Modifications (c) George Louthan
 
 * fonts.c:
 
-** Code is (c) George Louthan
+    * Code is (c) George Louthan
 
-** Font bitmaps may be considered derived from sources that prohibit commercial use.
+    * Font bitmaps may be considered derived from sources that prohibit commercial use.
 
-*** (or maybe not. IANAL.)
+        * (or maybe not. IANAL.)
