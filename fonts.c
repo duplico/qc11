@@ -1,8 +1,14 @@
 /*
  * fonts.c
  *
- *  Created on: Jun 9, 2014
- *      Author: George
+ * Font bitmaps may be based on sources that are free for non-commercial use
+ *  only.
+ *
+ * Some code generated using The Dot Factory
+ * 	<http://www.eran.io/the-dot-factory-an-lcd-font-and-image-generator/>
+ *
+ * Otherwise (c) 2014 George Louthan and released under 3-clause BSD license;
+ *  see license.md.
  */
 
 #include "qcxi.h"
@@ -573,7 +579,7 @@ uint8_t font_bits[] =
 };
 
 
-/* Character descriptors for D3 Littlebitmapism Suquare 5pt */
+/* Character descriptors for D3 5pt */
 /* { [Char width in bits], [Offset into d3_5ptCharBitmaps in bytes] } */
 FONT_CHAR_INFO d3_5ptDescriptors[] =
 {

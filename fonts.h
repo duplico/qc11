@@ -1,8 +1,11 @@
 /*
  * fonts.h
  *
- *  Created on: Jun 9, 2014
- *      Author: George
+ * Some code generated using The Dot Factory
+ * 	<http://www.eran.io/the-dot-factory-an-lcd-font-and-image-generator/>
+ *
+ * (c) 2014 George Louthan and released under 3-clause BSD license;
+ *  see license.md.
  */
 
 #ifndef FONTS_H_

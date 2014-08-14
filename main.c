@@ -1,4 +1,11 @@
-//#pragma FUNC_ALWAYS_INLINE (UCS_clearAllOscFlagsWithTimeout);
+/*
+ * Queercon XI Badge main code
+ *
+ * main.c
+ *
+ * (c) 2014 George Louthan
+ * 3-clause BSD license; see license.md.
+ */
 
 #include "qcxi.h"
 #include <string.h>

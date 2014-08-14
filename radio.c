@@ -1,8 +1,8 @@
 /*
  * radio.c
  *
- *  Created on: May 26, 2014
- *      Author: George
+ * (c) 2014 George Louthan
+ * 3-clause BSD license; see license.md.
  */
 
 #include "radio.h"
@@ -168,26 +168,6 @@ void init_radio() {
 	write_single_register(0x3A, RFM_BROADCAST); // BroadcastAddress
 
 	write_single_register(0x3c, 0x8f); // TxStartCondition - FifoNotEmpty
-
-	// Bandwidth settings we're currently mucking around with:
-	// Bandwidth (see pg 26, 3.4.6):
-	// BW > 1/2 BR
-	// Our BW needs to be >= 1/2 of bitrate
-//	write_single_register(0x19, 0b01001011);
-	// Beta = 2 * FDEV / BR
-	// Set Fdev, so 2xFDEV/BR \in [0.5,10]
-//	write_single_register(0x06, 0x52); // FDEV = 61*this value.
-	// Bitrate:
-//	write_single_register(0x03, 0x06);
-//	write_single_register(0x04, 0x83);
-	// Auto frequency correction settings:
-//	write_single_register(0x0b, 0b00100000); // Special AFC for low-beta
-//	write_single_register(0x71, 1); // Low-beta AFC offset / 488 Hz
-//	write_single_register(0x6f, 0x20); // Fading margin improvement // 0x20 for low beta, 0x30 for high beta
-//	write_single_register(0x1a, 0b10000101); // AFC bandwidth
-//	write_single_register(0x1e, 0b00001100); // Restart every time we hit RX mode
-	// Preamble LSB:
-//	write_single_register(0x2d, 0x10); // 16 preamble bytes
 
 	for (uint8_t sync_addr=0x2f; sync_addr<=0x36; sync_addr++) {
 		write_single_register(sync_addr, "QCXI"[sync_addr%4]);
@@ -489,7 +469,7 @@ __interrupt void radio_interrupt_0(void) {
 	} else { // rx
 		radio_recv_start();
 	}
-//	GPIO_clearInterruptFlag(GPIO_PORT_P2, GPIO_PIN0); // TODO?
+//	GPIO_clearInterruptFlag(GPIO_PORT_P2, GPIO_PIN0);
 	__bic_SR_register_on_exit(LPM3_bits);
 	P2IFG &= ~GPIO_PIN0; // Is this needed?
 }
