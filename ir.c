@@ -1,8 +1,7 @@
 /*
  * ir.c
- *
- *  Created on: Jun 28, 2014
- *      Author: George
+ * (c) 2014 George Louthan
+ * 3-clause BSD license; see license.md.
  */
 
 #include "ir.h"
@@ -219,9 +218,6 @@ void ir_proto_setup(uint8_t to_addr, uint8_t opcode, uint8_t seqnum) {
 	ir_tx_frame[5] = opcode;
 	ir_tx_frame[6] = seqnum;
 
-	if (len>2) {
-	}
-
 	CRC_setSeed(CRC_BASE, 0xBEEF);
 	CRC_set8BitData(CRC_BASE, my_conf.badge_id);
 	CRC_set8BitData(CRC_BASE, len);
@@ -257,7 +253,6 @@ uint8_t ir_partner = 0;
 uint8_t ir_proto_seqnum = 0;
 
 inline uint8_t ir_paired() {
-//	return (ir_proto_state & 0b1111) == 4;
 	return ir_proto_state == IR_PROTO_PAIRED;
 }
 
