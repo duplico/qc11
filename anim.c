@@ -1,8 +1,10 @@
 /*
  * anim.c
  *
- *  Created on: Jul 21, 2014
- *      Author: glouthan
+ * (c) 2014 George Louthan and Jonathan Nelson
+ *
+ * 3-clause BSD license; see license.md
+ *
  */
 #include "qcxi.h"
 #include "anim.h"

@@ -1,8 +1,7 @@
 /*
  * ir.h
- *
- *  Created on: Jun 28, 2014
- *      Author: George
+ * (c) 2014 George Louthan
+ * 3-clause BSD license; see license.md.
  */
 
 #ifndef IR_H_

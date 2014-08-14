@@ -1,3 +1,8 @@
+/*
+ * (c) 2014 George Louthan
+ * 3-clause BSD license; see license.md.
+ *
+ */
 #include <stdint.h>
 
 #define NUMBEROFLEDS	1
